@@ -1,9 +1,5 @@
 .vscode/*
 !.vscode/c_cpp_properties.json
 dump
-external
-**/inputs
-**/outputs
-build
-build*
+
 dist

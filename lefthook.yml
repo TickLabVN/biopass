@@ -1,0 +1,8 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: Biome check
+      root: app/
+      glob: "*.{js,ts,jsx,tsx,json}"
+      run: bun run lint {staged_files}
+

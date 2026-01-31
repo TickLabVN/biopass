@@ -12,13 +12,28 @@ endif()
 set(CMAKE_CXX_STANDARD          17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 
+# Avoid RPATH warnings about shadowed libraries in non-system directories (like libtorch)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+set(CMAKE_SKIP_BUILD_RPATH FALSE)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} ${OpenCV_CFLAGS_OTHER}")
 
 # Find dependencies
-SET(Torch_DIR external/libtorch/share/cmake/Torch)
+set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/libtorch")
+SET(Torch_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/libtorch/share/cmake/Torch)
 
-find_package(Torch REQUIRED)
+# Hack to silence shadowing warnings by telling CMake this is an "implicit" directory
+list(APPEND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/external/libtorch/lib")
+
+find_package(Torch REQUIRED NO_DEFAULT_PATH)
+
+# Ensure we use full paths to libraries to avoid shadowing warnings
+cmake_policy(SET CMP0060 NEW)
+
 find_package(OpenCV REQUIRED)
+
+
 find_package(CLI11 CONFIG REQUIRED)
 
 add_subdirectory(config)

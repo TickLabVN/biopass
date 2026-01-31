@@ -33,11 +33,14 @@ cmake_policy(SET CMP0060 NEW)
 
 find_package(OpenCV REQUIRED)
 
-
-find_package(CLI11 CONFIG REQUIRED)
+# yaml-cpp for config parsing
+find_package(yaml-cpp REQUIRED)
 
 add_subdirectory(config)
+add_subdirectory(core)
 add_subdirectory(face)
+add_subdirectory(voice)
+add_subdirectory(fingerprint)
 add_subdirectory(pam)
 
 set(FaceDetection_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/face/detection)
@@ -45,13 +48,11 @@ set(FaceRecognition_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/face/recognition)
 set(FaceAntiSpoof_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/face/antispoofing)
 set(FaceConfig_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/config)
 
-add_subdirectory(cli)
-
 add_subdirectory(test/face_engine)
 add_subdirectory(test/pam)
 
 install(
-    TARGETS ${PROJECT_NAME} facepass_cfg facepass_det facepass_reg facepass_as
+    TARGETS facepass_cfg facepass_det facepass_reg facepass_as
     COMPONENT applications
     RUNTIME DESTINATION "/usr/bin"
     LIBRARY DESTINATION "/usr/lib"
@@ -78,7 +79,7 @@ SET(CPACK_PACKAGE_NAME ${PROJECT_NAME})
 SET(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 SET(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
 SET(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Facepass is a face recognition authentication system.")
-SET(CPACK_DEBIAN_PACKAGE_DEPENDS "libpam0g-dev, libcli11-dev, libopencv-dev")
+SET(CPACK_DEBIAN_PACKAGE_DEPENDS "libpam0g-dev, libopencv-dev, libyaml-cpp-dev")
 SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Nguyen Phuc Vinh & Tran Trung Thai") #required
 # SET(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_SOURCE_DIR}/scripts/postinst")
 

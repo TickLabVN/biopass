@@ -2,23 +2,7 @@
     "configurations": [
         {
             "name": "Linux",
-            "includePath": [
-                "${workspaceFolder}/**",
-                "/usr/include/opencv4",
-                "/usr/include/gtk-4.0",
-                "/usr/include/glib-2.0",
-                "/usr/lib/x86_64-linux-gnu/glib-2.0/include",
-                "/usr/include/cairo",
-                "/usr/include/pango-1.0",
-                "/usr/include/harfbuzz",
-                "/usr/include/gdk-pixbuf-2.0",
-                "/usr/include/graphene-1.0",
-                "/usr/lib/x86_64-linux-gnu/graphene-1.0/include"
-            ],
-            "defines": [],
-            "compilerPath": "/usr/bin/g++",
-            "cStandard": "c17",
-            "cppStandard": "gnu++17",
+            "compileCommands": "${workspaceFolder}/auth/build/compile_commands.json",
             "intelliSenseMode": "linux-gcc-x64"
         }
     ],

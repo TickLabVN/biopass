@@ -172,7 +172,7 @@ pub fn load_config(app: AppHandle) -> Result<FacepassConfig, String> {
     let content = fs::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config file: {}", e))?;
 
-    serde_yaml::from_str(&content)
+    serde_yml::from_str(&content)
         .map_err(|e| format!("Failed to parse config file: {}", e))
 }
 
@@ -181,7 +181,7 @@ pub fn save_config(app: AppHandle, config: FacepassConfig) -> Result<(), String>
     let config_dir = get_config_dir(&app)?;
     let config_path = get_config_path(&app)?;
     
-    let yaml_content = serde_yaml::to_string(&config)
+    let yaml_content = serde_yml::to_string(&config)
         .map_err(|e| format!("Failed to serialize config: {}", e))?;
 
     // Create directory if needed
@@ -244,7 +244,7 @@ pub fn save_voice_recording(app: AppHandle, audio_data: String) -> Result<String
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| format!("Failed to get timestamp: {}", e))?
         .as_millis();
-    let filename = format!("voice_{}.webm", timestamp);
+    let filename = format!("voice_{}.wav", timestamp);
     let file_path = voices_dir.join(&filename);
 
     // Create directory if needed

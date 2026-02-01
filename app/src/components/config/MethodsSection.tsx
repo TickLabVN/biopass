@@ -13,6 +13,8 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import type {
@@ -398,7 +400,7 @@ function FaceCaptureSection() {
                     onClick={() => deleteFace(path)}
                     className="absolute top-1 right-1 p-1 rounded bg-destructive/80 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-3 h-3 text-white" />
                   </button>
                 </div>
               ))}
@@ -723,16 +725,16 @@ function InputField({
 }) {
   const id = `input-${label.toLowerCase().replace(/\s+/g, "-")}`;
   return (
-    <div className="grid gap-1">
-      <label htmlFor={id} className="text-xs font-medium text-muted-foreground">
+    <div className="grid gap-1.5">
+      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
         {label}
-      </label>
-      <input
+      </Label>
+      <Input
         id={id}
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+        className="h-9"
       />
     </div>
   );

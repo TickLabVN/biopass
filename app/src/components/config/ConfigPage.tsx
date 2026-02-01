@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { RotateCcw, Save, User } from "lucide-react";
+import { RotateCcw, Save } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,34 +12,23 @@ export function ConfigPage() {
   const [config, setConfig] = useState<FacepassConfig>(defaultConfig);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [username, setUsername] = useState("");
 
-  const initUser = useCallback(async () => {
+  const initConfig = useCallback(async () => {
     try {
-      const currentUser = await invoke<string>("get_current_username");
-      setUsername(currentUser);
-
-      // Load config
-      try {
-        setLoading(true);
-        const loadedConfig = await invoke<FacepassConfig>("load_config");
-        setConfig(loadedConfig);
-      } catch (err) {
-        console.error("Failed to load config:", err);
-        toast.error(`Failed to load config: ${err}`);
-      } finally {
-        setLoading(false);
-      }
+      setLoading(true);
+      const loadedConfig = await invoke<FacepassConfig>("load_config");
+      setConfig(loadedConfig);
     } catch (err) {
-      console.error("Failed to get username:", err);
-      toast.error(`Failed to get username: ${err}`);
+      console.error("Failed to load config:", err);
+      toast.error(`Failed to load config: ${err}`);
+    } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    initUser();
-  }, [initUser]);
+    initConfig();
+  }, [initConfig]);
 
   async function saveConfig() {
     try {
@@ -74,9 +63,8 @@ export function ConfigPage() {
           <h1 className="text-3xl font-bold bg-linear-to-r from-primary to-purple-500 bg-clip-text text-transparent">
             Facepass Configuration
           </h1>
-          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-            <User className="w-3 h-3" />
-            <span className="font-medium">{username}</span>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage your authentication methods and execution strategies
           </p>
         </div>
         <div className="flex gap-2">

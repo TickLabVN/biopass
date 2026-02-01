@@ -16,6 +16,15 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Zap } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { StrategyConfig } from "@/types/config";
 
 interface Props {
@@ -51,33 +60,39 @@ export function StrategySection({ strategy, onChange }: Props) {
         Strategy Settings
       </h2>
 
-      <div className="grid gap-4">
+      <div className="grid gap-6">
         {/* Execution Mode */}
-        <div className="grid gap-2">
-          <span className="text-sm font-medium text-muted-foreground">
+        <div className="grid gap-2.5">
+          <Label className="text-sm font-medium text-muted-foreground">
             Execution Mode
-          </span>
-          <div className="flex gap-2">
-            {["sequential", "parallel"].map((mode) => (
-              <button
-                type="button"
-                key={mode}
-                onClick={() =>
-                  onChange({
-                    ...strategy,
-                    execution_mode: mode as "sequential" | "parallel",
-                  })
-                }
-                className={`px-4 py-2 rounded-lg border transition-all capitalize cursor-pointer ${
-                  strategy.execution_mode === mode
-                    ? "bg-primary text-primary-foreground border-primary shadow-md"
-                    : "bg-background border-border hover:border-primary/50"
-                }`}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
+          </Label>
+          <Select
+            value={strategy.execution_mode}
+            onValueChange={(value) =>
+              onChange({
+                ...strategy,
+                execution_mode: value as "sequential" | "parallel",
+              })
+            }
+          >
+            <SelectTrigger className="w-full h-10 transition-all">
+              <SelectValue placeholder="Select execution mode" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sequential" className="cursor-pointer">
+                Sequential
+                <span className="text-[10px] block opacity-60">
+                  Try one by one
+                </span>
+              </SelectItem>
+              <SelectItem value="parallel" className="cursor-pointer">
+                Parallel
+                <span className="text-[10px] block opacity-60">
+                  Run all at once
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
           <p className="text-xs text-muted-foreground">
             {strategy.execution_mode === "sequential"
               ? "Methods are tried in order until one succeeds"
@@ -85,42 +100,48 @@ export function StrategySection({ strategy, onChange }: Props) {
           </p>
         </div>
 
-        {/* Method Order */}
-        <div className="grid gap-2">
-          <span className="text-sm font-medium text-muted-foreground">
-            Method Priority Order
-            <span className="text-xs text-muted-foreground/70 ml-2">
-              (drag to reorder)
-            </span>
-          </span>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={strategy.order}
-              strategy={verticalListSortingStrategy}
+        {/* Method Order - Only show in sequential mode */}
+        {strategy.execution_mode === "sequential" && (
+          <div className="grid gap-2.5">
+            <Label className="text-sm font-medium text-muted-foreground">
+              Method Priority Order
+              <span className="text-xs text-muted-foreground/70 ml-2">
+                (drag to reorder)
+              </span>
+            </Label>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
             >
-              <div className="flex flex-col gap-2">
-                {strategy.order.map((method, index) => (
-                  <SortableMethodItem key={method} id={method} index={index} />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </div>
+              <SortableContext
+                items={strategy.order}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="flex flex-col gap-2">
+                  {strategy.order.map((method, index) => (
+                    <SortableMethodItem
+                      key={method}
+                      id={method}
+                      index={index}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+        )}
 
         {/* Retries and Delay */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-6 mt-2">
           <div className="grid gap-2">
-            <label
+            <Label
               htmlFor="max-retries"
               className="text-sm font-medium text-muted-foreground"
             >
               Max Retries
-            </label>
-            <input
+            </Label>
+            <Input
               id="max-retries"
               type="number"
               min="0"
@@ -132,17 +153,17 @@ export function StrategySection({ strategy, onChange }: Props) {
                   retries: parseInt(e.target.value, 10) || 0,
                 })
               }
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="h-10"
             />
           </div>
           <div className="grid gap-2">
-            <label
+            <Label
               htmlFor="retry-delay"
               className="text-sm font-medium text-muted-foreground"
             >
               Retry Delay (ms)
-            </label>
-            <input
+            </Label>
+            <Input
               id="retry-delay"
               type="number"
               min="0"
@@ -155,7 +176,7 @@ export function StrategySection({ strategy, onChange }: Props) {
                   retry_delay: parseInt(e.target.value, 10) || 0,
                 })
               }
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="h-10"
             />
           </div>
         </div>

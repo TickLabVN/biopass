@@ -1,4 +1,12 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+mod config;
+
+use config::{
+    load_config, save_config, get_config_path_str, get_current_username,
+    save_face_image, save_voice_recording, list_face_images, list_voice_recordings,
+    delete_face_image, delete_voice_recording
+};
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -26,7 +34,21 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            load_config,
+            save_config,
+            get_config_path_str,
+            get_current_username,
+            save_face_image,
+            save_voice_recording,
+            list_face_images,
+            list_voice_recordings,
+            delete_face_image,
+            delete_voice_recording
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+

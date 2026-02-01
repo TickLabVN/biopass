@@ -7,6 +7,17 @@
     "core:default",
     "opener:default",
     "fs:allow-download-write",
-    "core:path:default"
+    "core:path:default",
+    {
+      "identifier": "fs:allow-read",
+      "allow": [
+        {
+          "path": "$HOME/.local/share/facepass/**"
+        },
+        {
+          "path": "$DATA/facepass/**"
+        }
+      ]
+    }
   ]
 }

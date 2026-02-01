@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Cpu, Laptop, Moon, Settings, Sun, User } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ConfigPage } from "@/components/config";
 import { ModelsPage } from "@/components/models";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,8 @@ function App() {
     };
   }, [theme]);
 
+  const initialized = useRef(false);
+
   useEffect(() => {
     const loadUsername = async () => {
       try {
@@ -61,6 +63,9 @@ function App() {
     };
 
     const loadInitialTheme = async () => {
+      if (initialized.current) return;
+      initialized.current = true;
+
       try {
         const config = await invoke<FacepassConfig>("load_config");
         if (config.appearance) {

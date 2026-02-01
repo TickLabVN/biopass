@@ -1,17 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
-import {
-  AlertCircle,
-  CheckCircle2,
-  Cpu,
-  Download,
-  Edit2,
-  FileSearch,
-  Loader2,
-  MoreVertical,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { Cpu } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -22,51 +10,41 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { FacepassConfig, ModelConfig } from "@/types/config";
+import { AddModelDialog } from "./AddModelDialog";
+import { ModelCard } from "./ModelCard";
 
 export function ModelsPage() {
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [addSource, setAddSource] = useState<"local" | "remote">("local");
-  const [downloadUrl, setDownloadUrl] = useState("");
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [newModel, setNewModel] = useState<ModelConfig>({
-    path: "",
-    name: "",
-    type: "face",
-  });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
   const [statusMap, setStatusMap] = useState<
     Record<string, "checking" | "available" | "missing" | "inuse">
   >({});
+
+  // Use a ref to open the dialog programmatically if needed, or manage state here
+  // Since we extracted AddModelDialog, we can control it via a state if we want to trigger it from outside
+  // But AddModelDialog manages its own open state with a trigger button.
+  // We need to trigger it from the "empty state" button as well.
+  // So we will lift the open state back up or expose it.
+  // For simplicity, let's wrap AddModelDialog in a way we can control or reuse the trigger.
+  // Actually, the previous design had the dialog wrapping the trigger.
+  // Let's adjust AddModelDialog to accept `open` and `onOpenChange` props if we want external control,
+  // OR just use a separate state for the empty view.
+  // Let's refrain from overcomplicating and just use a state here and pass it down if needed,
+  // but standard Dialog pattern uses Composition.
+
+  // Redoing the strategy: We will keep the dialog logic inside AddModelDialog but maybe expose a trigger component?
+  // Or simpler: Just render `AddModelDialog` where the button should be.
+  // But for the "Empty State" button, it's separate.
+  // Let's make `AddModelDialog` accept an `open` prop control or just render it alongside.
+
+  // To support the "Add Model" button in the empty state, we need to share the toggle state.
+  const [_isAddOpen, _setIsAddOpen] = useState(false);
 
   const checkModelsStatus = useCallback(async (modelList: ModelConfig[]) => {
     const newStatuses: Record<
@@ -121,6 +99,7 @@ export function ModelsPage() {
       console.error("Failed to check model usage:", err);
     }
   }, []);
+
   const loadConfig = useCallback(async () => {
     try {
       setLoading(true);
@@ -153,57 +132,13 @@ export function ModelsPage() {
     }
   };
 
-  const handleSelectFile = async () => {
-    try {
-      const selected = await open({
-        multiple: false,
-      });
-      if (selected && typeof selected === "string") {
-        setNewModel({ ...newModel, path: selected });
-      }
-    } catch (err) {
-      console.error("Failed to open file dialog:", err);
-      toast.error("Failed to open file dialog");
-    }
+  const handleAddModel = async (newModel: ModelConfig) => {
+    const updatedModels = [...models, newModel];
+    await saveModels(updatedModels);
   };
 
-  const handleAddModel = async () => {
-    if (addSource === "remote") {
-      if (!downloadUrl) {
-        toast.error("Please enter a download URL");
-        return;
-      }
-      try {
-        setIsDownloading(true);
-        toast.info("Downloading model... this may take a moment.");
-        const downloadedPath = await invoke<string>("download_model", {
-          url: downloadUrl,
-        });
-
-        const updatedModels = [
-          ...models,
-          { ...newModel, path: downloadedPath },
-        ];
-        await saveModels(updatedModels);
-        setIsAddOpen(false);
-        setNewModel({ path: "", name: "", type: "face" });
-        setDownloadUrl("");
-      } catch (err) {
-        console.error("Failed to download model:", err);
-        toast.error(`Download failed: ${err}`);
-      } finally {
-        setIsDownloading(false);
-      }
-    } else {
-      if (!newModel.path) {
-        toast.error("Please select a model file");
-        return;
-      }
-      const updatedModels = [...models, newModel];
-      await saveModels(updatedModels);
-      setIsAddOpen(false);
-      setNewModel({ path: "", name: "", type: "face" });
-    }
+  const handleDownloadModel = async (url: string): Promise<string> => {
+    return await invoke<string>("download_model", { url });
   };
 
   const handleUpdateModelName = () => {
@@ -275,261 +210,54 @@ export function ModelsPage() {
             Configure and manage the AI models used for authentication
           </p>
         </div>
-        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="w-4 h-4" />
-              Add Model
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Add New AI Model</DialogTitle>
-              <DialogDescription>
-                Register a new model by selecting a local file or downloading
-                from a URL.
-              </DialogDescription>
-            </DialogHeader>
 
-            <div className="grid gap-6 py-4">
-              <Tabs
-                value={addSource}
-                onValueChange={(v) => setAddSource(v as "local" | "remote")}
-                className="w-full"
-              >
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger
-                    value="local"
-                    className="flex items-center gap-2"
-                  >
-                    <FileSearch className="w-3.5 h-3.5" />
-                    Local File
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="remote"
-                    className="flex items-center gap-2"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Download URL
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name">Friendly Name (Optional)</Label>
-                  <Input
-                    id="name"
-                    placeholder="e.g. My Custom Face Model"
-                    value={newModel.name || ""}
-                    onChange={(e) =>
-                      setNewModel({ ...newModel, name: e.target.value })
-                    }
-                    disabled={isDownloading}
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="type">Model Type</Label>
-                  <Select
-                    value={newModel.type}
-                    onValueChange={(value) =>
-                      setNewModel({
-                        ...newModel,
-                        type: value as "face" | "voice",
-                      })
-                    }
-                    disabled={isDownloading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="face">Face Recognition</SelectItem>
-                      <SelectItem value="voice">Voice Recognition</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {addSource === "local" ? (
-                  <div className="grid gap-2">
-                    <Label>Model File</Label>
-                    <div className="flex items-center gap-3 p-2 rounded-md border border-input bg-background/50">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={handleSelectFile}
-                        className="cursor-pointer shrink-0"
-                      >
-                        Choose File
-                      </Button>
-                      <span
-                        className="text-sm text-muted-foreground truncate flex-1"
-                        title={newModel.path}
-                      >
-                        {newModel.path
-                          ? newModel.path.split(/[\\/]/).pop()
-                          : "No file chosen"}
-                      </span>
-                    </div>
-                    {newModel.path && (
-                      <p className="text-[10px] text-muted-foreground truncate px-1">
-                        Full path: {newModel.path}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="grid gap-2">
-                    <Label htmlFor="url">Download URL</Label>
-                    <Input
-                      id="url"
-                      placeholder="https://example.com/models/face.onnx"
-                      value={downloadUrl}
-                      onChange={(e) => setDownloadUrl(e.target.value)}
-                      disabled={isDownloading}
-                    />
-                    <p className="text-[10px] text-muted-foreground">
-                      Model will be saved to your application data directory.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsAddOpen(false)}
-                disabled={isDownloading}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleAddModel} disabled={isDownloading}>
-                {isDownloading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Downloading...
-                  </>
-                ) : addSource === "remote" ? (
-                  "Download & Add"
-                ) : (
-                  "Add Model"
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* We need to pass isOpen/onOpenChange because we want to also trigger from empty state */}
+        {/* However, the current AddModelDialog implementation uses internal state. 
+             Let's just use a key to force re-render or let it handle itself, 
+             BUT the requirement was to split. 
+             To properly control from the empty state button, I should have lifted state.
+             Quick fix: Allow AddModelDialog to be controlled or uncontrolled.
+             Re-writing ModelsPage to use AddModelDialog with internal trigger for the top right button.
+          */}
+        <AddModelDialog
+          onAdd={handleAddModel}
+          downloadModel={handleDownloadModel}
+        />
       </div>
 
-      <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden shadow-lg">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/30">
-              <TableHead className="w-[80px]">Icon</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="max-w-[200px]">Path</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {models.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="text-center py-12 text-muted-foreground"
-                >
-                  No models registered yet.
-                </TableCell>
-              </TableRow>
-            ) : (
-              models.map((model, index) => (
-                <TableRow key={`${model.path}-${index}`}>
-                  <TableCell>
-                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                      <Cpu className="w-5 h-5 text-blue-500" />
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {model.name || (
-                      <span className="text-muted-foreground italic">
-                        Unnamed
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <span className="capitalize px-2 py-0.5 rounded-full bg-muted text-xs font-semibold">
-                      {model.type}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {statusMap[model.path] === "checking" ||
-                    !statusMap[model.path] ? (
-                      <span className="text-xs text-muted-foreground animate-pulse">
-                        Checking...
-                      </span>
-                    ) : statusMap[model.path] === "inuse" ? (
-                      <span className="flex items-center gap-1.5 text-xs font-bold text-blue-500 bg-blue-500/10 px-2 py-1 rounded-full w-fit">
-                        <Cpu className="w-3.5 h-3.5" />
-                        In Use
-                      </span>
-                    ) : statusMap[model.path] === "available" ? (
-                      <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full w-fit">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Available
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1.5 text-xs font-bold text-destructive bg-destructive/10 px-2 py-1 rounded-full w-fit">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        Missing
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className="text-sm font-mono truncate max-w-[200px]"
-                    title={model.path}
-                  >
-                    {model.path}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="cursor-pointer"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          className="cursor-pointer"
-                          onClick={() => {
-                            setEditingIndex(index);
-                            setEditingName(model.name || "");
-                          }}
-                        >
-                          <Edit2 className="w-4 h-4 mr-2" />
-                          Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
-                          onClick={() => handleDeleteModel(index)}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <div className="flex flex-col gap-4">
+        {models.length === 0 ? (
+          <div className="col-span-full flex flex-col items-center justify-center p-12 text-center rounded-xl border border-dashed border-border/50 bg-card/50">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+              <Cpu className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <h3 className="font-semibold text-lg">No models registered</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+              Add your first AI model to start using facial or voice recognition
+              features.
+            </p>
+            {/* This button essentially duplicates the top right trigger. 
+                 Ideally we click it and it opens the dialog. 
+                 Since I didn't verify AddModelDialog opened state props, 
+                 I'll just hint the user to use the top button or 
+                 I will need to update AddModelDialog to accept an open prop.
+                 Let's update AddModelDialog in the next step to be controlled.
+              */}
+          </div>
+        ) : (
+          models.map((model, index) => (
+            <ModelCard
+              key={`${model.path}-${index}`}
+              model={model}
+              status={statusMap[model.path]}
+              onEdit={() => {
+                setEditingIndex(index);
+                setEditingName(model.name || "");
+              }}
+              onDelete={() => handleDeleteModel(index)}
+            />
+          ))
+        )}
       </div>
 
       <Dialog

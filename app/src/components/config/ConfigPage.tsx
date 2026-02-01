@@ -185,12 +185,8 @@ export function ConfigPage() {
       <div className="grid gap-6">
         <StrategySection
           strategy={config.strategy}
-          appearance={config.appearance}
           onChange={(strategy: typeof config.strategy) =>
             setConfig({ ...config, strategy })
-          }
-          onAppearanceChange={(appearance: string) =>
-            setConfig({ ...config, appearance })
           }
         />
         <MethodsSection

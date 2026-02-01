@@ -1,6 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import {
-  AlertCircle,
   Camera,
   ChevronDown,
   Circle,
@@ -13,6 +12,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -32,6 +32,7 @@ import type {
   ModelConfig,
   VoiceMethodConfig,
 } from "@/types/config";
+import { ModelStatus } from "../models/ModelStatus";
 
 interface Props {
   methods: MethodsConfig;
@@ -737,10 +738,13 @@ function VoiceRecordingSection() {
             </Button>
           )}
           {recording && (
-            <div className="flex items-center gap-2 text-red-500">
-              <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-sm font-medium">Recording...</span>
-            </div>
+            <Badge
+              variant="destructive"
+              className="animate-pulse gap-1.5 h-7 px-3"
+            >
+              <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+              Recording...
+            </Badge>
           )}
         </div>
 
@@ -812,9 +816,21 @@ function MethodCard({
           </span>
           <div>
             <h3 className="font-medium">{title}</h3>
-            <p className="text-xs text-muted-foreground">
-              {enabled ? "Enabled" : "Disabled"}
-            </p>
+            {enabled ? (
+              <Badge
+                variant="default"
+                className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-none px-2 py-0.5 h-auto text-[10px]"
+              >
+                Enabled
+              </Badge>
+            ) : (
+              <Badge
+                variant="secondary"
+                className="px-2 py-0.5 h-auto text-[10px] opacity-70"
+              >
+                Disabled
+              </Badge>
+            )}
           </div>
           <ChevronDown
             className={`ml-auto mr-4 w-4 h-4 transition-transform ${expanded ? "rotate-180" : ""}`}
@@ -908,10 +924,7 @@ function ModelSelectField({
                     selectedModel.path.split(/[\\/]/).pop()}
                 </span>
                 {statusMap[selectedModel.path] === false && (
-                  <div className="flex items-center gap-1 text-[10px] text-destructive font-bold animate-pulse">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    <span>Missing</span>
-                  </div>
+                  <ModelStatus status="missing" size="sm" className="ml-2" />
                 )}
               </div>
             )}
@@ -937,10 +950,11 @@ function ModelSelectField({
                       {model.name || model.path.split(/[\\/]/).pop()}
                     </span>
                     {statusMap[model.path] === false && (
-                      <div className="flex items-center gap-1 text-[9px] text-destructive font-bold uppercase bg-destructive/10 px-1.5 py-0.5 rounded-sm">
-                        <AlertCircle className="w-3 h-3" />
-                        <span>Missing</span>
-                      </div>
+                      <ModelStatus
+                        status="missing"
+                        size="sm"
+                        className="ml-2"
+                      />
                     )}
                   </div>
                   <span className="text-[10px] opacity-60 font-mono truncate max-w-[280px]">

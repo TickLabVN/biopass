@@ -1,4 +1,5 @@
 #include "voice_auth.h"
+
 #include <iostream>
 
 namespace facepass {
@@ -9,13 +10,12 @@ bool VoiceAuth::is_available() const {
   return false;
 }
 
-AuthResult VoiceAuth::authenticate(const std::string &username,
-                                   const AuthConfig &config) {
-  (void)username; // Suppress unused parameter warning
+AuthResult VoiceAuth::authenticate(const std::string &username, const AuthConfig &config) {
+  (void)username;  // Suppress unused parameter warning
   (void)config;
 
   std::cerr << "VoiceAuth: Not implemented yet" << std::endl;
   return AuthResult::Unavailable;
 }
 
-} // namespace facepass
+}  // namespace facepass

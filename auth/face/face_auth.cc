@@ -1,4 +1,5 @@
 #include "face_auth.h"
+
 #include <chrono>
 #include <iostream>
 #include <opencv2/opencv.hpp>
@@ -19,8 +20,7 @@ bool FaceAuth::is_available() const {
   return available;
 }
 
-AuthResult FaceAuth::authenticate(const std::string &username,
-                                  const AuthConfig &config) {
+AuthResult FaceAuth::authenticate(const std::string &username, const AuthConfig &config) {
   cv::VideoCapture camera(0, cv::CAP_V4L2);
   if (!camera.isOpened()) {
     std::cerr << "FaceAuth: Could not open camera" << std::endl;
@@ -30,8 +30,7 @@ AuthResult FaceAuth::authenticate(const std::string &username,
   std::string userFacePath = user_face_path(username);
   cv::Mat preparedFace = cv::imread(userFacePath);
   if (preparedFace.empty()) {
-    std::cerr << "FaceAuth: Face not registered for user " << username
-              << std::endl;
+    std::cerr << "FaceAuth: Face not registered for user " << username << std::endl;
     return AuthResult::Failure;
   }
 
@@ -40,8 +39,7 @@ AuthResult FaceAuth::authenticate(const std::string &username,
   std::unique_ptr<FaceAntiSpoofing> faceAs = nullptr;
 
   if (config.anti_spoof) {
-    faceAs = std::make_unique<FaceAntiSpoofing>(
-        model_path(username, FACE_ANTI_SPOOFING));
+    faceAs = std::make_unique<FaceAntiSpoofing>(model_path(username, FACE_ANTI_SPOOFING));
   }
 
   int retries = config.retries;
@@ -56,8 +54,7 @@ AuthResult FaceAuth::authenticate(const std::string &username,
     std::vector<Detection> detectedImages = faceDetector.inference(loginFace);
     if (detectedImages.empty()) {
       std::cerr << "FaceAuth: No face detected" << std::endl;
-      std::this_thread::sleep_for(
-          std::chrono::milliseconds(config.retry_delay_ms));
+      std::this_thread::sleep_for(std::chrono::milliseconds(config.retry_delay_ms));
       continue;
     }
 
@@ -66,10 +63,8 @@ AuthResult FaceAuth::authenticate(const std::string &username,
     if (config.anti_spoof && faceAs) {
       SpoofResult spoofCheck = faceAs->inference(face);
       if (spoofCheck.spoof) {
-        std::cerr << "FaceAuth: Spoof detected, score: " << spoofCheck.score
-                  << std::endl;
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(config.retry_delay_ms));
+        std::cerr << "FaceAuth: Spoof detected, score: " << spoofCheck.score << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(config.retry_delay_ms));
         continue;
       }
     }
@@ -79,11 +74,10 @@ AuthResult FaceAuth::authenticate(const std::string &username,
       return AuthResult::Success;
     }
 
-    std::this_thread::sleep_for(
-        std::chrono::milliseconds(config.retry_delay_ms));
+    std::this_thread::sleep_for(std::chrono::milliseconds(config.retry_delay_ms));
   }
 
   return AuthResult::Failure;
 }
 
-} // namespace facepass
+}  // namespace facepass

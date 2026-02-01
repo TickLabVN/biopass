@@ -2,8 +2,16 @@
     "configurations": [
         {
             "name": "Linux",
-            "compileCommands": "${workspaceFolder}/auth/build/compile_commands.json",
-            "intelliSenseMode": "linux-gcc-x64"
+            "compileCommands": [
+                "${workspaceFolder}/auth/build/compile_commands.json"
+            ],
+            "intelliSenseMode": "linux-gcc-x64",
+            "includePath": [
+                "${default}",
+                "/usr/include/opencv4",
+                "${workspaceFolder}/auth/external/libtorch/include/torch/csrc/api/include",
+                "${workspaceFolder}/auth/external/libtorch/include"
+            ]
         }
     ],
     "version": 4

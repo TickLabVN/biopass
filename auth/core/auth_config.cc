@@ -1,12 +1,13 @@
 #include "auth_config.h"
-#include <fstream>
-#include <iostream>
+
 #include <pwd.h>
 #include <unistd.h>
 #include <yaml-cpp/yaml.h>
 
-namespace facepass {
+#include <fstream>
+#include <iostream>
 
+namespace facepass {
 std::string get_config_path(const std::string &username) {
   // Get home directory for the user
   struct passwd *pw = getpwnam(username.c_str());
@@ -16,7 +17,7 @@ std::string get_config_path(const std::string &username) {
     if (home) {
       return std::string(home) + "/.config/facepass/config.yaml";
     }
-    return "/etc/facepass/config.yaml"; // System-wide fallback
+    return "/etc/facepass/config.yaml";  // System-wide fallback
   }
   return std::string(pw->pw_dir) + "/.config/facepass/config.yaml";
 }
@@ -25,7 +26,7 @@ ExecutionMode parse_mode(const std::string &mode_str) {
   if (mode_str == "parallel") {
     return ExecutionMode::Parallel;
   }
-  return ExecutionMode::Sequential; // Default
+  return ExecutionMode::Sequential;  // Default
 }
 
 FacePassConfig load_config(const std::string &username) {
@@ -67,16 +68,15 @@ FacePassConfig load_config(const std::string &username) {
     }
 
     std::cout << "FacePass: Loaded config from " << config_path << std::endl;
-
   } catch (const YAML::BadFile &e) {
-    std::cerr << "FacePass: Config file not found at " << config_path
-              << ", using defaults" << std::endl;
+    std::cerr << "FacePass: Config file not found at " << config_path << ", using defaults"
+              << std::endl;
   } catch (const YAML::Exception &e) {
-    std::cerr << "FacePass: Failed to parse config: " << e.what()
-              << ", using defaults" << std::endl;
+    std::cerr << "FacePass: Failed to parse config: " << e.what() << ", using defaults"
+              << std::endl;
   }
 
   return config;
 }
 
-} // namespace facepass
+}  // namespace facepass

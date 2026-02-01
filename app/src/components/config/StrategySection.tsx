@@ -78,18 +78,12 @@ export function StrategySection({ strategy, onChange }: Props) {
             <SelectTrigger className="w-full h-10 transition-all">
               <SelectValue placeholder="Select execution mode" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent position="popper">
               <SelectItem value="sequential" className="cursor-pointer">
                 Sequential
-                <span className="text-[10px] block opacity-60">
-                  Try one by one
-                </span>
               </SelectItem>
               <SelectItem value="parallel" className="cursor-pointer">
                 Parallel
-                <span className="text-[10px] block opacity-60">
-                  Run all at once
-                </span>
               </SelectItem>
             </SelectContent>
           </Select>

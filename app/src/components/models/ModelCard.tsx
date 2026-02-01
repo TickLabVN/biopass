@@ -42,7 +42,7 @@ function ModelFileFolderButton({ path }: { path: string }) {
             onClick={() => handleOpenFileFolder(path)}
             className="text-[10px] font-mono text-muted-foreground opacity-60 truncate max-w-[150px] bg-muted/50 px-1.5 py-0.5 rounded hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all cursor-pointer"
           >
-            {path.split(/[\/]/).pop()}
+            {path.split(/[/]/).pop()}
           </button>
         </TooltipTrigger>
         <TooltipContent
@@ -59,7 +59,7 @@ function ModelFileFolderButton({ path }: { path: string }) {
 
 export function ModelCard({ model, status, onEdit, onDelete }: ModelCardProps) {
   return (
-    <div className="group relative flex flex-col gap-4 p-5 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm hover:border-primary/20 hover:shadow-lg transition-all duration-300">
+    <div className="group relative flex flex-col gap-4 p-5 rounded-xl border border-border bg-card/50 backdrop-blur-sm hover:border-primary/20 hover:shadow-lg transition-all duration-300">
       <div className="flex sm:flex-row sm:items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-linear-to-br from-blue-500/10 to-indigo-500/10 flex items-center justify-center border border-blue-500/10 group-hover:border-blue-500/30 transition-colors">

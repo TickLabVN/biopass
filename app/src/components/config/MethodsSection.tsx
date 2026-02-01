@@ -801,7 +801,7 @@ function MethodCard({
 }) {
   return (
     <div
-      className={`rounded-lg border transition-all ${enabled ? "border-border" : "border-border/50 opacity-60"}`}
+      className={`rounded-lg border transition-all ${enabled ? "border-border" : "border-border/50"}`}
     >
       <div className="flex items-center justify-between p-4">
         <button
@@ -842,7 +842,7 @@ function MethodCard({
           className="cursor-pointer"
         />
       </div>
-      {expanded && enabled && (
+      {expanded && (
         <div className="px-4 pb-4 border-t border-border/50">{children}</div>
       )}
     </div>

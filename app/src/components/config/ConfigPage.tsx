@@ -10,6 +10,7 @@ import { StrategySection } from "./StrategySection.tsx";
 
 export function ConfigPage() {
   const [config, setConfig] = useState<FacepassConfig>(defaultConfig);
+  const [savedConfig, setSavedConfig] = useState<FacepassConfig>(defaultConfig);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -18,6 +19,7 @@ export function ConfigPage() {
       setLoading(true);
       const loadedConfig = await invoke<FacepassConfig>("load_config");
       setConfig(loadedConfig);
+      setSavedConfig(loadedConfig);
     } catch (err) {
       console.error("Failed to load config:", err);
       toast.error(`Failed to load config: ${err}`);
@@ -31,9 +33,102 @@ export function ConfigPage() {
   }, [initConfig]);
 
   async function saveConfig() {
+    const registeredModelPaths = new Set(
+      (config.models || []).map((m) => m.path),
+    );
+
+    if (config.methods.face.enable) {
+      if (
+        !config.methods.face.detection.model ||
+        !registeredModelPaths.has(config.methods.face.detection.model)
+      ) {
+        toast.error("Valid Face Detection model is required");
+        return;
+      }
+      if (
+        !config.methods.face.recognition.model ||
+        !registeredModelPaths.has(config.methods.face.recognition.model)
+      ) {
+        toast.error("Valid Face Recognition model is required");
+        return;
+      }
+      if (
+        config.methods.face.anti_spoofing.enable &&
+        (!config.methods.face.anti_spoofing.model ||
+          !registeredModelPaths.has(config.methods.face.anti_spoofing.model))
+      ) {
+        toast.error("Valid Anti-Spoofing model is required when enabled");
+        return;
+      }
+
+      // Validate face samples
+      try {
+        const samples = await invoke<string[]>("list_face_images");
+        if (samples.length === 0) {
+          toast.error(
+            "At least one face sample must be captured before enabling Face method",
+          );
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to check face samples:", err);
+      }
+    }
+
+    if (config.methods.voice.enable) {
+      if (
+        !config.methods.voice.model ||
+        !registeredModelPaths.has(config.methods.voice.model)
+      ) {
+        toast.error("Valid Voice Recognition model is required");
+        return;
+      }
+
+      // Validate voice samples
+      try {
+        const samples = await invoke<string[]>("list_voice_recordings");
+        if (samples.length === 0) {
+          toast.error(
+            "At least one voice recording must be captured before enabling Voice method",
+          );
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to check voice samples:", err);
+      }
+    }
+
+    // Check for missing model files
+    const modelsToCheck = [];
+    if (config.methods.face.enable) {
+      modelsToCheck.push(config.methods.face.detection.model);
+      modelsToCheck.push(config.methods.face.recognition.model);
+      if (config.methods.face.anti_spoofing.enable) {
+        modelsToCheck.push(config.methods.face.anti_spoofing.model);
+      }
+    }
+    if (config.methods.voice.enable) {
+      modelsToCheck.push(config.methods.voice.model);
+    }
+
+    for (const path of modelsToCheck) {
+      try {
+        const exists = await invoke<boolean>("check_file_exists", { path });
+        if (!exists) {
+          toast.error(
+            `Model file not found: ${path.split(/[\\/]/).pop()}. Please check AI Models.`,
+          );
+          return;
+        }
+      } catch (err) {
+        console.error("Status check failed:", err);
+      }
+    }
+
     try {
       setSaving(true);
       await invoke("save_config", { config });
+      setSavedConfig(config);
       toast.success("Configuration saved successfully!");
     } catch (err) {
       console.error("Failed to save config:", err);
@@ -44,8 +139,8 @@ export function ConfigPage() {
   }
 
   function resetConfig() {
-    setConfig(defaultConfig);
-    toast.info("Configuration reset to defaults");
+    setConfig(savedConfig);
+    toast.info("Configuration reset to last saved state");
   }
 
   if (loading) {
@@ -90,12 +185,17 @@ export function ConfigPage() {
       <div className="grid gap-6">
         <StrategySection
           strategy={config.strategy}
+          appearance={config.appearance}
           onChange={(strategy: typeof config.strategy) =>
             setConfig({ ...config, strategy })
+          }
+          onAppearanceChange={(appearance: string) =>
+            setConfig({ ...config, appearance })
           }
         />
         <MethodsSection
           methods={config.methods}
+          models={config.models}
           onChange={(methods: typeof config.methods) =>
             setConfig({ ...config, methods })
           }

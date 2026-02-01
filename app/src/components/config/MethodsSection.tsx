@@ -1,5 +1,6 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import {
+  AlertCircle,
   Camera,
   ChevronDown,
   Circle,
@@ -13,24 +14,46 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import type {
   FaceMethodConfig,
   FingerprintMethodConfig,
   MethodsConfig,
+  ModelConfig,
   VoiceMethodConfig,
 } from "@/types/config";
 
 interface Props {
   methods: MethodsConfig;
+  models: ModelConfig[];
   onChange: (methods: MethodsConfig) => void;
 }
 
-export function MethodsSection({ methods, onChange }: Props) {
+export function MethodsSection({ methods, models, onChange }: Props) {
   const [expandedMethod, setExpandedMethod] = useState<string | null>("face");
+  const [videoDevices, setVideoDevices] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchDevices = async () => {
+      try {
+        const devices = await invoke<string[]>("list_video_devices");
+        setVideoDevices(devices);
+      } catch (err) {
+        console.error("Failed to fetch video devices:", err);
+      }
+    };
+    fetchDevices();
+  }, []);
 
   const updateFace = (face: FaceMethodConfig) => onChange({ ...methods, face });
   const updateVoice = (voice: VoiceMethodConfig) =>
@@ -75,65 +98,75 @@ export function MethodsSection({ methods, onChange }: Props) {
           <div className="grid gap-4 pt-4">
             {/* Face Capture */}
             <FaceCaptureSection />
-
             {/* Detection */}
             <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
-              <h4 className="font-medium mb-3">Detection</h4>
-              <div className="grid gap-3">
-                <InputField
-                  label="Model Path"
-                  value={methods.face.detection.model}
-                  onChange={(model) =>
-                    updateFace({
-                      ...methods.face,
-                      detection: { ...methods.face.detection, model },
-                    })
-                  }
-                />
-                <SliderField
-                  label="Threshold"
-                  value={methods.face.detection.threshold}
-                  onChange={(threshold) =>
-                    updateFace({
-                      ...methods.face,
-                      detection: { ...methods.face.detection, threshold },
-                    })
-                  }
-                />
+              <h4 className="font-medium mb-3 text-sm">Detection</h4>
+              <div className="flex gap-6 items-end">
+                <div className="flex-1 min-w-0">
+                  <ModelSelectField
+                    label="Model"
+                    value={methods.face.detection.model}
+                    models={models.filter((m) => m.type === "face")}
+                    error={methods.face.enable}
+                    onChange={(model) =>
+                      updateFace({
+                        ...methods.face,
+                        detection: { ...methods.face.detection, model },
+                      })
+                    }
+                  />
+                </div>
+                <div className="w-48 shrink-0">
+                  <SliderField
+                    label="Threshold"
+                    value={methods.face.detection.threshold}
+                    onChange={(threshold) =>
+                      updateFace({
+                        ...methods.face,
+                        detection: { ...methods.face.detection, threshold },
+                      })
+                    }
+                  />
+                </div>
               </div>
             </div>
-
             {/* Recognition */}
             <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
-              <h4 className="font-medium mb-3">Recognition</h4>
-              <div className="grid gap-3">
-                <InputField
-                  label="Model Path"
-                  value={methods.face.recognition.model}
-                  onChange={(model) =>
-                    updateFace({
-                      ...methods.face,
-                      recognition: { ...methods.face.recognition, model },
-                    })
-                  }
-                />
-                <SliderField
-                  label="Threshold"
-                  value={methods.face.recognition.threshold}
-                  onChange={(threshold) =>
-                    updateFace({
-                      ...methods.face,
-                      recognition: { ...methods.face.recognition, threshold },
-                    })
-                  }
-                />
+              <h4 className="font-medium mb-3 text-sm">Recognition</h4>
+              <div className="flex gap-6 items-end">
+                <div className="flex-1 min-w-0">
+                  <ModelSelectField
+                    label="Model"
+                    value={methods.face.recognition.model}
+                    models={models.filter((m) => m.type === "face")}
+                    error={methods.face.enable}
+                    onChange={(model) =>
+                      updateFace({
+                        ...methods.face,
+                        recognition: { ...methods.face.recognition, model },
+                      })
+                    }
+                  />
+                </div>
+                <div className="w-48 shrink-0">
+                  <SliderField
+                    label="Threshold"
+                    value={methods.face.recognition.threshold}
+                    onChange={(threshold) =>
+                      updateFace({
+                        ...methods.face,
+                        recognition: { ...methods.face.recognition, threshold },
+                      })
+                    }
+                  />
+                </div>
               </div>
             </div>
 
             {/* Anti-Spoofing */}
             <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
               <div className="flex items-center justify-between mb-3">
-                <h4 className="font-medium">Anti-Spoofing</h4>
+                <h4 className="font-medium text-sm">Anti-Spoofing</h4>
                 <Switch
                   checked={methods.face.anti_spoofing.enable}
                   onCheckedChange={(enable) =>
@@ -146,30 +179,108 @@ export function MethodsSection({ methods, onChange }: Props) {
                 />
               </div>
               {methods.face.anti_spoofing.enable && (
-                <div className="grid gap-3">
-                  <InputField
-                    label="Model Path"
-                    value={methods.face.anti_spoofing.model}
-                    onChange={(model) =>
-                      updateFace({
-                        ...methods.face,
-                        anti_spoofing: { ...methods.face.anti_spoofing, model },
-                      })
+                <div className="flex gap-6 items-end">
+                  <div className="flex-1 min-w-0">
+                    <ModelSelectField
+                      label="Model"
+                      value={methods.face.anti_spoofing.model}
+                      models={models.filter((m) => m.type === "face")}
+                      error={methods.face.anti_spoofing.enable}
+                      onChange={(model) =>
+                        updateFace({
+                          ...methods.face,
+                          anti_spoofing: {
+                            ...methods.face.anti_spoofing,
+                            model,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="w-48 shrink-0">
+                    <SliderField
+                      label="Threshold"
+                      value={methods.face.anti_spoofing.threshold}
+                      onChange={(threshold) =>
+                        updateFace({
+                          ...methods.face,
+                          anti_spoofing: {
+                            ...methods.face.anti_spoofing,
+                            threshold,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* IR Camera */}
+            <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium text-sm">IR Camera</h4>
+                <Switch
+                  checked={methods.face.ir_camera.enable}
+                  onCheckedChange={(enable) =>
+                    updateFace({
+                      ...methods.face,
+                      ir_camera: { ...methods.face.ir_camera, enable },
+                    })
+                  }
+                  className="cursor-pointer"
+                />
+              </div>
+              {methods.face.ir_camera.enable && (
+                <div className="grid gap-2">
+                  <Label
+                    htmlFor="ir-device"
+                    className="text-xs text-muted-foreground"
+                  >
+                    Select Device
+                  </Label>
+                  <Select
+                    value={
+                      videoDevices.includes(
+                        `/dev/video${methods.face.ir_camera.device_id}`,
+                      )
+                        ? `/dev/video${methods.face.ir_camera.device_id}`
+                        : ""
                     }
-                  />
-                  <SliderField
-                    label="Threshold"
-                    value={methods.face.anti_spoofing.threshold}
-                    onChange={(threshold) =>
+                    onValueChange={(value) =>
                       updateFace({
                         ...methods.face,
-                        anti_spoofing: {
-                          ...methods.face.anti_spoofing,
-                          threshold,
+                        ir_camera: {
+                          ...methods.face.ir_camera,
+                          device_id:
+                            Number.parseInt(
+                              value.replace("/dev/video", ""),
+                              10,
+                            ) || 0,
                         },
                       })
                     }
-                  />
+                  >
+                    <SelectTrigger id="ir-device" className="h-10 w-full">
+                      <SelectValue placeholder="Select IR Camera Device" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {videoDevices.length > 0 ? (
+                        videoDevices.map((device) => (
+                          <SelectItem key={device} value={device}>
+                            {device}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="none" disabled>
+                          No video devices found
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">
+                    Infrared camera device used for anti-spoofing.
+                  </p>
                 </div>
               )}
             </div>
@@ -213,20 +324,28 @@ export function MethodsSection({ methods, onChange }: Props) {
             <VoiceRecordingSection />
 
             <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
-              <h4 className="font-medium mb-3">Recognition Settings</h4>
-              <div className="grid gap-3">
-                <InputField
-                  label="Model Path"
-                  value={methods.voice.model}
-                  onChange={(model) => updateVoice({ ...methods.voice, model })}
-                />
-                <SliderField
-                  label="Threshold"
-                  value={methods.voice.threshold}
-                  onChange={(threshold) =>
-                    updateVoice({ ...methods.voice, threshold })
-                  }
-                />
+              <h4 className="font-medium mb-3 text-sm">Recognition Settings</h4>
+              <div className="flex gap-6 items-end">
+                <div className="flex-1 min-w-0">
+                  <ModelSelectField
+                    label="Model"
+                    value={methods.voice.model}
+                    models={models.filter((m) => m.type === "voice")}
+                    error={methods.voice.enable}
+                    onChange={(model) =>
+                      updateVoice({ ...methods.voice, model })
+                    }
+                  />
+                </div>
+                <div className="w-48 shrink-0">
+                  <SliderField
+                    label="Threshold"
+                    value={methods.voice.threshold}
+                    onChange={(threshold) =>
+                      updateVoice({ ...methods.voice, threshold })
+                    }
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -714,28 +833,125 @@ function MethodCard({
   );
 }
 
-function InputField({
+function ModelSelectField({
   label,
   value,
+  models,
+  error,
   onChange,
 }: {
   label: string;
   value: string;
+  models: ModelConfig[];
+  error?: boolean;
   onChange: (value: string) => void;
 }) {
-  const id = `input-${label.toLowerCase().replace(/\s+/g, "-")}`;
+  const id = `select-${label.toLowerCase().replace(/\s+/g, "-")}`;
+  const selectedModel = models.find((m) => m.path === value);
+  const [statusMap, setStatusMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const checkAllModels = async () => {
+      const newStatusMap: Record<string, boolean> = {};
+      await Promise.all(
+        models.map(async (m) => {
+          try {
+            newStatusMap[m.path] = await invoke<boolean>("check_file_exists", {
+              path: m.path,
+            });
+          } catch {
+            newStatusMap[m.path] = false;
+          }
+        }),
+      );
+      setStatusMap(newStatusMap);
+    };
+
+    checkAllModels();
+
+    const onFocus = () => checkAllModels();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [models]);
+
   return (
-    <div className="grid gap-1.5">
-      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
-        {label}
+    <div className="grid gap-1.5 w-full">
+      <Label
+        htmlFor={id}
+        className={cn(
+          "text-[10px] font-bold uppercase tracking-wider pl-0.5",
+          error && (!value || !selectedModel)
+            ? "text-destructive"
+            : "text-muted-foreground/70",
+        )}
+      >
+        {label}{" "}
+        {error && (!value || !selectedModel) && (
+          <span className="text-destructive">* Required</span>
+        )}
       </Label>
-      <Input
-        id={id}
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-9"
-      />
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger
+          id={id}
+          className={cn(
+            "w-full h-11 px-3",
+            error &&
+              (!value || !selectedModel) &&
+              "border-destructive ring-destructive/20 ring-[3px]",
+          )}
+        >
+          <SelectValue placeholder="Select model...">
+            {selectedModel && (
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-xs text-left">
+                  {selectedModel.name ||
+                    selectedModel.path.split(/[\\/]/).pop()}
+                </span>
+                {statusMap[selectedModel.path] === false && (
+                  <div className="flex items-center gap-1 text-[10px] text-destructive font-bold animate-pulse">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>Missing</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {models.length === 0 ? (
+            <div className="p-4 text-sm text-muted-foreground italic text-center">
+              No models found.
+              <br />
+              <span className="text-xs">Add some in AI Models tab.</span>
+            </div>
+          ) : (
+            models.map((model) => (
+              <SelectItem
+                key={model.path}
+                value={model.path}
+                className="cursor-pointer py-2.5"
+              >
+                <div className="flex flex-col gap-0.5 pointer-events-none relative pr-8">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">
+                      {model.name || model.path.split(/[\\/]/).pop()}
+                    </span>
+                    {statusMap[model.path] === false && (
+                      <div className="flex items-center gap-1 text-[9px] text-destructive font-bold uppercase bg-destructive/10 px-1.5 py-0.5 rounded-sm">
+                        <AlertCircle className="w-3 h-3" />
+                        <span>Missing</span>
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-[10px] opacity-60 font-mono truncate max-w-[280px]">
+                    {model.path}
+                  </span>
+                </div>
+              </SelectItem>
+            ))
+          )}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
@@ -759,13 +975,15 @@ function SliderField({
           {value.toFixed(2)}
         </span>
       </div>
-      <Slider
-        value={[value]}
-        min={0}
-        max={1}
-        step={0.01}
-        onValueChange={(values) => onChange(values[0])}
-      />
+      <div className="py-2">
+        <Slider
+          value={[value]}
+          min={0}
+          max={1}
+          step={0.01}
+          onValueChange={(values) => onChange(values[0])}
+        />
+      </div>
     </div>
   );
 }

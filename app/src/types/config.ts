@@ -2,6 +2,7 @@ export interface FacepassConfig {
   strategy: StrategyConfig;
   methods: MethodsConfig;
   models: ModelConfig[];
+  appearance: string;
 }
 
 export interface StrategyConfig {
@@ -32,6 +33,10 @@ export interface FaceMethodConfig {
     model: string;
     threshold: number;
   };
+  ir_camera: {
+    enable: boolean;
+    device_id: number;
+  };
 }
 
 export interface FingerprintMethodConfig {
@@ -47,7 +52,7 @@ export interface VoiceMethodConfig {
 export interface ModelConfig {
   path: string;
   name?: string;
-  type: "face" | "fingerprint" | "voice";
+  type: "face" | "voice";
 }
 
 export const defaultConfig: FacepassConfig = {
@@ -73,6 +78,10 @@ export const defaultConfig: FacepassConfig = {
         model: "models/face_anti_spoofing.onnx",
         threshold: 0.8,
       },
+      ir_camera: {
+        enable: false,
+        device_id: 1,
+      },
     },
     fingerprint: {
       enable: true,
@@ -85,7 +94,7 @@ export const defaultConfig: FacepassConfig = {
   },
   models: [
     { path: "models/face.onnx", name: "Onnx", type: "face" },
-    { path: "models/fingerprint.onnx", type: "fingerprint" },
     { path: "models/voice.onnx", type: "voice" },
   ],
+  appearance: "system",
 };

@@ -1,7 +1,9 @@
+use base64::{engine::general_purpose, Engine as _};
+use reqwest;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
-use base64::{Engine as _, engine::general_purpose};
 use tauri::{AppHandle, Manager};
 
 // XDG user directories via Tauri path API
@@ -14,6 +16,7 @@ pub struct FacepassConfig {
     pub strategy: StrategyConfig,
     pub methods: MethodsConfig,
     pub models: Vec<ModelConfig>,
+    pub appearance: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -37,6 +40,13 @@ pub struct FaceMethodConfig {
     pub detection: DetectionConfig,
     pub recognition: RecognitionConfig,
     pub anti_spoofing: AntiSpoofingConfig,
+    pub ir_camera: IRCameraConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct IRCameraConfig {
+    pub enable: bool,
+    pub device_id: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -102,11 +112,19 @@ fn get_voices_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(get_data_dir(app)?.join("voices"))
 }
 
+fn get_models_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(get_data_dir(app)?.join("models"))
+}
+
 fn get_default_config() -> FacepassConfig {
     FacepassConfig {
         strategy: StrategyConfig {
             execution_mode: "sequential".to_string(),
-            order: vec!["face".to_string(), "fingerprint".to_string(), "voice".to_string()],
+            order: vec![
+                "face".to_string(),
+                "fingerprint".to_string(),
+                "voice".to_string(),
+            ],
             retries: 3,
             retry_delay: 500,
         },
@@ -125,6 +143,10 @@ fn get_default_config() -> FacepassConfig {
                     enable: true,
                     model: "models/face_anti_spoofing.onnx".to_string(),
                     threshold: 0.8,
+                },
+                ir_camera: IRCameraConfig {
+                    enable: false,
+                    device_id: 1,
                 },
             },
             fingerprint: FingerprintMethodConfig { enable: true },
@@ -151,6 +173,7 @@ fn get_default_config() -> FacepassConfig {
                 model_type: "voice".to_string(),
             },
         ],
+        appearance: "system".to_string(),
     }
 }
 
@@ -172,17 +195,16 @@ pub fn load_config(app: AppHandle) -> Result<FacepassConfig, String> {
     let content = fs::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config file: {}", e))?;
 
-    serde_yml::from_str(&content)
-        .map_err(|e| format!("Failed to parse config file: {}", e))
+    serde_yml::from_str(&content).map_err(|e| format!("Failed to parse config file: {}", e))
 }
 
 #[tauri::command]
 pub fn save_config(app: AppHandle, config: FacepassConfig) -> Result<(), String> {
     let config_dir = get_config_dir(&app)?;
     let config_path = get_config_path(&app)?;
-    
-    let yaml_content = serde_yml::to_string(&config)
-        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+    let yaml_content =
+        serde_yml::to_string(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;
 
     // Create directory if needed
     if !config_dir.exists() {
@@ -191,8 +213,7 @@ pub fn save_config(app: AppHandle, config: FacepassConfig) -> Result<(), String>
     }
 
     // Write config file
-    fs::write(&config_path, yaml_content)
-        .map_err(|e| format!("Failed to write config file: {}", e))
+    fs::write(&config_path, yaml_content).map_err(|e| format!("Failed to write config file: {}", e))
 }
 
 #[tauri::command]
@@ -203,7 +224,7 @@ pub fn get_config_path_str(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub fn save_face_image(app: AppHandle, image_data: String) -> Result<String, String> {
     let faces_dir = get_faces_dir(&app)?;
-    
+
     // Decode base64 image data
     let image_bytes = general_purpose::STANDARD
         .decode(&image_data)
@@ -224,8 +245,7 @@ pub fn save_face_image(app: AppHandle, image_data: String) -> Result<String, Str
     }
 
     // Write file
-    fs::write(&file_path, image_bytes)
-        .map_err(|e| format!("Failed to write image: {}", e))?;
+    fs::write(&file_path, image_bytes).map_err(|e| format!("Failed to write image: {}", e))?;
 
     Ok(file_path.to_string_lossy().to_string())
 }
@@ -233,7 +253,7 @@ pub fn save_face_image(app: AppHandle, image_data: String) -> Result<String, Str
 #[tauri::command]
 pub fn save_voice_recording(app: AppHandle, audio_data: String) -> Result<String, String> {
     let voices_dir = get_voices_dir(&app)?;
-    
+
     // Decode base64 audio data
     let audio_bytes = general_purpose::STANDARD
         .decode(&audio_data)
@@ -254,8 +274,7 @@ pub fn save_voice_recording(app: AppHandle, audio_data: String) -> Result<String
     }
 
     // Write file
-    fs::write(&file_path, audio_bytes)
-        .map_err(|e| format!("Failed to write audio: {}", e))?;
+    fs::write(&file_path, audio_bytes).map_err(|e| format!("Failed to write audio: {}", e))?;
 
     Ok(file_path.to_string_lossy().to_string())
 }
@@ -263,17 +282,21 @@ pub fn save_voice_recording(app: AppHandle, audio_data: String) -> Result<String
 #[tauri::command]
 pub fn list_face_images(app: AppHandle) -> Result<Vec<String>, String> {
     let faces_dir = get_faces_dir(&app)?;
-    
+
     if !faces_dir.exists() {
         return Ok(vec![]);
     }
 
-    let entries = fs::read_dir(&faces_dir)
-        .map_err(|e| format!("Failed to read faces directory: {}", e))?;
+    let entries =
+        fs::read_dir(&faces_dir).map_err(|e| format!("Failed to read faces directory: {}", e))?;
 
     let mut files: Vec<String> = entries
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "jpg" || ext == "png"))
+        .filter(|e| {
+            e.path()
+                .extension()
+                .map_or(false, |ext| ext == "jpg" || ext == "png")
+        })
         .map(|e| e.path().to_string_lossy().to_string())
         .collect();
 
@@ -284,17 +307,21 @@ pub fn list_face_images(app: AppHandle) -> Result<Vec<String>, String> {
 #[tauri::command]
 pub fn list_voice_recordings(app: AppHandle) -> Result<Vec<String>, String> {
     let voices_dir = get_voices_dir(&app)?;
-    
+
     if !voices_dir.exists() {
         return Ok(vec![]);
     }
 
-    let entries = fs::read_dir(&voices_dir)
-        .map_err(|e| format!("Failed to read voices directory: {}", e))?;
+    let entries =
+        fs::read_dir(&voices_dir).map_err(|e| format!("Failed to read voices directory: {}", e))?;
 
     let mut files: Vec<String> = entries
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "webm" || ext == "wav" || ext == "mp3"))
+        .filter(|e| {
+            e.path()
+                .extension()
+                .map_or(false, |ext| ext == "webm" || ext == "wav" || ext == "mp3")
+        })
         .map(|e| e.path().to_string_lossy().to_string())
         .collect();
 
@@ -304,12 +331,87 @@ pub fn list_voice_recordings(app: AppHandle) -> Result<Vec<String>, String> {
 
 #[tauri::command]
 pub fn delete_face_image(path: String) -> Result<(), String> {
-    fs::remove_file(&path)
-        .map_err(|e| format!("Failed to delete file: {}", e))
+    fs::remove_file(&path).map_err(|e| format!("Failed to delete file: {}", e))
 }
 
 #[tauri::command]
 pub fn delete_voice_recording(path: String) -> Result<(), String> {
-    fs::remove_file(&path)
-        .map_err(|e| format!("Failed to delete file: {}", e))
+    fs::remove_file(&path).map_err(|e| format!("Failed to delete file: {}", e))
+}
+
+#[tauri::command]
+pub async fn download_model(app: AppHandle, url: String) -> Result<String, String> {
+    let models_dir = get_models_dir(&app)?;
+
+    // Create directory if it doesn't exist
+    if !models_dir.exists() {
+        fs::create_dir_all(&models_dir)
+            .map_err(|e| format!("Failed to create models directory: {}", e))?;
+    }
+
+    // Extract filename from URL or use a default, removing query parameters
+    let filename = url
+        .split('/')
+        .last()
+        .unwrap_or("model.onnx")
+        .split('?')
+        .next()
+        .unwrap_or("model.onnx");
+
+    if filename.is_empty() {
+        return Err("Could not determine filename from URL".to_string());
+    }
+
+    let file_path = models_dir.join(filename);
+
+    // Download the file
+    let response = reqwest::get(url)
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+    let content = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to get bytes: {}", e))?;
+
+    let mut file =
+        fs::File::create(&file_path).map_err(|e| format!("Failed to create file: {}", e))?;
+    file.write_all(&content)
+        .map_err(|e| format!("Failed to write to file: {}", e))?;
+
+    Ok(file_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn check_file_exists(path: String) -> bool {
+    std::path::Path::new(&path).exists()
+}
+
+#[tauri::command]
+pub fn list_video_devices() -> Result<Vec<String>, String> {
+    let mut devices = Vec::new();
+    let entries = fs::read_dir("/dev").map_err(|e| format!("Failed to read /dev: {}", e))?;
+
+    for entry in entries {
+        if let Ok(entry) = entry {
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            if file_name.starts_with("video") {
+                devices.push(format!("/dev/{}", file_name));
+            }
+        }
+    }
+
+    // Sort naturally video0, video1, video2...
+    devices.sort_by(|a, b| {
+        let a_num = a
+            .trim_start_matches("/dev/video")
+            .parse::<i32>()
+            .unwrap_or(-1);
+        let b_num = b
+            .trim_start_matches("/dev/video")
+            .parse::<i32>()
+            .unwrap_or(-1);
+        a_num.cmp(&b_num)
+    });
+
+    Ok(devices)
 }

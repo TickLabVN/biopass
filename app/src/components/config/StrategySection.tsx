@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Zap } from "lucide-react";
+import { GripVertical, Palette, Zap } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -29,10 +29,17 @@ import type { StrategyConfig } from "@/types/config";
 
 interface Props {
   strategy: StrategyConfig;
+  appearance: string;
   onChange: (strategy: StrategyConfig) => void;
+  onAppearanceChange: (appearance: string) => void;
 }
 
-export function StrategySection({ strategy, onChange }: Props) {
+export function StrategySection({
+  strategy,
+  appearance,
+  onChange,
+  onAppearanceChange,
+}: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -97,6 +104,33 @@ export function StrategySection({ strategy, onChange }: Props) {
             {strategy.execution_mode === "sequential"
               ? "Methods are tried in order until one succeeds"
               : "All methods run simultaneously, first success wins"}
+          </p>
+        </div>
+
+        {/* Appearance Settings */}
+        <div className="grid gap-2.5">
+          <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <Palette className="w-3.5 h-3.5" />
+            Appearance
+          </Label>
+          <Select value={appearance} onValueChange={onAppearanceChange}>
+            <SelectTrigger className="w-full h-10 transition-all">
+              <SelectValue placeholder="Select theme" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="light" className="cursor-pointer">
+                Light
+              </SelectItem>
+              <SelectItem value="dark" className="cursor-pointer">
+                Dark
+              </SelectItem>
+              <SelectItem value="system" className="cursor-pointer">
+                System
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Choose how Facepass looks on your screen
           </p>
         </div>
 

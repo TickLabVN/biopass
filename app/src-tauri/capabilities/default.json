@@ -18,6 +18,7 @@
           "path": "$DATA/facepass/**"
         }
       ]
-    }
+    },
+    "dialog:default"
   ]
 }

@@ -29,8 +29,7 @@ struct AuthConfig {
  * Interface for authentication methods.
  * All auth methods (face, voice, fingerprint) must implement this interface.
  */
-class IAuthMethod {
- public:
+struct IAuthMethod {
   virtual ~IAuthMethod() = default;
 
   /**

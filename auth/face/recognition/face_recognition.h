@@ -13,20 +13,15 @@
 #include <torch/script.h>
 #include <torch/torch.h>
 
-class Recognition {
- public:
+struct Recognition {
   torch::Tensor feature;
-  Recognition(torch::Tensor& feature) { this->feature = feature; }
+  Recognition(torch::Tensor& feature) : feature(feature) {}
 };
 
-class MatchResult {
- public:
+struct MatchResult {
   float dist;
   bool similar;
-  MatchResult(float dist, bool similar) {
-    this->dist = dist;
-    this->similar = similar;
-  }
+  MatchResult(float dist, bool similar) : dist(dist), similar(similar) {}
 };
 
 class FaceRecognition {

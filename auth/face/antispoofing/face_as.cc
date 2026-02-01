@@ -4,14 +4,14 @@ int torch_argmax(const torch::Tensor& input) {
   torch::Tensor flat_tensor = input.to(torch::kCPU).contiguous().view(-1);
   int max_index = flat_tensor.argmax().item<int>();
   return max_index;
-};
+}
 
 torch::Tensor face_as_to_tensor(const cv::Mat& img) {
   torch::Tensor img_tensor = torch::from_blob(img.data, {img.rows, img.cols, 3}, torch::kUInt8);
   img_tensor = img_tensor / 255.0;
   img_tensor = img_tensor.permute({2, 0, 1}).to(torch::kFloat32);
   return img_tensor;
-};
+}
 
 torch::Tensor face_as_normalize(const torch::Tensor& input, const std::vector<float>& mean,
                                 const std::vector<float>& std) {
@@ -40,7 +40,7 @@ FaceAntiSpoofing::FaceAntiSpoofing(const std::string& ckpt, const cv::Size& imgs
 
 void FaceAntiSpoofing::load_model(const std::string& ckpt) {
   this->ckpt = ckpt;
-  this->model = torch::jit::load(this->ckpt);
+  this->model = torch::jit::load(ckpt);
   this->model.eval();
   this->model.to(this->device, torch::kFloat32);
 }
@@ -70,6 +70,5 @@ SpoofResult FaceAntiSpoofing::inference(cv::Mat& image) {
 
   int spoof_cls = torch_argmax(output);
   float score = output.view(-1)[spoof_cls].item<float>();
-  SpoofResult result(score, spoof_cls == 1 && score >= this->threshold);
-  return result;
+  return SpoofResult(score, spoof_cls == 1 && score >= this->threshold);
 }

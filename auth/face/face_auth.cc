@@ -36,45 +36,34 @@ AuthResult FaceAuth::authenticate(const std::string &username, const AuthConfig 
 
   FaceRecognition faceReg(model_path(username, FACE_RECOGNITION));
   FaceDetection faceDetector(model_path(username, FACE_DETECTION));
-  std::unique_ptr<FaceAntiSpoofing> faceAs = nullptr;
 
-  if (config.anti_spoof) {
-    faceAs = std::make_unique<FaceAntiSpoofing>(model_path(username, FACE_ANTI_SPOOFING));
+  cv::Mat loginFace;
+  camera >> loginFace;
+  if (loginFace.empty()) {
+    std::cerr << "FaceAuth: Could not read frame" << std::endl;
+    return AuthResult::Retry;
   }
 
-  int retries = config.retries;
-  while (retries-- > 0) {
-    cv::Mat loginFace;
-    camera >> loginFace;
-    if (loginFace.empty()) {
-      std::cerr << "FaceAuth: Could not read frame" << std::endl;
-      break;
+  std::vector<Detection> detectedImages = faceDetector.inference(loginFace);
+  if (detectedImages.empty()) {
+    std::cerr << "FaceAuth: No face detected" << std::endl;
+    return AuthResult::Retry;
+  }
+
+  cv::Mat face = detectedImages[0].image;
+
+  if (config.anti_spoof) {
+    FaceAntiSpoofing faceAs(model_path(username, FACE_ANTI_SPOOFING));
+    SpoofResult spoofCheck = faceAs.inference(face);
+    if (spoofCheck.spoof) {
+      std::cerr << "FaceAuth: Spoof detected, score: " << spoofCheck.score << std::endl;
+      return AuthResult::Retry;
     }
+  }
 
-    std::vector<Detection> detectedImages = faceDetector.inference(loginFace);
-    if (detectedImages.empty()) {
-      std::cerr << "FaceAuth: No face detected" << std::endl;
-      std::this_thread::sleep_for(std::chrono::milliseconds(config.retry_delay_ms));
-      continue;
-    }
-
-    cv::Mat face = detectedImages[0].image;
-
-    if (config.anti_spoof && faceAs) {
-      SpoofResult spoofCheck = faceAs->inference(face);
-      if (spoofCheck.spoof) {
-        std::cerr << "FaceAuth: Spoof detected, score: " << spoofCheck.score << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(config.retry_delay_ms));
-        continue;
-      }
-    }
-
-    MatchResult match = faceReg.match(preparedFace, face);
-    if (match.similar) {
-      return AuthResult::Success;
-    }
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(config.retry_delay_ms));
+  MatchResult match = faceReg.match(preparedFace, face);
+  if (match.similar) {
+    return AuthResult::Success;
   }
 
   return AuthResult::Failure;

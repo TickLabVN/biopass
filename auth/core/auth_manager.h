@@ -1,10 +1,11 @@
 #pragma once
 
-#include "auth_method.h"
 #include <future>
 #include <memory>
 #include <thread>
 #include <vector>
+
+#include "auth_method.h"
 
 namespace facepass {
 
@@ -12,15 +13,15 @@ namespace facepass {
  * Execution mode for authentication methods.
  */
 enum class ExecutionMode {
-  Sequential, // Try methods in order, fallback on failure
-  Parallel    // Run all methods concurrently, succeed on first success
+  Sequential,  // Try methods in order, fallback on failure
+  Parallel     // Run all methods concurrently, succeed on first success
 };
 
 /**
  * Manages multiple authentication methods and their execution.
  */
 class AuthManager {
-public:
+ public:
   AuthManager() = default;
   ~AuthManager() = default;
 
@@ -53,7 +54,7 @@ public:
    */
   int authenticate(const std::string &username);
 
-private:
+ private:
   /**
    * Run methods sequentially with fallback.
    */
@@ -69,4 +70,4 @@ private:
   AuthConfig config_;
 };
 
-} // namespace facepass
+}  // namespace facepass

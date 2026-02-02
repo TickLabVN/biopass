@@ -11,9 +11,8 @@
 #include "voice_auth.h"
 
 // Called by PAM when a user needs to be authenticated
-PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc,
-                                   const char **argv) {
-  (void)flags; // Suppress unused parameter warning
+PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv) {
+  (void)flags;  // Suppress unused parameter warning
   (void)argc;
   (void)argv;
 
@@ -56,8 +55,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc,
 }
 
 // The functions below are required by PAM, but not needed in this module
-PAM_EXTERN int pam_sm_open_session(pam_handle_t *pamh, int flags, int argc,
-                                   const char **argv) {
+PAM_EXTERN int pam_sm_open_session(pam_handle_t *pamh, int flags, int argc, const char **argv) {
   (void)pamh;
   (void)flags;
   (void)argc;
@@ -65,8 +63,7 @@ PAM_EXTERN int pam_sm_open_session(pam_handle_t *pamh, int flags, int argc,
   return PAM_IGNORE;
 }
 
-PAM_EXTERN int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc,
-                                const char **argv) {
+PAM_EXTERN int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
   (void)pamh;
   (void)flags;
   (void)argc;
@@ -74,8 +71,7 @@ PAM_EXTERN int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc,
   return PAM_IGNORE;
 }
 
-PAM_EXTERN int pam_sm_close_session(pam_handle_t *pamh, int flags, int argc,
-                                    const char **argv) {
+PAM_EXTERN int pam_sm_close_session(pam_handle_t *pamh, int flags, int argc, const char **argv) {
   (void)pamh;
   (void)flags;
   (void)argc;
@@ -83,8 +79,7 @@ PAM_EXTERN int pam_sm_close_session(pam_handle_t *pamh, int flags, int argc,
   return PAM_IGNORE;
 }
 
-PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc,
-                                const char **argv) {
+PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv) {
   (void)pamh;
   (void)flags;
   (void)argc;
@@ -92,8 +87,7 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc,
   return PAM_IGNORE;
 }
 
-PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc,
-                              const char **argv) {
+PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv) {
   (void)pamh;
   (void)flags;
   (void)argc;

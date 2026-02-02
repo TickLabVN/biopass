@@ -6,3 +6,16 @@ pre-commit:
       glob: "*.{js,ts,jsx,tsx,json}"
       run: bun run lint {staged_files}
 
+    - name: Clang Format
+      root: auth/
+      glob: "*.{cc,h}"
+      run: |
+        for file in {staged_files}; do
+          clang-format -i "$file"
+          git add "$file"
+        done
+
+    - name: Rust Format
+      root: app/src-tauri/
+      glob: "*.rs"
+      run: cargo fmt --all --check

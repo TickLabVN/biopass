@@ -50,6 +50,7 @@ set(FaceConfig_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/config)
 
 add_subdirectory(test/face_engine)
 add_subdirectory(test/pam)
+add_subdirectory(test/fingerprint)
 
 install(
     TARGETS facepass_cfg facepass_det facepass_reg facepass_as

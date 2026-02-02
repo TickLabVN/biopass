@@ -10,14 +10,13 @@ namespace facepass {
  * implemented.
  */
 class VoiceAuth : public IAuthMethod {
-public:
+ public:
   VoiceAuth() = default;
   ~VoiceAuth() override = default;
 
   std::string name() const override { return "Voice"; }
   bool is_available() const override;
-  AuthResult authenticate(const std::string &username,
-                          const AuthConfig &config) override;
+  AuthResult authenticate(const std::string &username, const AuthConfig &config) override;
 };
 
-} // namespace facepass
+}  // namespace facepass

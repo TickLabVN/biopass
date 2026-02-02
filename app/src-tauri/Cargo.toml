@@ -30,5 +30,6 @@ base64 = "0.22"
 webkit2gtk = "2.0.1"
 gtk = "0.18.2"
 tauri-plugin-dialog = "2"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
+futures-util = "0.3"
 tokio = { version = "1.36.0", features = ["full"] }

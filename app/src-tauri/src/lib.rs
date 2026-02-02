@@ -2,7 +2,7 @@
 mod config;
 
 use config::{
-    check_file_exists, delete_face_image, delete_voice_recording, download_model,
+    check_file_exists, delete_face_image, delete_file, delete_voice_recording, download_model,
     get_config_path_str, get_current_username, list_face_images, list_video_devices,
     list_voice_recordings, load_config, save_config, save_face_image, save_voice_recording,
 };
@@ -51,7 +51,8 @@ pub fn run() {
             delete_face_image,
             delete_voice_recording,
             download_model,
-            check_file_exists
+            check_file_exists,
+            delete_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

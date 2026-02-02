@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 // XDG user directories via Tauri path API
 // Config: ~/.config/facepass/config.yaml (or AppData on Windows)
@@ -330,6 +330,14 @@ pub fn list_voice_recordings(app: AppHandle) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+pub fn delete_file(path: String) -> Result<(), String> {
+    if !std::path::Path::new(&path).exists() {
+        return Ok(());
+    }
+    fs::remove_file(&path).map_err(|e| format!("Failed to delete file: {}", e))
+}
+
+#[tauri::command]
 pub fn delete_face_image(path: String) -> Result<(), String> {
     fs::remove_file(&path).map_err(|e| format!("Failed to delete file: {}", e))
 }
@@ -337,6 +345,22 @@ pub fn delete_face_image(path: String) -> Result<(), String> {
 #[tauri::command]
 pub fn delete_voice_recording(path: String) -> Result<(), String> {
     fs::remove_file(&path).map_err(|e| format!("Failed to delete file: {}", e))
+}
+
+#[derive(Clone, Serialize)]
+struct DownloadProgress {
+    url: String,
+    path: String,
+    progress: f64,
+    total: Option<u64>,
+    downloaded: u64,
+}
+
+#[derive(Clone, Serialize)]
+struct DownloadFinished {
+    url: String,
+    path: Option<String>,
+    error: Option<String>,
 }
 
 #[tauri::command]
@@ -356,29 +380,109 @@ pub async fn download_model(app: AppHandle, url: String) -> Result<String, Strin
         .unwrap_or("model.onnx")
         .split('?')
         .next()
-        .unwrap_or("model.onnx");
+        .unwrap_or("model.onnx")
+        .to_string();
 
     if filename.is_empty() {
         return Err("Could not determine filename from URL".to_string());
     }
 
-    let file_path = models_dir.join(filename);
+    let mut file_path = models_dir.join(&filename);
 
-    // Download the file
-    let response = reqwest::get(url)
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-    let content = response
-        .bytes()
-        .await
-        .map_err(|e| format!("Failed to get bytes: {}", e))?;
+    // Ensure unique filename
+    if file_path.exists() {
+        let name_stem = std::path::Path::new(&filename)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("model");
+        let extension = std::path::Path::new(&filename)
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("onnx");
 
-    let mut file =
-        fs::File::create(&file_path).map_err(|e| format!("Failed to create file: {}", e))?;
-    file.write_all(&content)
-        .map_err(|e| format!("Failed to write to file: {}", e))?;
+        let mut counter = 1;
+        while file_path.exists() {
+            let new_filename = format!("{} ({}).{}", name_stem, counter, extension);
+            file_path = models_dir.join(new_filename);
+            counter += 1;
+        }
+    }
 
-    Ok(file_path.to_string_lossy().to_string())
+    let path_str = file_path.to_string_lossy().to_string();
+    let url_clone = url.clone();
+    let path_clone = path_str.clone();
+
+    // Run in background
+    tauri::async_runtime::spawn(async move {
+        let result = async {
+            // Download the file
+            let response = reqwest::get(&url_clone)
+                .await
+                .map_err(|e| format!("Request failed: {}", e))?;
+
+            let total_size = response.content_length();
+            let mut downloaded: u64 = 0;
+
+            let mut file = fs::File::create(&file_path)
+                .map_err(|e| format!("Failed to create file: {}", e))?;
+
+            let mut stream = response.bytes_stream();
+            use futures_util::StreamExt;
+
+            while let Some(item) = stream.next().await {
+                let chunk = item.map_err(|e| format!("Error while downloading: {}", e))?;
+                file.write_all(&chunk)
+                    .map_err(|e| format!("Failed to write to file: {}", e))?;
+
+                downloaded += chunk.len() as u64;
+
+                let progress = if let Some(total) = total_size {
+                    (downloaded as f64 / total as f64) * 100.0
+                } else {
+                    0.0
+                };
+
+                let _ = app.emit(
+                    "download-progress",
+                    DownloadProgress {
+                        url: url_clone.clone(),
+                        path: path_clone.clone(),
+                        progress,
+                        total: total_size,
+                        downloaded,
+                    },
+                );
+            }
+
+            Ok(path_clone)
+        }
+        .await;
+
+        match result {
+            Ok(path) => {
+                let _ = app.emit(
+                    "download-finished",
+                    DownloadFinished {
+                        url: url.clone(),
+                        path: Some(path),
+                        error: None,
+                    },
+                );
+            }
+            Err(e) => {
+                let _ = app.emit(
+                    "download-finished",
+                    DownloadFinished {
+                        url: url.clone(),
+                        path: None,
+                        error: Some(e),
+                    },
+                );
+            }
+        }
+    });
+
+    Ok(path_str)
 }
 
 #[tauri::command]

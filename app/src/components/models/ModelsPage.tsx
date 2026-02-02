@@ -1,29 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Cpu } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
+import { Cpu, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import type { FacepassConfig, ModelConfig } from "@/types/config";
-import { AddModelDialog } from "./AddModelDialog";
 import { ModelCard } from "./ModelCard";
+import { ModelDialog } from "./ModelDialog";
 
 export function ModelsPage() {
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editingName, setEditingName] = useState("");
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const [statusMap, setStatusMap] = useState<
     Record<string, "checking" | "available" | "missing" | "inuse">
+  >({});
+  const [downloadProgress, setDownloadProgress] = useState<
+    Record<string, number>
   >({});
 
   // Use a ref to open the dialog programmatically if needed, or manage state here
@@ -44,7 +38,7 @@ export function ModelsPage() {
   // Let's make `AddModelDialog` accept an `open` prop control or just render it alongside.
 
   // To support the "Add Model" button in the empty state, we need to share the toggle state.
-  const [_isAddOpen, _setIsAddOpen] = useState(false);
+  const [_unused, _setUnused] = useState(false);
 
   const checkModelsStatus = useCallback(async (modelList: ModelConfig[]) => {
     const newStatuses: Record<
@@ -116,6 +110,44 @@ export function ModelsPage() {
 
   useEffect(() => {
     loadConfig();
+
+    const unlistenProgress = listen<{
+      url: string;
+      path: string;
+      progress: number;
+    }>("download-progress", (event) => {
+      setDownloadProgress((prev) => ({
+        ...prev,
+        [event.payload.path]: event.payload.progress,
+      }));
+    });
+
+    const unlistenFinished = listen<{
+      url: string;
+      path?: string;
+      error?: string;
+    }>("download-finished", (event) => {
+      if (event.payload.path) {
+        const path = event.payload.path;
+        setDownloadProgress((prev) => {
+          const next = { ...prev };
+          delete next[path];
+          return next;
+        });
+      }
+
+      if (event.payload.error) {
+        toast.error(`Download failed: ${event.payload.error}`);
+      } else {
+        toast.success("Download complete!");
+        loadConfig(); // Refresh to show the new model as available
+      }
+    });
+
+    return () => {
+      unlistenProgress.then((u) => u());
+      unlistenFinished.then((u) => u());
+    };
   }, [loadConfig]);
 
   const saveModels = async (updatedModels: ModelConfig[]) => {
@@ -133,6 +165,12 @@ export function ModelsPage() {
   };
 
   const handleAddModel = async (newModel: ModelConfig) => {
+    // Validation: Check for duplicate local paths
+    if (models.some((m) => m.path === newModel.path)) {
+      toast.error("A model with this file path already exists.");
+      throw new Error("Duplicate path");
+    }
+
     const updatedModels = [...models, newModel];
     await saveModels(updatedModels);
   };
@@ -141,16 +179,21 @@ export function ModelsPage() {
     return await invoke<string>("download_model", { url });
   };
 
-  const handleUpdateModelName = () => {
+  const handleUpdateModel = async (updatedModel: ModelConfig) => {
     if (editingIndex === null) return;
+
+    // Validation: Check for duplicate local paths (excluding the one being edited)
+    if (
+      models.some((m, i) => i !== editingIndex && m.path === updatedModel.path)
+    ) {
+      toast.error("Another model with this file path already exists.");
+      throw new Error("Duplicate path");
+    }
+
     const updatedModels = [...models];
-    updatedModels[editingIndex] = {
-      ...updatedModels[editingIndex],
-      name: editingName,
-    };
-    saveModels(updatedModels);
+    updatedModels[editingIndex] = updatedModel;
+    await saveModels(updatedModels);
     setEditingIndex(null);
-    setEditingName("");
   };
 
   const handleDeleteModel = async (index: number) => {
@@ -185,6 +228,14 @@ export function ModelsPage() {
 
       const updatedModels = models.filter((_, i) => i !== index);
       await saveModels(updatedModels);
+
+      // Delete the actual file from disk
+      try {
+        await invoke("delete_file", { path: modelToDelete.path });
+      } catch (err) {
+        console.error("Failed to delete model file:", err);
+        // We don't toast error here because the model is already gone from config
+      }
     } catch (err) {
       console.error("Failed to check model usage:", err);
       toast.error("Failed to verify model usage before deletion");
@@ -211,17 +262,18 @@ export function ModelsPage() {
           </p>
         </div>
 
-        {/* We need to pass isOpen/onOpenChange because we want to also trigger from empty state */}
-        {/* However, the current AddModelDialog implementation uses internal state. 
-             Let's just use a key to force re-render or let it handle itself, 
-             BUT the requirement was to split. 
-             To properly control from the empty state button, I should have lifted state.
-             Quick fix: Allow AddModelDialog to be controlled or uncontrolled.
-             Re-writing ModelsPage to use AddModelDialog with internal trigger for the top right button.
-          */}
-        <AddModelDialog
-          onAdd={handleAddModel}
+        <ModelDialog
+          mode="add"
+          isOpen={isAddOpen}
+          onOpenChange={setIsAddOpen}
+          onSubmit={handleAddModel}
           downloadModel={handleDownloadModel}
+          trigger={
+            <Button className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Add Model
+            </Button>
+          }
         />
       </div>
 
@@ -236,60 +288,40 @@ export function ModelsPage() {
               Add your first AI model to start using facial or voice recognition
               features.
             </p>
-            {/* This button essentially duplicates the top right trigger. 
-                 Ideally we click it and it opens the dialog. 
-                 Since I didn't verify AddModelDialog opened state props, 
-                 I'll just hint the user to use the top button or 
-                 I will need to update AddModelDialog to accept an open prop.
-                 Let's update AddModelDialog in the next step to be controlled.
-              */}
+            <Button
+              className="mt-4 flex items-center gap-2"
+              onClick={() => setIsAddOpen(true)}
+            >
+              <Plus className="w-4 h-4" />
+              Add Model
+            </Button>
           </div>
         ) : (
           models.map((model, index) => (
             <ModelCard
               key={`${model.path}-${index}`}
               model={model}
-              status={statusMap[model.path]}
-              onEdit={() => {
-                setEditingIndex(index);
-                setEditingName(model.name || "");
-              }}
+              status={
+                downloadProgress[model.path] !== undefined
+                  ? "downloading"
+                  : statusMap[model.path]
+              }
+              progress={downloadProgress[model.path] || 0}
+              onEdit={() => setEditingIndex(index)}
               onDelete={() => handleDeleteModel(index)}
             />
           ))
         )}
       </div>
 
-      <Dialog
-        open={editingIndex !== null}
+      <ModelDialog
+        mode="edit"
+        isOpen={editingIndex !== null}
         onOpenChange={(open) => !open && setEditingIndex(null)}
-      >
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Rename Model</DialogTitle>
-            <DialogDescription>
-              Give this model a friendly name for easier identification.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="edit-name">Model Name</Label>
-              <Input
-                id="edit-name"
-                value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                placeholder="e.g. Production Face Model"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingIndex(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdateModelName}>Save Changes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        initialData={editingIndex !== null ? models[editingIndex] : undefined}
+        onSubmit={handleUpdateModel}
+        downloadModel={handleDownloadModel}
+      />
     </div>
   );
 }

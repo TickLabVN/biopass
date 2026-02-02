@@ -20,6 +20,7 @@ import { ModelStatus, type ModelStatusType } from "./ModelStatus";
 interface ModelCardProps {
   model: ModelConfig;
   status: ModelStatusType;
+  progress?: number;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -57,7 +58,13 @@ function ModelFileFolderButton({ path }: { path: string }) {
   );
 }
 
-export function ModelCard({ model, status, onEdit, onDelete }: ModelCardProps) {
+export function ModelCard({
+  model,
+  status,
+  progress = 0,
+  onEdit,
+  onDelete,
+}: ModelCardProps) {
   return (
     <div className="group relative flex flex-col gap-4 p-5 rounded-xl border border-border bg-card/50 backdrop-blur-sm hover:border-primary/20 hover:shadow-lg transition-all duration-300">
       <div className="flex sm:flex-row sm:items-start justify-between gap-4">
@@ -84,7 +91,7 @@ export function ModelCard({ model, status, onEdit, onDelete }: ModelCardProps) {
         </div>
 
         <div className="flex items-center gap-1">
-          <ModelStatus status={status} />
+          <ModelStatus status={status} progress={progress} />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -99,7 +106,7 @@ export function ModelCard({ model, status, onEdit, onDelete }: ModelCardProps) {
             <DropdownMenuContent align="end">
               <DropdownMenuItem className="cursor-pointer" onClick={onEdit}>
                 <Edit2 className="w-4 h-4 mr-2" />
-                Rename
+                Edit
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"

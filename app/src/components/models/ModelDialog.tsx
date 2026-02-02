@@ -1,6 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { Download, FileSearch, Loader2, Plus } from "lucide-react";
-import { useState } from "react";
+import { Download, FileSearch, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,21 +24,52 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ModelConfig } from "@/types/config";
 
-interface AddModelDialogProps {
-  onAdd: (model: ModelConfig) => Promise<void>;
-  downloadModel: (url: string) => Promise<string>;
+interface ModelDialogProps {
+  mode: "add" | "edit";
+  initialData?: ModelConfig;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (
+    model: ModelConfig,
+    isRemote: boolean,
+    downloadUrl?: string,
+  ) => Promise<void>;
+  downloadModel?: (url: string) => Promise<string>;
+  trigger?: React.ReactNode;
 }
 
-export function AddModelDialog({ onAdd, downloadModel }: AddModelDialogProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function ModelDialog({
+  mode,
+  initialData,
+  isOpen,
+  onOpenChange,
+  onSubmit,
+  downloadModel,
+  trigger,
+}: ModelDialogProps) {
   const [addSource, setAddSource] = useState<"local" | "remote">("local");
   const [downloadUrl, setDownloadUrl] = useState("");
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [newModel, setNewModel] = useState<ModelConfig>({
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [model, setModel] = useState<ModelConfig>({
     path: "",
     name: "",
     type: "face",
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      if (mode === "edit" && initialData) {
+        setModel(initialData);
+        // If it's an edit, we typically don't show the "download" tab if it's already a local path,
+        // but we can allow switching if desired. For simplicity, default to local.
+        setAddSource("local");
+      } else {
+        setModel({ path: "", name: "", type: "face" });
+        setDownloadUrl("");
+        setAddSource("local");
+      }
+    }
+  }, [isOpen, mode, initialData]);
 
   const handleSelectFile = async () => {
     try {
@@ -46,7 +77,7 @@ export function AddModelDialog({ onAdd, downloadModel }: AddModelDialogProps) {
         multiple: false,
       });
       if (selected && typeof selected === "string") {
-        setNewModel({ ...newModel, path: selected });
+        setModel({ ...model, path: selected });
       }
     } catch (err) {
       console.error("Failed to open file dialog:", err);
@@ -54,54 +85,72 @@ export function AddModelDialog({ onAdd, downloadModel }: AddModelDialogProps) {
     }
   };
 
-  const handleAddStart = async () => {
+  const handleAction = async () => {
     if (addSource === "remote") {
       if (!downloadUrl) {
         toast.error("Please enter a download URL");
         return;
       }
       try {
-        setIsDownloading(true);
-        toast.info("Downloading model... this may take a moment.");
-
-        const downloadedPath = await downloadModel(downloadUrl);
-
-        await onAdd({ ...newModel, path: downloadedPath });
-
-        setIsOpen(false);
-        setNewModel({ path: "", name: "", type: "face" });
-        setDownloadUrl("");
+        setIsProcessing(true);
+        if (mode === "add") {
+          toast.info("Starting model download in background...");
+          if (downloadModel) {
+            const downloadedPath = await downloadModel(downloadUrl);
+            await onSubmit(
+              { ...model, path: downloadedPath },
+              true,
+              downloadUrl,
+            );
+          }
+        } else {
+          // Editing existing to a new download URL
+          toast.info("Updating model with new download...");
+          if (downloadModel) {
+            const downloadedPath = await downloadModel(downloadUrl);
+            await onSubmit(
+              { ...model, path: downloadedPath },
+              true,
+              downloadUrl,
+            );
+          }
+        }
+        onOpenChange(false);
       } catch (err) {
-        console.error("Failed to download model:", err);
-        toast.error(`Download failed: ${err}`);
+        console.error("Failed to process model:", err);
+        toast.error(`Failed to process model: ${err}`);
       } finally {
-        setIsDownloading(false);
+        setIsProcessing(false);
       }
     } else {
-      if (!newModel.path) {
+      if (!model.path) {
         toast.error("Please select a model file");
         return;
       }
-      await onAdd(newModel);
-      setIsOpen(false);
-      setNewModel({ path: "", name: "", type: "face" });
+      try {
+        setIsProcessing(true);
+        await onSubmit(model, false);
+        onOpenChange(false);
+      } catch (_err) {
+        // Error toast is usually handled by parent
+      } finally {
+        setIsProcessing(false);
+      }
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button className="flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          Add Model
-        </Button>
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Add New AI Model</DialogTitle>
+          <DialogTitle>
+            {mode === "add" ? "Add New AI Model" : "Edit AI Model"}
+          </DialogTitle>
           <DialogDescription>
-            Register a new model by selecting a local file or downloading from a
-            URL.
+            {mode === "add"
+              ? "Register a new model by selecting a local file or downloading from a URL."
+              : "Update your model configuration or replace the model file."}
           </DialogDescription>
         </DialogHeader>
 
@@ -129,25 +178,23 @@ export function AddModelDialog({ onAdd, downloadModel }: AddModelDialogProps) {
               <Input
                 id="name"
                 placeholder="e.g. My Custom Face Model"
-                value={newModel.name || ""}
-                onChange={(e) =>
-                  setNewModel({ ...newModel, name: e.target.value })
-                }
-                disabled={isDownloading}
+                value={model.name || ""}
+                onChange={(e) => setModel({ ...model, name: e.target.value })}
+                disabled={isProcessing}
               />
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="type">Model Type</Label>
               <Select
-                value={newModel.type}
+                value={model.type}
                 onValueChange={(value) =>
-                  setNewModel({
-                    ...newModel,
+                  setModel({
+                    ...model,
                     type: value as "face" | "voice",
                   })
                 }
-                disabled={isDownloading}
+                disabled={isProcessing}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
@@ -169,21 +216,22 @@ export function AddModelDialog({ onAdd, downloadModel }: AddModelDialogProps) {
                     size="sm"
                     onClick={handleSelectFile}
                     className="cursor-pointer shrink-0"
+                    disabled={isProcessing}
                   >
                     Choose File
                   </Button>
                   <span
                     className="text-sm text-muted-foreground truncate flex-1"
-                    title={newModel.path}
+                    title={model.path}
                   >
-                    {newModel.path
-                      ? newModel.path.split(/[\\/]/).pop()
+                    {model.path
+                      ? model.path.split(/[\\/]/).pop()
                       : "No file chosen"}
                   </span>
                 </div>
-                {newModel.path && (
+                {model.path && (
                   <p className="text-[10px] text-muted-foreground truncate px-1">
-                    Full path: {newModel.path}
+                    Full path: {model.path}
                   </p>
                 )}
               </div>
@@ -195,7 +243,7 @@ export function AddModelDialog({ onAdd, downloadModel }: AddModelDialogProps) {
                   placeholder="https://example.com/models/face.onnx"
                   value={downloadUrl}
                   onChange={(e) => setDownloadUrl(e.target.value)}
-                  disabled={isDownloading}
+                  disabled={isProcessing}
                 />
                 <p className="text-[10px] text-muted-foreground">
                   Model will be saved to your application data directory.
@@ -208,17 +256,19 @@ export function AddModelDialog({ onAdd, downloadModel }: AddModelDialogProps) {
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => setIsOpen(false)}
-            disabled={isDownloading}
+            onClick={() => onOpenChange(false)}
+            disabled={isProcessing}
           >
             Cancel
           </Button>
-          <Button onClick={handleAddStart} disabled={isDownloading}>
-            {isDownloading ? (
+          <Button onClick={handleAction} disabled={isProcessing}>
+            {isProcessing ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Downloading...
+                {addSource === "remote" ? "Starting..." : "Processing..."}
               </>
+            ) : mode === "edit" ? (
+              "Save Changes"
             ) : addSource === "remote" ? (
               "Download & Add"
             ) : (

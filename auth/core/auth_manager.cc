@@ -1,63 +1,77 @@
 #include "auth_manager.h"
+
 #include <atomic>
 #include <iostream>
+
+#include "retry_strategy.h"
 
 namespace facepass {
 
 void AuthManager::add_method(std::unique_ptr<IAuthMethod> method) {
-  methods_.push_back(std::move(method));
+  this->methods_.push_back(std::move(method));
 }
 
-void AuthManager::set_mode(ExecutionMode mode) { mode_ = mode; }
+void AuthManager::set_mode(ExecutionMode mode) { this->mode_ = mode; }
 
-void AuthManager::set_config(const AuthConfig &config) { config_ = config; }
+void AuthManager::set_config(const AuthConfig &config) { this->config_ = config; }
 
 int AuthManager::authenticate(const std::string &username) {
-  if (methods_.empty()) {
-    std::cerr << "AuthManager: No authentication methods configured"
-              << std::endl;
+  if (this->methods_.empty()) {
+    std::cerr << "AuthManager: No authentication methods configured" << std::endl;
     return PAM_AUTH_ERR;
   }
 
-  switch (mode_) {
-  case ExecutionMode::Sequential:
-    return run_sequential(username);
-  case ExecutionMode::Parallel:
-    return run_parallel(username);
-  default:
-    return PAM_AUTH_ERR;
+  switch (this->mode_) {
+    case ExecutionMode::Sequential:
+      return this->run_sequential(username);
+    case ExecutionMode::Parallel:
+      return this->run_parallel(username);
+    default:
+      return PAM_AUTH_ERR;
   }
 }
 
 int AuthManager::run_sequential(const std::string &username) {
-  for (auto &method : methods_) {
+  RetryStrategy retry_strategy(this->config_.retries);
+
+  for (auto &method : this->methods_) {
     if (!method->is_available()) {
-      std::cerr << "AuthManager: " << method->name()
-                << " is not available, skipping" << std::endl;
+      std::cerr << "AuthManager: " << method->name() << " is not available, skipping" << std::endl;
       continue;
     }
 
-    std::cout << "AuthManager: Trying " << method->name() << " authentication"
-              << std::endl;
-    AuthResult result = method->authenticate(username, config_);
+    int attempts = 0;
+    AuthResult result;
+
+    do {
+      if (attempts > 0) {
+        std::cerr << "AuthManager: Retrying " << method->name() << " (attempt " << attempts + 1
+                  << "/" << this->config_.retries << ")" << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(this->config_.retry_delay_ms));
+      } else {
+        std::cout << "AuthManager: Trying " << method->name() << " authentication" << std::endl;
+      }
+
+      result = method->authenticate(username, this->config_);
+      attempts++;
+
+    } while (retry_strategy.should_retry(result, attempts));
 
     switch (result) {
-    case AuthResult::Success:
-      std::cout << "AuthManager: " << method->name()
-                << " authentication succeeded" << std::endl;
-      return PAM_SUCCESS;
-    case AuthResult::Failure:
-      std::cerr << "AuthManager: " << method->name()
-                << " authentication failed, trying next" << std::endl;
-      break;
-    case AuthResult::Retry:
-      std::cerr << "AuthManager: " << method->name()
-                << " requested retry, trying next" << std::endl;
-      break;
-    case AuthResult::Unavailable:
-      std::cerr << "AuthManager: " << method->name() << " became unavailable"
-                << std::endl;
-      break;
+      case AuthResult::Success:
+        std::cout << "AuthManager: " << method->name() << " authentication succeeded" << std::endl;
+        return PAM_SUCCESS;
+      case AuthResult::Failure:
+        std::cerr << "AuthManager: " << method->name() << " authentication failed, trying next"
+                  << std::endl;
+        break;
+      case AuthResult::Retry:
+        std::cerr << "AuthManager: " << method->name()
+                  << " requested retry but max retries exceeded" << std::endl;
+        break;
+      case AuthResult::Unavailable:
+        std::cerr << "AuthManager: " << method->name() << " became unavailable" << std::endl;
+        break;
     }
   }
 
@@ -70,31 +84,43 @@ int AuthManager::run_parallel(const std::string &username) {
   std::vector<std::future<AuthResult>> futures;
 
   // Launch all methods in parallel
-  for (auto &method : methods_) {
+  for (auto &method : this->methods_) {
     if (!method->is_available()) {
-      std::cerr << "AuthManager: " << method->name()
-                << " is not available, skipping" << std::endl;
+      std::cerr << "AuthManager: " << method->name() << " is not available, skipping" << std::endl;
       continue;
     }
 
     // Capture by reference - methods_ lifetime is guaranteed during
     // authenticate()
-    futures.push_back(
-        std::async(std::launch::async, [&method, &username, &config = config_,
-                                        &success_found]() {
-          // Early exit if another method already succeeded
-          if (success_found.load()) {
-            return AuthResult::Failure;
-          }
+    futures.push_back(std::async(
+        std::launch::async, [&method, &username, &config = this->config_, &success_found]() {
+          RetryStrategy retry_strategy(config.retries);
+          int attempts = 0;
+          AuthResult result;
 
-          std::cout << "AuthManager: Starting " << method->name()
-                    << " authentication (parallel)" << std::endl;
-          AuthResult result = method->authenticate(username, config);
+          do {
+            // Early exit if another method already succeeded
+            if (success_found.load()) {
+              return AuthResult::Failure;
+            }
+
+            if (attempts > 0) {
+              std::cout << "AuthManager: Retrying " << method->name() << " (parallel attempt "
+                        << attempts + 1 << ")" << std::endl;
+              std::this_thread::sleep_for(std::chrono::milliseconds(config.retry_delay_ms));
+            } else {
+              std::cout << "AuthManager: Starting " << method->name()
+                        << " authentication (parallel)" << std::endl;
+            }
+
+            result = method->authenticate(username, config);
+            attempts++;
+          } while (retry_strategy.should_retry(result, attempts) && !success_found.load());
 
           if (result == AuthResult::Success) {
             success_found.store(true);
-            std::cout << "AuthManager: " << method->name()
-                      << " authentication succeeded (parallel)" << std::endl;
+            std::cout << "AuthManager: " << method->name() << " authentication succeeded (parallel)"
+                      << std::endl;
           }
 
           return result;
@@ -114,9 +140,8 @@ int AuthManager::run_parallel(const std::string &username) {
     return PAM_SUCCESS;
   }
 
-  std::cerr << "AuthManager: All parallel authentication methods failed"
-            << std::endl;
+  std::cerr << "AuthManager: All parallel authentication methods failed" << std::endl;
   return PAM_AUTH_ERR;
 }
 
-} // namespace facepass
+}  // namespace facepass

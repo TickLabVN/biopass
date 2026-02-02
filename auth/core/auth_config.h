@@ -1,8 +1,9 @@
 #pragma once
 
-#include "auth_manager.h"
 #include <string>
 #include <vector>
+
+#include "auth_manager.h"
 
 namespace facepass {
 
@@ -28,4 +29,4 @@ FacePassConfig load_config(const std::string &username);
  */
 std::string get_config_path(const std::string &username);
 
-} // namespace facepass
+}  // namespace facepass

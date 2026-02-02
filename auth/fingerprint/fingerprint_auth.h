@@ -10,14 +10,13 @@ namespace facepass {
  * implemented.
  */
 class FingerprintAuth : public IAuthMethod {
-public:
+ public:
   FingerprintAuth() = default;
   ~FingerprintAuth() override = default;
 
   std::string name() const override { return "Fingerprint"; }
   bool is_available() const override;
-  AuthResult authenticate(const std::string &username,
-                          const AuthConfig &config) override;
+  AuthResult authenticate(const std::string &username, const AuthConfig &config) override;
 };
 
-} // namespace facepass
+}  // namespace facepass

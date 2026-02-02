@@ -15,3 +15,7 @@ pre-commit:
           git add "$file"
         done
 
+    - name: Rust Format
+      root: app/src-tauri/
+      glob: "*.rs"
+      run: cargo fmt --all --check

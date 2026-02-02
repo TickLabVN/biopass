@@ -17,5 +17,5 @@
 #include "face_detection.h"
 #include "face_recognition.h"
 
-int scan_face(const string &, int8_t, const int, bool anti_spoofing = false);
+int scan_face(const string &username, int8_t retries, const int gap, bool anti_spoofing = false);
 #endif

@@ -15,19 +15,12 @@
 #include <torch/script.h>
 #include <torch/torch.h>
 
-class Box {
- public:
+struct Box {
   int x1, y1, x2, y2;
-  Box(int _x1 = 0, int _y1 = 0, int _x2 = 0, int _y2 = 0) {
-    x1 = _x1;
-    x2 = _x2;
-    y1 = _y1;
-    y2 = _y2;
-  }
+  Box(int x1 = 0, int y1 = 0, int x2 = 0, int y2 = 0) : x1(x1), y1(y1), x2(x2), y2(y2) {}
 };
 
-class Detection {
- public:
+struct Detection {
   int class_id{-1};
   cv::Rect box;
   Box xyxy_box;
@@ -37,23 +30,22 @@ class Detection {
   std::string class_name;
 
   Detection(int class_id, std::string class_name, float conf, cv::Rect box, Box xyxy_box,
-            const cv::Mat& image, cv::Scalar color) {
-    this->class_id = class_id;
-    this->class_name = class_name;
-    this->conf = conf;
-    this->box = box;
-    this->xyxy_box = xyxy_box;
-    this->color = color;
-    this->image = image;
-  };
+            const cv::Mat& image, cv::Scalar color)
+      : class_id(class_id),
+        class_name(class_name),
+        conf(conf),
+        box(box),
+        xyxy_box(xyxy_box),
+        color(color),
+        image(image) {}
 
   bool operator>(const Detection& obj) const {
-    return (this->box.width * this->box.height) > (obj.box.width * obj.box.height);
-  };
+    return (box.width * box.height) > (obj.box.width * obj.box.height);
+  }
 
   bool operator<(const Detection& obj) const {
-    return (this->box.width * this->box.height) < (obj.box.width * obj.box.height);
-  };
+    return (box.width * box.height) < (obj.box.width * obj.box.height);
+  }
 };
 
 class FaceDetection {

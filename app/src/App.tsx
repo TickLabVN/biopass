@@ -1,72 +1,198 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useState } from "react";
-import { CameraSample } from "@/components/samples/CameraSample";
-import { VoiceSample } from "@/components/samples/VoiceSample";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Cpu, Laptop, Moon, Settings, Sun, User } from "lucide-react";
+import { useTheme } from "next-themes";
+import { useEffect, useRef, useState } from "react";
+import { ConfigPage } from "@/components/config";
+import { ModelsPage } from "@/components/models";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import type { FacepassConfig } from "@/types/config";
 import logo from "./assets/logo.png";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
-  const [showSamples, setShowSamples] = useState(false);
+type Tab = "config" | "models";
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+function App() {
+  const [username, setUsername] = useState("");
+  const [activeTab, setActiveTab] = useState<Tab>("config");
+  const { setTheme, theme } = useTheme();
+
+  useEffect(() => {
+    // Listen for system theme changes from Tauri (more reliable on Linux)
+    const window = getCurrentWindow();
+
+    const sync = async () => {
+      if (theme === "system") {
+        const sysTheme = await window.theme();
+        if (sysTheme)
+          document.documentElement.classList.toggle(
+            "dark",
+            sysTheme === "dark",
+          );
+      }
+    };
+
+    sync();
+
+    const unlisten = window.onThemeChanged(({ payload: newTheme }) => {
+      if (theme === "system") {
+        document.documentElement.classList.toggle("dark", newTheme === "dark");
+      }
+    });
+
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [theme]);
+
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    const loadUsername = async () => {
+      try {
+        const u = await invoke<string>("get_current_username");
+        setUsername(u);
+      } catch (err) {
+        console.error("Failed to get username:", err);
+      }
+    };
+
+    const loadInitialTheme = async () => {
+      if (initialized.current) return;
+      initialized.current = true;
+
+      try {
+        const config = await invoke<FacepassConfig>("load_config");
+        if (config.appearance) {
+          setTheme(config.appearance);
+        }
+      } catch (err) {
+        console.error("Failed to load initial theme from config:", err);
+      }
+    };
+
+    loadUsername();
+    loadInitialTheme();
+  }, [setTheme]);
+
+  // Update theme in config when it changes manually via toggle
+  useEffect(() => {
+    const updateConfigTheme = async () => {
+      try {
+        const config = await invoke<FacepassConfig>("load_config");
+        if (config.appearance !== theme) {
+          config.appearance = theme ?? "dark";
+          await invoke("save_config", { config });
+        }
+      } catch (err) {
+        console.debug("Theme sync to config skipped or failed:", err);
+      }
+    };
+    if (theme) updateConfigTheme();
+  }, [theme]);
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen p-8 bg-background text-foreground text-center">
-      <img
-        src={logo}
-        className="h-32 mb-8 hover:scale-105 transition-transform"
-        alt="Facepass logo"
-      />
-      <h1 className="text-4xl font-bold mb-4">Facepass</h1>
-      <p className="mb-8 text-muted-foreground max-w-md">
-        Modern FaceID login for Linux. A fast, secure, and privacy-focused
-        facial recognition module.
-      </p>
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Navigation */}
+      <nav className="sticky top-0 z-50 backdrop-blur-lg bg-background/80 border-b border-border">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-8">
+              <div className="flex items-center gap-3">
+                <img src={logo} className="h-8" alt="Facepass logo" />
+                <span className="font-bold text-lg hidden sm:inline-block">
+                  Facepass
+                </span>
+              </div>
 
-      <div className="flex flex-col gap-8 w-full max-w-2xl items-center">
-        {!showSamples ? (
-          <div className="flex flex-col items-center gap-4">
-            <form
-              className="flex gap-2 mb-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                greet();
-              }}
-            >
-              <input
-                id="greet-input"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                onChange={(e) => setName(e.currentTarget.value)}
-                placeholder="Enter a name..."
-              />
-              <Button type="submit">Greet</Button>
-            </form>
-            <p className="font-medium h-6">{greetMsg}</p>
-            <Button variant="outline" onClick={() => setShowSamples(true)}>
-              View Input Samples
-            </Button>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-2xl font-bold">Input Samples</h2>
-              <Button variant="ghost" onClick={() => setShowSamples(false)}>
-                Back to Greet
-              </Button>
+              {/* Tab Navigation */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("config")}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+                    activeTab === "config"
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  <Settings className="w-4 h-4" />
+                  <span className="text-sm font-medium">Configuration</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("models")}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+                    activeTab === "models"
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  <Cpu className="w-4 h-4" />
+                  <span className="text-sm font-medium">AI Models</span>
+                </button>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <CameraSample />
-              <VoiceSample />
-            </div>
+
+            {username && (
+              <div className="flex items-center gap-4">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="cursor-pointer"
+                    >
+                      <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                      <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                      <span className="sr-only">Toggle theme</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => setTheme("light")}
+                      className="cursor-pointer"
+                    >
+                      <Sun className="mr-2 h-4 w-4" />
+                      <span>Light</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setTheme("dark")}
+                      className="cursor-pointer"
+                    >
+                      <Moon className="mr-2 h-4 w-4" />
+                      <span>Dark</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setTheme("system")}
+                      className="cursor-pointer"
+                    >
+                      <Laptop className="mr-2 h-4 w-4" />
+                      <span>System</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 border border-border/50">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{username}</span>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    </main>
+        </div>
+      </nav>
+
+      {/* Content */}
+      <main className="max-w-6xl mx-auto">
+        {activeTab === "config" ? <ConfigPage /> : <ModelsPage />}
+      </main>
+    </div>
   );
 }
 

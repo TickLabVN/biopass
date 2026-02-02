@@ -13,14 +13,10 @@
 #include <torch/script.h>
 #include <torch/torch.h>
 
-class SpoofResult {
- public:
+struct SpoofResult {
   float score;
   bool spoof;
-  SpoofResult(float score, bool spoof) {
-    this->score = score;
-    this->spoof = spoof;
-  }
+  SpoofResult(float score, bool spoof) : score(score), spoof(spoof) {}
 };
 
 class FaceAntiSpoofing {

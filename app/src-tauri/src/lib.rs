@@ -7,6 +7,14 @@ use config::{
     list_voice_recordings, load_config, save_config, save_face_image, save_voice_recording,
 };
 
+mod fingerprint;
+mod fingerprint_ffi;
+use fingerprint::{
+    add_fingerprint, authenticate_fingerprint, delete_fingerprint, enroll_fingerprint,
+    fingerprint_is_available, list_enrolled_fingerprints, list_fingerprint_devices,
+    remove_fingerprint,
+};
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -52,7 +60,15 @@ pub fn run() {
             delete_voice_recording,
             download_model,
             check_file_exists,
-            delete_file
+            delete_file,
+            add_fingerprint,
+            delete_fingerprint,
+            enroll_fingerprint,
+            remove_fingerprint,
+            fingerprint_is_available,
+            list_enrolled_fingerprints,
+            authenticate_fingerprint,
+            list_fingerprint_devices
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -41,6 +41,12 @@ export interface FaceMethodConfig {
 
 export interface FingerprintMethodConfig {
   enable: boolean;
+  fingers: FingerConfig[];
+}
+
+export interface FingerConfig {
+  name: string;
+  created_at: number;
 }
 
 export interface VoiceMethodConfig {
@@ -85,6 +91,7 @@ export const defaultConfig: FacepassConfig = {
     },
     fingerprint: {
       enable: true,
+      fingers: [],
     },
     voice: {
       enable: true,

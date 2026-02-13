@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import type { StrategyConfig } from "@/types/config";
 
 interface Props {
@@ -61,6 +62,31 @@ export function StrategySection({ strategy, onChange }: Props) {
       </h2>
 
       <div className="grid gap-6">
+        {/* PAM Enablement */}
+        <div className="flex items-center justify-between p-4 rounded-lg bg-primary/5 border border-primary/10 transition-all">
+          <div className="grid gap-0.5">
+            <Label
+              htmlFor="pam-enabled"
+              className="text-sm font-semibold flex items-center gap-2"
+            >
+              System Sign-in Integration
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-bold uppercase tracking-wider">
+                Recommended
+              </span>
+            </Label>
+            <p className="text-xs text-muted-foreground max-w-[400px]">
+              Use FacePass to unlock your computer and authorize system actions.
+            </p>
+          </div>
+          <Switch
+            id="pam-enabled"
+            checked={strategy.pam_enabled}
+            onCheckedChange={(checked) =>
+              onChange({ ...strategy, pam_enabled: checked })
+            }
+          />
+        </div>
+
         {/* Execution Mode */}
         <div className="grid gap-2.5">
           <Label className="text-sm font-medium text-muted-foreground">

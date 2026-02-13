@@ -32,14 +32,23 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
   manager.set_config(config.auth);
 
   // Add requested authentication methods
+  int methods_count = 0;
   for (const auto &method_name : config.methods) {
     if (method_name == "face") {
       manager.add_method(std::make_unique<facepass::FaceAuth>());
+      methods_count++;
     } else if (method_name == "voice") {
       manager.add_method(std::make_unique<facepass::VoiceAuth>());
+      methods_count++;
     } else if (method_name == "fingerprint") {
       manager.add_method(std::make_unique<facepass::FingerprintAuth>());
+      methods_count++;
     }
+  }
+
+  // If no methods are enabled, ignore this module and let PAM jump to the next one
+  if (methods_count == 0) {
+    return PAM_IGNORE;
   }
 
   // Authenticate

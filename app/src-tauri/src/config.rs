@@ -25,6 +25,8 @@ pub struct StrategyConfig {
     pub order: Vec<String>,
     pub retries: u32,
     pub retry_delay: u32,
+    #[serde(default)]
+    pub pam_enabled: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -135,6 +137,7 @@ fn get_default_config() -> FacepassConfig {
             ],
             retries: 3,
             retry_delay: 500,
+            pam_enabled: false,
         },
         methods: MethodsConfig {
             face: FaceMethodConfig {

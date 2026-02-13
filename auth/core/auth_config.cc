@@ -37,33 +37,49 @@ FacePassConfig load_config(const std::string &username) {
   try {
     YAML::Node yaml = YAML::LoadFile(config_path);
 
-    // Parse mode
-    if (yaml["mode"]) {
-      config.mode = parse_mode(yaml["mode"].as<std::string>());
-    }
+    // 1. Parse Strategy settings
+    if (yaml["strategy"]) {
+      const auto &strategy = yaml["strategy"];
 
-    // Parse methods
-    if (yaml["methods"] && yaml["methods"].IsSequence()) {
-      config.methods.clear();
-      for (const auto &method : yaml["methods"]) {
-        config.methods.push_back(method.as<std::string>());
+      if (strategy["execution_mode"]) {
+        config.mode = parse_mode(strategy["execution_mode"].as<std::string>());
+      }
+
+      if (strategy["retries"]) {
+        config.auth.retries = strategy["retries"].as<int>();
+      }
+
+      if (strategy["retry_delay"]) {
+        config.auth.retry_delay_ms = strategy["retry_delay"].as<int>();
+      }
+
+      // Load prioritized order of methods
+      if (strategy["order"] && strategy["order"].IsSequence()) {
+        config.methods.clear();
+        for (const auto &method : strategy["order"]) {
+          config.methods.push_back(method.as<std::string>());
+        }
       }
     }
 
-    // Parse auth config
-    if (yaml["auth"]) {
-      const auto &auth = yaml["auth"];
+    // 2. Filter methods based on 'enable' flag in 'methods' block
+    if (yaml["methods"]) {
+      const auto &methods_node = yaml["methods"];
+      std::vector<std::string> enabled_methods;
 
-      if (auth["retries"]) {
-        config.auth.retries = auth["retries"].as<int>();
+      for (const auto &method_name : config.methods) {
+        if (methods_node[method_name] && methods_node[method_name]["enable"]) {
+          if (methods_node[method_name]["enable"].as<bool>()) {
+            enabled_methods.push_back(method_name);
+          }
+        }
       }
+      config.methods = enabled_methods;
 
-      if (auth["retry_delay_ms"]) {
-        config.auth.retry_delay_ms = auth["retry_delay_ms"].as<int>();
-      }
-
-      if (auth["anti_spoof"]) {
-        config.auth.anti_spoof = auth["anti_spoof"].as<bool>();
+      // Check anti-spoofing specifically for face if available
+      if (methods_node["face"] && methods_node["face"]["anti_spoofing"] &&
+          methods_node["face"]["anti_spoofing"]["enable"]) {
+        config.auth.anti_spoof = methods_node["face"]["anti_spoofing"]["enable"].as<bool>();
       }
     }
 

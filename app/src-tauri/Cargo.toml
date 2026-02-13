@@ -35,3 +35,6 @@ tauri-plugin-dialog = "2"
 reqwest = { version = "0.12", features = ["json", "stream"] }
 futures-util = "0.3"
 tokio = { version = "1.36.0", features = ["full"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -9,6 +9,7 @@ use config::{
 
 mod fingerprint;
 mod fingerprint_ffi;
+mod pam;
 use fingerprint::{
     add_fingerprint, authenticate_fingerprint, delete_fingerprint, enroll_fingerprint,
     fingerprint_is_available, list_enrolled_fingerprints, list_fingerprint_devices,
@@ -68,7 +69,8 @@ pub fn run() {
             fingerprint_is_available,
             list_enrolled_fingerprints,
             authenticate_fingerprint,
-            list_fingerprint_devices
+            list_fingerprint_devices,
+            pam::apply_pam_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

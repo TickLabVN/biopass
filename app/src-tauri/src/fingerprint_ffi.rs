@@ -39,6 +39,14 @@ extern "C" {
         auth: *mut std::ffi::c_void,
         username: *const c_char,
         finger_name: *const c_char,
+        callback: Option<
+            unsafe extern "C" fn(
+                done: bool,
+                status: *const c_char,
+                user_data: *mut std::ffi::c_void,
+            ),
+        >,
+        user_data: *mut std::ffi::c_void,
     ) -> bool;
 
     // Remove finger
@@ -130,13 +138,50 @@ impl FingerprintAuth {
     }
 
     /// Enroll a new fingerprint for a user
-    pub fn enroll(&self, username: &str, finger_name: &str) -> Result<bool, String> {
+    pub fn enroll(
+        &self,
+        username: &str,
+        finger_name: &str,
+        app_handle: &tauri::AppHandle,
+    ) -> Result<bool, String> {
         let username_c = CString::new(username).map_err(|_| "Invalid username".to_string())?;
         let finger_name_c =
             CString::new(finger_name).map_err(|_| "Invalid finger name".to_string())?;
 
-        let success =
-            unsafe { fingerprint_enroll(self.inner, username_c.as_ptr(), finger_name_c.as_ptr()) };
+        unsafe extern "C" fn enroll_callback(
+            done: bool,
+            status: *const c_char,
+            user_data: *mut std::ffi::c_void,
+        ) {
+            use tauri::Emitter;
+            let app = &*(user_data as *const tauri::AppHandle);
+            let status_str = CStr::from_ptr(status).to_string_lossy().into_owned();
+
+            #[derive(serde::Serialize, Clone)]
+            struct ProgressPayload {
+                done: bool,
+                status: String,
+            }
+
+            app.emit(
+                "fingerprint-enroll-status",
+                ProgressPayload {
+                    done,
+                    status: status_str,
+                },
+            )
+            .ok();
+        }
+
+        let success = unsafe {
+            fingerprint_enroll(
+                self.inner,
+                username_c.as_ptr(),
+                finger_name_c.as_ptr(),
+                Some(enroll_callback),
+                app_handle as *const tauri::AppHandle as *mut std::ffi::c_void,
+            )
+        };
 
         Ok(success)
     }

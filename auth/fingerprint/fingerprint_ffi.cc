@@ -88,10 +88,12 @@ void fingerprint_free_string_array(char** array, int count) {
   delete[] array;
 }
 
-bool fingerprint_enroll(void* auth, const char* username, const char* finger_name) {
+bool fingerprint_enroll(void* auth, const char* username, const char* finger_name,
+                        EnrollProgressCallback callback, void* user_data) {
   if (!auth || !username || !finger_name)
     return false;
-  return static_cast<facepass::FingerprintAuth*>(auth)->enroll(username, finger_name);
+  return static_cast<facepass::FingerprintAuth*>(auth)->enroll(username, finger_name, callback,
+                                                               user_data);
 }
 
 bool fingerprint_remove_finger(void* auth, const char* username, const char* finger_name) {

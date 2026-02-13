@@ -20,7 +20,9 @@ class FingerprintAuth : public IAuthMethod {
   bool is_available() const override;
   AuthResult authenticate(const std::string &username, const AuthConfig &config) override;
   std::vector<std::string> list_enrolled_fingers(const std::string &username);
-  bool enroll(const std::string &username, const std::string &finger_name);
+  bool enroll(const std::string &username, const std::string &finger_name,
+              void (*callback)(bool done, const char *status, void *user_data) = nullptr,
+              void *user_data = nullptr);
   bool remove_finger(const std::string &username, const std::string &finger_name);
 };
 

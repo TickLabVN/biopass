@@ -21,6 +21,11 @@ typedef struct {
 } FingerprintAuthConfig;
 
 /**
+ * Callback for enrollment progress
+ */
+typedef void (*EnrollProgressCallback)(bool done, const char* status, void* user_data);
+
+/**
  * Initialize fingerprint auth instance
  * Returns opaque pointer to FingerprintAuth instance
  */
@@ -58,7 +63,8 @@ void fingerprint_free_string_array(char** array, int count);
  * Enroll a new fingerprint
  * Returns true on success, false on failure
  */
-bool fingerprint_enroll(void* auth, const char* username, const char* finger_name);
+bool fingerprint_enroll(void* auth, const char* username, const char* finger_name,
+                        EnrollProgressCallback callback, void* user_data);
 
 /**
  * Remove an enrolled fingerprint

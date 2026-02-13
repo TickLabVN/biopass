@@ -66,7 +66,7 @@ pub async fn enroll_fingerprint(
     }
 
     // Perform enrollment through FFI
-    let success = auth.enroll(&username, &finger_name)?;
+    let success = auth.enroll(&username, &finger_name, &app)?;
     if !success {
         return Err("Failed to enroll fingerprint".to_string());
     }

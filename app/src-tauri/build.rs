@@ -7,6 +7,10 @@ fn main() {
 
     println!("cargo:rustc-link-search=native={}", library_dir.display());
     println!("cargo:rustc-link-lib=static=facepass_fingerprint");
+    println!(
+        "cargo:rerun-if-changed={}",
+        library_dir.join("libfacepass_fingerprint.a").display()
+    );
 
     // Link C++ standard library
     println!("cargo:rustc-link-lib=stdc++");

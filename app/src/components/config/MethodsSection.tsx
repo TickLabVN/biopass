@@ -1,4 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import {
   Camera,
   ChevronDown,
@@ -43,21 +44,14 @@ interface Props {
 export function MethodsSection({ methods, models, onChange }: Props) {
   const [expandedMethod, setExpandedMethod] = useState<string | null>("face");
   const [videoDevices, setVideoDevices] = useState<string[]>([]);
-  const [fingerprintDevices, setFingerprintDevices] = useState<
-    { name: string; driver: string; device_id: string }[]
-  >([]);
 
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const [vDevices, fDevices] = await Promise.all([
+        const [vDevices] = await Promise.all([
           invoke<string[]>("list_video_devices"),
-          invoke<{ name: string; driver: string; device_id: string }[]>(
-            "list_fingerprint_devices",
-          ),
         ]);
         setVideoDevices(vDevices);
-        setFingerprintDevices(fDevices);
       } catch (err) {
         console.error("Failed to fetch devices:", err);
       }
@@ -105,7 +99,7 @@ export function MethodsSection({ methods, models, onChange }: Props) {
             setExpandedMethod(expandedMethod === "face" ? null : "face")
           }
         >
-          <div className="grid gap-4 pt-4">
+          <div className="grid gap-4">
             {/* Face Capture */}
             <FaceCaptureSection />
             {/* Detection */}
@@ -316,7 +310,6 @@ export function MethodsSection({ methods, models, onChange }: Props) {
           <div className="pt-4 overflow-hidden">
             <FingerprintSection
               config={methods.fingerprint}
-              devices={fingerprintDevices}
               onUpdate={(fingerprint) => updateFingerprint(fingerprint)}
             />
           </div>
@@ -532,7 +525,7 @@ function FaceCaptureSection() {
                   <button
                     type="button"
                     onClick={() => deleteFace(path)}
-                    className="absolute top-1 right-1 p-1 rounded bg-destructive/80 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    className="absolute top-1 right-1 p-1 rounded bg-destructive/80 text-destructive-foreground cursor-pointer"
                   >
                     <Trash2 className="w-3 h-3 text-white" />
                   </button>
@@ -796,16 +789,12 @@ function VoiceRecordingSection() {
 
 function FingerprintSection({
   config,
-  devices,
   onUpdate,
 }: {
   config: FingerprintMethodConfig;
-  devices: { name: string; driver: string; device_id: string }[];
   onUpdate: (config: FingerprintMethodConfig) => void;
 }) {
-  const [selectedDevice, setSelectedDevice] = useState<string>("");
-  const [selectedFinger, setSelectedFinger] =
-    useState<string>("right-index-finger");
+  const [selectedFinger, setSelectedFinger] = useState<string>("");
   const [isAdding, setIsAdding] = useState(false);
   const [username, setUsername] = useState<string>("");
 
@@ -857,14 +846,23 @@ function FingerprintSection({
   ];
 
   const handleAdd = async () => {
-    if (!selectedDevice) {
-      toast.error("Please select a fingerprint device");
-      return;
-    }
-
     setIsAdding(true);
     const toastId = toast.loading(
       `Enrolling ${selectedFinger.replace(/-/g, " ")}... Please touch the sensor.`,
+    );
+
+    let scanCount = 0;
+    const unlisten = await listen<{ done: boolean; status: string }>(
+      "fingerprint-enroll-status",
+      (event) => {
+        if (event.payload.status === "enroll-stage-passed") {
+          scanCount++;
+          toast.loading(
+            `Enrolling ${selectedFinger.replace(/-/g, " ")}... Scan ${scanCount} complete.`,
+            { id: toastId },
+          );
+        }
+      },
     );
 
     try {
@@ -873,7 +871,10 @@ function FingerprintSection({
         fingerName: selectedFinger,
       });
 
-      toast.success(`${selectedFinger.replace(/-/g, " ")} enrolled!`, {
+      const formattedName = selectedFinger.replace(/-/g, " ");
+      const capitalizedName =
+        formattedName.charAt(0).toUpperCase() + formattedName.slice(1);
+      toast.success(`${capitalizedName} enrolled!`, {
         id: toastId,
       });
 
@@ -885,9 +886,11 @@ function FingerprintSection({
           { name: selectedFinger, created_at: Math.floor(Date.now() / 1000) },
         ],
       });
+      setSelectedFinger("");
     } catch (err) {
       toast.error(`Enrollment failed: ${err}`, { id: toastId });
     } finally {
+      unlisten();
       setIsAdding(false);
     }
   };
@@ -898,7 +901,10 @@ function FingerprintSection({
         username: username,
         fingerName: fingerName,
       });
-      toast.success(`${fingerName.replace(/-/g, " ")} deleted`);
+      const formattedName = fingerName.replace(/-/g, " ");
+      const capitalizedName =
+        formattedName.charAt(0).toUpperCase() + formattedName.slice(1);
+      toast.success(`${capitalizedName} deleted`);
 
       onUpdate({
         ...config,
@@ -924,10 +930,6 @@ function FingerprintSection({
                   <span className="text-sm font-medium capitalize">
                     {f.name.replace(/-/g, " ")}
                   </span>
-                  <span className="text-[10px] text-muted-foreground italic">
-                    Added on{" "}
-                    {new Date(f.created_at * 1000).toLocaleDateString()}
-                  </span>
                 </div>
                 <button
                   type="button"
@@ -951,34 +953,17 @@ function FingerprintSection({
         <div className="grid gap-3">
           <div className="grid gap-2">
             <Label className="text-xs text-muted-foreground">
-              Select Device
-            </Label>
-            <Select value={selectedDevice} onValueChange={setSelectedDevice}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Select Device" />
-              </SelectTrigger>
-              <SelectContent>
-                {devices.map((d) => (
-                  <SelectItem key={d.device_id} value={d.device_id}>
-                    {d.name} ({d.driver})
-                  </SelectItem>
-                ))}
-                {devices.length === 0 && (
-                  <SelectItem value="none" disabled>
-                    No fingerprint readers found
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label className="text-xs text-muted-foreground">
               Select Finger
             </Label>
             <Select value={selectedFinger} onValueChange={setSelectedFinger}>
               <SelectTrigger className="h-9">
-                <SelectValue placeholder="Select Finger" />
+                <SelectValue placeholder="Select Finger">
+                  {selectedFinger && (
+                    <span className="capitalize">
+                      {selectedFinger.replace(/-/g, " ")}
+                    </span>
+                  )}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {fingerOptions.map((f) => (
@@ -997,7 +982,7 @@ function FingerprintSection({
 
           <Button
             onClick={handleAdd}
-            disabled={isAdding || !selectedDevice}
+            disabled={isAdding || !selectedFinger}
             className="w-full h-9 mt-1"
           >
             {isAdding ? "Enrolling..." : "Enroll Finger"}
@@ -1030,17 +1015,23 @@ function MethodCard({
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-xl border transition-all duration-300",
+        "group relative overflow-hidden rounded-xl border transition-all duration-200",
         expanded
-          ? "border-border bg-muted/30 shadow-md ring-1 ring-border/50"
-          : "border-border/30 bg-background/50 hover:bg-muted/20",
+          ? "border-border bg-muted/30 shadow-md ring-2 ring-primary/20"
+          : "border-border bg-background/50 hover:bg-muted/20 shadow-xs",
       )}
     >
       <div className="p-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 flex-1">
+        <div
+          className="flex items-center gap-4 flex-1 cursor-pointer group/header"
+          onClick={onExpand}
+          onKeyDown={(e) => e.key === "Enter" && onExpand()}
+          role="button"
+          tabIndex={0}
+        >
           <div
             className={cn(
-              "w-10 h-10 rounded-lg bg-linear-to-br flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm",
+              "w-10 h-10 rounded-lg bg-linear-to-br flex items-center justify-center transition-transform group-hover/header:scale-110 shadow-sm",
               color,
             )}
           >
@@ -1064,7 +1055,13 @@ function MethodCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div
+          className="flex items-center gap-4"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center gap-2 pr-2 border-r border-border/50">
             <Switch
               checked={enabled}
@@ -1074,7 +1071,10 @@ function MethodCard({
           </div>
           <button
             type="button"
-            onClick={onExpand}
+            onClick={(e) => {
+              e.stopPropagation();
+              onExpand();
+            }}
             className={cn(
               "w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/80 transition-all cursor-pointer",
               expanded && "bg-muted/80 rotate-180",
@@ -1087,13 +1087,15 @@ function MethodCard({
 
       <div
         className={cn(
-          "grid transition-all duration-300 ease-in-out px-4 pb-4",
+          "grid transition-all duration-200 ease-in-out",
           expanded
             ? "grid-rows-[1fr] opacity-100"
             : "grid-rows-[0fr] opacity-0",
         )}
       >
-        <div className="overflow-hidden">{children}</div>
+        <div className="overflow-hidden">
+          <div className="px-4 pb-4">{children}</div>
+        </div>
       </div>
     </div>
   );
@@ -1141,11 +1143,6 @@ function ModelSelectField({
     <div className="grid gap-2">
       <div className="flex items-center justify-between">
         <Label className="text-xs text-muted-foreground">{label}</Label>
-        <ModelStatus
-          status={selectedModel ? statusMap[selectedModel.path] : "checking"}
-          className="text-[10px]"
-          size="sm"
-        />
       </div>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger
@@ -1160,14 +1157,14 @@ function ModelSelectField({
           {models.length > 0 ? (
             models.map((model) => (
               <SelectItem key={model.path} value={model.path}>
-                <div className="flex items-center justify-between w-[200px]">
+                <div className="flex items-center gap-3 pr-6">
                   <span className="truncate">
                     {model.name || model.path.split("/").pop()}
                   </span>
                   <ModelStatus
                     status={statusMap[model.path]}
                     size="sm"
-                    className="ml-2 h-4"
+                    className="h-4"
                   />
                 </div>
               </SelectItem>

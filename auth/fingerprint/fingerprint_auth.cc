@@ -334,7 +334,9 @@ std::vector<std::string> FingerprintAuth::list_enrolled_fingers(const std::strin
   return enrolled_fingers;
 }
 
-bool FingerprintAuth::enroll(const std::string& username, const std::string& finger_name) {
+bool FingerprintAuth::enroll(const std::string& username, const std::string& finger_name,
+                             void (*callback)(bool done, const char* status, void* user_data),
+                             void* user_data) {
   GError* error = nullptr;
   GDBusConnection* connection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, nullptr, &error);
   if (!connection) {
@@ -428,11 +430,15 @@ bool FingerprintAuth::enroll(const std::string& username, const std::string& fin
     GMainLoop* loop;
     bool success;
     std::string error_msg;
+    void (*callback)(bool done, const char* status, void* user_data);
+    void* user_data;
   };
 
   EnrollContext ctx;
   ctx.loop = g_main_loop_new(nullptr, FALSE);
   ctx.success = false;
+  ctx.callback = callback;
+  ctx.user_data = user_data;
 
   auto on_enroll_status = [](GDBusConnection* connection, const gchar* sender_name,
                              const gchar* object_path, const gchar* interface_name,
@@ -445,6 +451,10 @@ bool FingerprintAuth::enroll(const std::string& username, const std::string& fin
     std::string res_str = result;
 
     std::cout << "Enrollment status: " << res_str << ", done: " << done << std::endl;
+
+    if (ctx->callback) {
+      ctx->callback(done, result, ctx->user_data);
+    }
 
     if (res_str == "enroll-completed") {
       ctx->success = true;
@@ -544,10 +554,28 @@ bool FingerprintAuth::remove_finger(const std::string& username, const std::stri
     return false;
   }
 
-  // 4. Delete enrolled finger
-  GVariant* delete_ret = g_dbus_proxy_call_sync(
-      device, "DeleteEnrolledFinger", g_variant_new("(ss)", username.c_str(), finger_name.c_str()),
-      G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
+  // 4. Claim Device
+  GVariant* claim_ret =
+      g_dbus_proxy_call_sync(device, "Claim", g_variant_new("(s)", username.c_str()),
+                             G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
+
+  if (!claim_ret) {
+    std::cerr << "Failed to claim device for deletion: " << (error ? error->message : "")
+              << std::endl;
+    if (error)
+      g_error_free(error);
+    g_object_unref(device);
+    g_object_unref(manager);
+    g_object_unref(connection);
+    return false;
+  }
+  g_variant_unref(claim_ret);
+
+  // 5. Delete enrolled finger
+  // DeleteEnrolledFinger expects only the finger name (s), not (username, finger_name)
+  GVariant* delete_ret = g_dbus_proxy_call_sync(device, "DeleteEnrolledFinger",
+                                                g_variant_new("(s)", finger_name.c_str()),
+                                                G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
 
   bool success = false;
   if (delete_ret) {
@@ -559,6 +587,12 @@ bool FingerprintAuth::remove_finger(const std::string& username, const std::stri
     if (error)
       g_error_free(error);
   }
+
+  // 6. Release Device
+  GVariant* release_ret = g_dbus_proxy_call_sync(device, "Release", nullptr, G_DBUS_CALL_FLAGS_NONE,
+                                                 -1, nullptr, nullptr);
+  if (release_ret)
+    g_variant_unref(release_ret);
 
   g_object_unref(device);
   g_object_unref(manager);

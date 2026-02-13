@@ -29,7 +29,7 @@ string debug_path(const string &username) {
   return string("/home/") + username + "/.config/facepass/debugs";
 }
 
-string model_path(const string &username, ModelType modelType) {
+string model_path(const string &username, const ModelType &modelType) {
   string modelTypeStr;
   switch (modelType) {
     case FACE_DETECTION:

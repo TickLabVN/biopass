@@ -10,6 +10,7 @@ export interface StrategyConfig {
   order: string[];
   retries: number;
   retry_delay: number;
+  pam_enabled: boolean;
 }
 
 export interface MethodsConfig {
@@ -67,6 +68,7 @@ export const defaultConfig: FacepassConfig = {
     order: ["face", "fingerprint", "voice"],
     retries: 3,
     retry_delay: 500,
+    pam_enabled: false,
   },
   methods: {
     face: {

@@ -916,6 +916,7 @@ dependencies = [
  "directories",
  "futures-util",
  "gtk",
+ "pkg-config",
  "reqwest",
  "serde",
  "serde_json",

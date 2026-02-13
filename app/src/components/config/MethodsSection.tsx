@@ -1,4 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import {
   Camera,
   ChevronDown,
@@ -47,10 +48,12 @@ export function MethodsSection({ methods, models, onChange }: Props) {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const devices = await invoke<string[]>("list_video_devices");
-        setVideoDevices(devices);
+        const [vDevices] = await Promise.all([
+          invoke<string[]>("list_video_devices"),
+        ]);
+        setVideoDevices(vDevices);
       } catch (err) {
-        console.error("Failed to fetch video devices:", err);
+        console.error("Failed to fetch devices:", err);
       }
     };
     fetchDevices();
@@ -96,7 +99,7 @@ export function MethodsSection({ methods, models, onChange }: Props) {
             setExpandedMethod(expandedMethod === "face" ? null : "face")
           }
         >
-          <div className="grid gap-4 pt-4">
+          <div className="grid gap-4">
             {/* Face Capture */}
             <FaceCaptureSection />
             {/* Detection */}
@@ -294,7 +297,9 @@ export function MethodsSection({ methods, models, onChange }: Props) {
           icon={methodIcons.fingerprint}
           color={methodColors.fingerprint}
           enabled={methods.fingerprint.enable}
-          onToggle={(enable) => updateFingerprint({ enable })}
+          onToggle={(enable) =>
+            updateFingerprint({ ...methods.fingerprint, enable })
+          }
           expanded={expandedMethod === "fingerprint"}
           onExpand={() =>
             setExpandedMethod(
@@ -302,9 +307,11 @@ export function MethodsSection({ methods, models, onChange }: Props) {
             )
           }
         >
-          <div className="pt-4 text-sm text-muted-foreground">
-            Fingerprint authentication uses the system's fingerprint reader via
-            fprintd. No additional configuration required.
+          <div className="pt-4 overflow-hidden">
+            <FingerprintSection
+              config={methods.fingerprint}
+              onUpdate={(fingerprint) => updateFingerprint(fingerprint)}
+            />
           </div>
         </MethodCard>
 
@@ -518,7 +525,7 @@ function FaceCaptureSection() {
                   <button
                     type="button"
                     onClick={() => deleteFace(path)}
-                    className="absolute top-1 right-1 p-1 rounded bg-destructive/80 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    className="absolute top-1 right-1 p-1 rounded bg-destructive/80 text-destructive-foreground cursor-pointer"
                   >
                     <Trash2 className="w-3 h-3 text-white" />
                   </button>
@@ -780,6 +787,212 @@ function VoiceRecordingSection() {
   );
 }
 
+function FingerprintSection({
+  config,
+  onUpdate,
+}: {
+  config: FingerprintMethodConfig;
+  onUpdate: (config: FingerprintMethodConfig) => void;
+}) {
+  const [selectedFinger, setSelectedFinger] = useState<string>("");
+  const [isAdding, setIsAdding] = useState(false);
+  const [username, setUsername] = useState<string>("");
+
+  useEffect(() => {
+    const fetchUsername = async () => {
+      try {
+        const user = await invoke<string>("get_current_username");
+        setUsername(user);
+
+        // Sync enrolled fingers from backend
+        const enrolledFingers = await invoke<string[]>(
+          "list_enrolled_fingerprints",
+          { username: user },
+        );
+
+        // Update local config if there's a mismatch (best effort)
+        const currentFingerNames = config.fingers.map((f) => f.name);
+        const needsSync =
+          enrolledFingers.some((f) => !currentFingerNames.includes(f)) ||
+          currentFingerNames.some((f) => !enrolledFingers.includes(f));
+
+        if (needsSync) {
+          const syncedFingers = enrolledFingers.map((name) => {
+            const existing = config.fingers.find((f) => f.name === name);
+            return (
+              existing || { name, created_at: Math.floor(Date.now() / 1000) }
+            );
+          });
+          onUpdate({ ...config, fingers: syncedFingers });
+        }
+      } catch (err) {
+        console.error("Failed to sync fingerprints:", err);
+      }
+    };
+    fetchUsername();
+  }, [config, onUpdate]);
+
+  const fingerOptions = [
+    "left-thumb",
+    "left-index-finger",
+    "left-middle-finger",
+    "left-ring-finger",
+    "left-little-finger",
+    "right-thumb",
+    "right-index-finger",
+    "right-middle-finger",
+    "right-ring-finger",
+    "right-little-finger",
+  ];
+
+  const handleAdd = async () => {
+    setIsAdding(true);
+    const toastId = toast.loading(
+      `Enrolling ${selectedFinger.replace(/-/g, " ")}... Please touch the sensor.`,
+    );
+
+    let scanCount = 0;
+    const unlisten = await listen<{ done: boolean; status: string }>(
+      "fingerprint-enroll-status",
+      (event) => {
+        if (event.payload.status === "enroll-stage-passed") {
+          scanCount++;
+          toast.loading(
+            `Enrolling ${selectedFinger.replace(/-/g, " ")}... Scan ${scanCount} complete.`,
+            { id: toastId },
+          );
+        }
+      },
+    );
+
+    try {
+      await invoke("enroll_fingerprint", {
+        username: username,
+        fingerName: selectedFinger,
+      });
+
+      const formattedName = selectedFinger.replace(/-/g, " ");
+      const capitalizedName =
+        formattedName.charAt(0).toUpperCase() + formattedName.slice(1);
+      toast.success(`${capitalizedName} enrolled!`, {
+        id: toastId,
+      });
+
+      // The backend saves to config, but we update UI immediately
+      onUpdate({
+        ...config,
+        fingers: [
+          ...config.fingers,
+          { name: selectedFinger, created_at: Math.floor(Date.now() / 1000) },
+        ],
+      });
+      setSelectedFinger("");
+    } catch (err) {
+      toast.error(`Enrollment failed: ${err}`, { id: toastId });
+    } finally {
+      unlisten();
+      setIsAdding(false);
+    }
+  };
+
+  const handleDelete = async (fingerName: string) => {
+    try {
+      await invoke("remove_fingerprint", {
+        username: username,
+        fingerName: fingerName,
+      });
+      const formattedName = fingerName.replace(/-/g, " ");
+      const capitalizedName =
+        formattedName.charAt(0).toUpperCase() + formattedName.slice(1);
+      toast.success(`${capitalizedName} deleted`);
+
+      onUpdate({
+        ...config,
+        fingers: config.fingers.filter((f) => f.name !== fingerName),
+      });
+    } catch (err) {
+      toast.error(`Delete failed: ${err}`);
+    }
+  };
+
+  return (
+    <div className="grid gap-4">
+      <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
+        <h4 className="font-medium mb-3 text-sm">Registered Fingers</h4>
+        {config.fingers.length > 0 ? (
+          <div className="grid gap-2">
+            {config.fingers.map((f) => (
+              <div
+                key={f.name}
+                className="flex items-center justify-between p-2 bg-background rounded-lg border"
+              >
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium capitalize">
+                    {f.name.replace(/-/g, " ")}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(f.name)}
+                  className="p-1 rounded hover:bg-destructive/20 text-destructive cursor-pointer transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground italic">
+            No fingers registered yet.
+          </p>
+        )}
+      </div>
+
+      <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
+        <h4 className="font-medium mb-3 text-sm">Enroll New Finger</h4>
+        <div className="grid gap-3">
+          <div className="grid gap-2">
+            <Label className="text-xs text-muted-foreground">
+              Select Finger
+            </Label>
+            <Select value={selectedFinger} onValueChange={setSelectedFinger}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Select Finger">
+                  {selectedFinger && (
+                    <span className="capitalize">
+                      {selectedFinger.replace(/-/g, " ")}
+                    </span>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {fingerOptions.map((f) => (
+                  <SelectItem
+                    key={f}
+                    value={f}
+                    className="capitalize"
+                    disabled={config.fingers.some((cf) => cf.name === f)}
+                  >
+                    {f.replace(/-/g, " ")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button
+            onClick={handleAdd}
+            disabled={isAdding || !selectedFinger}
+            className="w-full h-9 mt-1"
+          >
+            {isAdding ? "Enrolling..." : "Enroll Finger"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MethodCard({
   title,
   icon,
@@ -801,50 +1014,89 @@ function MethodCard({
 }) {
   return (
     <div
-      className={`rounded-lg border transition-all ${enabled ? "border-border" : "border-border/50"}`}
+      className={cn(
+        "group relative overflow-hidden rounded-xl border transition-all duration-200",
+        expanded
+          ? "border-border bg-muted/30 shadow-md ring-2 ring-primary/20"
+          : "border-border bg-background/50 hover:bg-muted/20 shadow-xs",
+      )}
     >
-      <div className="flex items-center justify-between p-4">
-        <button
-          type="button"
+      <div className="p-4 flex items-center justify-between gap-4">
+        <div
+          className="flex items-center gap-4 flex-1 cursor-pointer group/header"
           onClick={onExpand}
-          className="flex items-center gap-3 flex-1 text-left cursor-pointer"
+          onKeyDown={(e) => e.key === "Enter" && onExpand()}
+          role="button"
+          tabIndex={0}
         >
-          <span
-            className={`w-10 h-10 rounded-lg bg-linear-to-br ${color} flex items-center justify-center text-xl`}
+          <div
+            className={cn(
+              "w-10 h-10 rounded-lg bg-linear-to-br flex items-center justify-center transition-transform group-hover/header:scale-110 shadow-sm",
+              color,
+            )}
           >
             {icon}
-          </span>
-          <div>
-            <h3 className="font-medium">{title}</h3>
-            {enabled ? (
+          </div>
+          <div className="flex-1">
+            <h3 className="font-medium text-sm sm:text-base">{title}</h3>
+            {!expanded && (
               <Badge
-                variant="default"
-                className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-none px-2 py-0.5 h-auto text-[10px]"
+                variant={enabled ? "default" : "secondary"}
+                className={cn(
+                  "mt-1 text-[10px] h-4 px-1.5 transition-colors",
+                  enabled
+                    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                    : "bg-muted text-muted-foreground",
+                )}
               >
-                Enabled
-              </Badge>
-            ) : (
-              <Badge
-                variant="secondary"
-                className="px-2 py-0.5 h-auto text-[10px] opacity-70"
-              >
-                Disabled
+                {enabled ? "Enabled" : "Disabled"}
               </Badge>
             )}
           </div>
-          <ChevronDown
-            className={`ml-auto mr-4 w-4 h-4 transition-transform ${expanded ? "rotate-180" : ""}`}
-          />
-        </button>
-        <Switch
-          checked={enabled}
-          onCheckedChange={onToggle}
-          className="cursor-pointer"
-        />
+        </div>
+
+        <div
+          className="flex items-center gap-4"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-2 pr-2 border-r border-border/50">
+            <Switch
+              checked={enabled}
+              onCheckedChange={onToggle}
+              className="cursor-pointer"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onExpand();
+            }}
+            className={cn(
+              "w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/80 transition-all cursor-pointer",
+              expanded && "bg-muted/80 rotate-180",
+            )}
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        </div>
       </div>
-      {expanded && (
-        <div className="px-4 pb-4 border-t border-border/50">{children}</div>
-      )}
+
+      <div
+        className={cn(
+          "grid transition-all duration-200 ease-in-out",
+          expanded
+            ? "grid-rows-[1fr] opacity-100"
+            : "grid-rows-[0fr] opacity-0",
+        )}
+      >
+        <div className="overflow-hidden">
+          <div className="px-4 pb-4">{children}</div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -859,10 +1111,9 @@ function ModelSelectField({
   label: string;
   value: string;
   models: ModelConfig[];
-  error?: boolean;
+  error: boolean;
   onChange: (value: string) => void;
 }) {
-  const id = `select-${label.toLowerCase().replace(/\s+/g, "-")}`;
   const selectedModel = models.find((m) => m.path === value);
   const [statusMap, setStatusMap] = useState<Record<string, boolean>>({});
 
@@ -884,85 +1135,44 @@ function ModelSelectField({
     };
 
     checkAllModels();
-
-    const onFocus = () => checkAllModels();
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
   }, [models]);
 
+  const isValid = selectedModel && statusMap[selectedModel.path];
+
   return (
-    <div className="grid gap-1.5 w-full">
-      <Label
-        htmlFor={id}
-        className={cn(
-          "text-[10px] font-bold uppercase tracking-wider pl-0.5",
-          error && (!value || !selectedModel)
-            ? "text-destructive"
-            : "text-muted-foreground/70",
-        )}
-      >
-        {label}{" "}
-        {error && (!value || !selectedModel) && (
-          <span className="text-destructive">* Required</span>
-        )}
-      </Label>
+    <div className="grid gap-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">{label}</Label>
+      </div>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger
-          id={id}
           className={cn(
-            "w-full h-11 px-3",
-            error &&
-              (!value || !selectedModel) &&
-              "border-destructive ring-destructive/20 ring-[3px]",
+            "h-9 transition-colors text-sm",
+            error && !isValid && "border-destructive ring-destructive/20",
           )}
         >
-          <SelectValue placeholder="Select model...">
-            {selectedModel && (
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-xs text-left">
-                  {selectedModel.name ||
-                    selectedModel.path.split(/[\\/]/).pop()}
-                </span>
-                {statusMap[selectedModel.path] === false && (
-                  <ModelStatus status="missing" size="sm" className="ml-2" />
-                )}
-              </div>
-            )}
-          </SelectValue>
+          <SelectValue placeholder="Select a model" />
         </SelectTrigger>
         <SelectContent>
-          {models.length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground italic text-center">
-              No models found.
-              <br />
-              <span className="text-xs">Add some in AI Models tab.</span>
-            </div>
-          ) : (
+          {models.length > 0 ? (
             models.map((model) => (
-              <SelectItem
-                key={model.path}
-                value={model.path}
-                className="cursor-pointer py-2.5"
-              >
-                <div className="flex flex-col gap-0.5 pointer-events-none relative pr-8">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm">
-                      {model.name || model.path.split(/[\\/]/).pop()}
-                    </span>
-                    {statusMap[model.path] === false && (
-                      <ModelStatus
-                        status="missing"
-                        size="sm"
-                        className="ml-2"
-                      />
-                    )}
-                  </div>
-                  <span className="text-[10px] opacity-60 font-mono truncate max-w-[280px]">
-                    {model.path}
+              <SelectItem key={model.path} value={model.path}>
+                <div className="flex items-center gap-3 pr-6">
+                  <span className="truncate">
+                    {model.name || model.path.split("/").pop()}
                   </span>
+                  <ModelStatus
+                    status={statusMap[model.path]}
+                    size="sm"
+                    className="h-4"
+                  />
                 </div>
               </SelectItem>
             ))
+          ) : (
+            <SelectItem value="none" disabled>
+              No models available
+            </SelectItem>
           )}
         </SelectContent>
       </Select>
@@ -981,21 +1191,19 @@ function SliderField({
 }) {
   return (
     <div className="grid gap-2">
-      <div className="flex justify-between">
-        <span className="text-xs font-medium text-muted-foreground">
-          {label}
-        </span>
-        <span className="text-xs font-mono text-muted-foreground">
-          {value.toFixed(2)}
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">{label}</Label>
+        <span className="text-xs font-mono font-medium">
+          {(value * 100).toFixed(0)}%
         </span>
       </div>
-      <div className="py-2">
+      <div className="h-9 flex items-center">
         <Slider
           value={[value]}
-          min={0}
           max={1}
           step={0.01}
-          onValueChange={(values) => onChange(values[0])}
+          onValueChange={([v]) => onChange(v)}
+          className="cursor-pointer"
         />
       </div>
     </div>

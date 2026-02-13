@@ -71,6 +71,14 @@ pub struct AntiSpoofingConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FingerprintMethodConfig {
     pub enable: bool,
+    #[serde(default)]
+    pub fingers: Vec<FingerConfig>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FingerConfig {
+    pub name: String,
+    pub created_at: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -149,7 +157,10 @@ fn get_default_config() -> FacepassConfig {
                     device_id: 1,
                 },
             },
-            fingerprint: FingerprintMethodConfig { enable: true },
+            fingerprint: FingerprintMethodConfig {
+                enable: true,
+                fingers: vec![],
+            },
             voice: VoiceMethodConfig {
                 enable: true,
                 model: "models/voice.onnx".to_string(),

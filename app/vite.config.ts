@@ -14,6 +14,32 @@ export default defineConfig(async () => ({
     },
   },
 
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          if (id.includes("node_modules")) {
+            // Group Tauri-related packages (usually independent)
+            if (id.includes("@tauri-apps")) {
+              return "vendor-tauri";
+            }
+            // Group Dnd-kit (can be large and is relatively independent)
+            if (id.includes("@dnd-kit")) {
+              return "vendor-dnd";
+            }
+            // Put all other node_modules (including React) into a single vendor chunk
+            // to avoid circular dependency cycles between libraries.
+            return "vendor";
+          }
+          // Group configuration UI components for better organization
+          if (id.includes("src/components/config")) {
+            return "config-ui";
+          }
+        },
+      },
+    },
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

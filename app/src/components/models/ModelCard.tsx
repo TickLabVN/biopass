@@ -66,7 +66,7 @@ export function ModelCard({
   onDelete,
 }: ModelCardProps) {
   return (
-    <div className="group relative flex flex-col gap-4 p-5 rounded-xl border border-border bg-card/50 backdrop-blur-sm hover:border-primary/20 hover:shadow-lg transition-all duration-300">
+    <div className="group relative flex flex-col gap-4 p-5 rounded-xl border border-border bg-linear-to-b from-card to-muted/20 shadow-sm hover:border-primary/30 hover:shadow-md transition-all duration-300">
       <div className="flex sm:flex-row sm:items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-linear-to-br from-blue-500/10 to-indigo-500/10 flex items-center justify-center border border-blue-500/10 group-hover:border-blue-500/30 transition-colors">

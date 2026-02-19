@@ -136,8 +136,6 @@ FacePassConfig load_config(const std::string &username) {
       }
       config.methods = enabled;
     }
-
-    std::cout << "FacePass: Loaded config from " << config_path << std::endl;
   } catch (const YAML::BadFile &e) {
     std::cerr << "FacePass: Config file not found at " << config_path << ", using defaults"
               << std::endl;

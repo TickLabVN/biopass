@@ -1,5 +1,7 @@
 #include "identify.h"
 
+#include <memory>
+
 namespace uuid {
 static std::random_device rd;
 static std::mt19937 gen(rd());
@@ -50,27 +52,56 @@ bool process_anti_spoofing(FaceAntiSpoofing &faceAs, cv::Mat &face) {
 void sleep_for(int ms) { this_thread::sleep_for(chrono::milliseconds(ms)); }
 }  // namespace
 
-int scan_face(const string &username, int8_t retries, const int gap, bool anti_spoofing) {
+int scan_face(const string &username, const facepass::FaceMethodConfig &face_config, int8_t retries,
+              const int gap, bool anti_spoofing) {
   cv::VideoCapture camera(0, cv::CAP_V4L2);
   if (!camera.isOpened()) {
     cerr << "ERROR: Could not open camera" << endl;
     return PAM_AUTH_ERR;
   }
 
-  string userFacePath = facepass::user_face_path(username);
-  cv::Mat preparedFace = cv::imread(userFacePath);
-  if (preparedFace.empty()) {
-    cerr << "ERROR: Face not register for user " << username << endl;
+  std::vector<std::string> enrolledFaces = facepass::list_user_faces(username);
+  if (enrolledFaces.empty()) {
+    cerr << "ERROR: No face enrolled for user " << username << endl;
     return PAM_AUTH_ERR;
   }
 
-  FaceRecognition faceReg(facepass::model_path(username, facepass::FACE_RECOGNITION));
-  FaceDetection faceDetector(facepass::model_path(username, facepass::FACE_DETECTION));
-  std::unique_ptr<FaceAntiSpoofing> faceAs = nullptr;
-
+  std::unique_ptr<FaceRecognition> faceReg;
+  std::unique_ptr<FaceDetection> faceDetector;
+  std::unique_ptr<FaceAntiSpoofing> faceAs;
+  try {
+    faceDetector = std::make_unique<FaceDetection>(face_config.detection.model);
+  } catch (const std::exception &e) {
+    std::string msg = e.what();
+    size_t first_line = msg.find('\n');
+    if (first_line != std::string::npos)
+      msg = msg.substr(0, first_line);
+    cerr << "ERROR: Failed to load detection model: " << msg << endl;
+    return PAM_AUTH_ERR;
+  }
+  try {
+    faceReg = std::make_unique<FaceRecognition>(face_config.recognition.model);
+  } catch (const std::exception &e) {
+    std::string msg = e.what();
+    size_t first_line = msg.find('\n');
+    if (first_line != std::string::npos)
+      msg = msg.substr(0, first_line);
+    cerr << "ERROR: Failed to load recognition model: " << msg << endl;
+    return PAM_AUTH_ERR;
+  }
   if (anti_spoofing) {
-    faceAs = std::make_unique<FaceAntiSpoofing>(
-        facepass::model_path(username, facepass::FACE_ANTI_SPOOFING));
+    try {
+      faceAs = std::make_unique<FaceAntiSpoofing>(face_config.anti_spoofing.model);
+    } catch (const std::exception &e) {
+      std::string msg = e.what();
+      size_t first_line = msg.find('\n');
+      if (first_line != std::string::npos)
+        msg = msg.substr(0, first_line);
+      cerr << "ERROR: Failed to load anti-spoofing model: " << msg << endl;
+      // Continue without anti-spoofing if it fails?
+      // identify.cc seems to depend on it if anti_spoofing is true.
+      return PAM_AUTH_ERR;
+    }
   }
 
   bool success = false;
@@ -82,7 +113,7 @@ int scan_face(const string &username, int8_t retries, const int gap, bool anti_s
       break;
     }
 
-    std::vector<Detection> detectedImages = faceDetector.inference(loginFace);
+    std::vector<Detection> detectedImages = faceDetector->inference(loginFace);
     if (detectedImages.empty()) {
       cerr << "ERROR: No face detected" << endl;
       sleep_for(gap);
@@ -96,8 +127,20 @@ int scan_face(const string &username, int8_t retries, const int gap, bool anti_s
       continue;
     }
 
-    MatchResult match = faceReg.match(preparedFace, face);
-    if (match.similar) {
+    // Match against all enrolled faces — succeed if any match
+    bool matched = false;
+    for (const auto &facePath : enrolledFaces) {
+      cv::Mat preparedFace = cv::imread(facePath);
+      if (preparedFace.empty())
+        continue;
+      MatchResult match = faceReg->match(preparedFace, face);
+      if (match.similar) {
+        matched = true;
+        break;
+      }
+    }
+
+    if (matched) {
       success = true;
       break;
     }

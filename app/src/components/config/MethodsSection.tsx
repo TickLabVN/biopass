@@ -157,8 +157,8 @@ export function MethodsSection({ methods, models, onChange }: Props) {
             </div>
 
             {/* Anti-Spoofing */}
-            <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
-              <div className="flex items-center justify-between mb-3">
+            <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-3">
+              <div className="flex items-center justify-between">
                 <h4 className="font-medium text-sm">Anti-Spoofing</h4>
                 <Switch
                   checked={methods.face.anti_spoofing.enable}
@@ -210,8 +210,8 @@ export function MethodsSection({ methods, models, onChange }: Props) {
             </div>
 
             {/* IR Camera */}
-            <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
-              <div className="flex items-center justify-between mb-3">
+            <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-3">
+              <div className="flex items-center justify-between">
                 <h4 className="font-medium text-sm">IR Camera</h4>
                 <Switch
                   checked={methods.face.ir_camera.enable}

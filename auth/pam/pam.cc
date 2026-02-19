@@ -39,7 +39,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
   int methods_count = 0;
   for (const auto &method_name : config.methods) {
     if (method_name == "face") {
-      manager.add_method(std::make_unique<facepass::FaceAuth>());
+      manager.add_method(std::make_unique<facepass::FaceAuth>(config.methods_config.face));
       methods_count++;
     } else if (method_name == "voice") {
       manager.add_method(std::make_unique<facepass::VoiceAuth>());

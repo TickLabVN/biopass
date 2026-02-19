@@ -65,7 +65,7 @@ export function ConfigPage() {
       // Apply PAM configuration
       try {
         await invoke("apply_pam_config");
-        toast.success("Configuration and system settings saved successfully!");
+        toast.success("Settings saved successfully!");
       } catch (pamErr) {
         console.error("Failed to apply PAM config:", pamErr);
         // Special handling for user cancelation of pkexec

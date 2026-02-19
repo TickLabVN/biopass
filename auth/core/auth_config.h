@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <string>
 #include <vector>
@@ -11,6 +12,53 @@
 #include "auth_manager.h"
 
 namespace facepass {
+
+// ---------------------------------------------------------------------------
+// Per-method config structs (mirrors Tauri config.rs)
+// ---------------------------------------------------------------------------
+
+struct DetectionConfig {
+  std::string model = "models/yolov11n-face.torchscript";
+  float threshold = 0.5f;
+};
+
+struct RecognitionConfig {
+  std::string model = "models/edgeface_s_gamma_05_ts.pt";
+  float threshold = 0.8f;
+};
+
+struct AntiSpoofingConfig {
+  bool enable = false;
+  std::string model = "models/mobilenetv3_antispoof_ts.pt";
+  float threshold = 0.8f;
+};
+
+struct FaceMethodConfig {
+  bool enable = true;
+  DetectionConfig detection;
+  RecognitionConfig recognition;
+  AntiSpoofingConfig anti_spoofing;
+};
+
+struct VoiceMethodConfig {
+  bool enable = false;
+  std::string model = "models/voice.onnx";
+  float threshold = 0.8f;
+};
+
+struct FingerprintMethodConfig {
+  bool enable = false;
+};
+
+struct MethodsConfig {
+  FaceMethodConfig face;
+  VoiceMethodConfig voice;
+  FingerprintMethodConfig fingerprint;
+};
+
+// ---------------------------------------------------------------------------
+// Top-level config
+// ---------------------------------------------------------------------------
 
 /**
  * Complete configuration for facepass.
@@ -20,41 +68,32 @@ struct FacePassConfig {
   ExecutionMode mode = ExecutionMode::Sequential;
   std::vector<std::string> methods = {"face"};
   AuthConfig auth = {};
+  MethodsConfig methods_config = {};
 };
 
-/**
- * Load configuration from the user's config file.
- * @param username The PAM username (used to find home directory).
- * @return FacePassConfig struct with loaded or default values.
- */
+// ---------------------------------------------------------------------------
+// Config loading
+// ---------------------------------------------------------------------------
+
 FacePassConfig load_config(const std::string &username);
-
-/**
- * Get the path to the config file for a user.
- */
 std::string get_config_path(const std::string &username);
-
-/**
- * Returns true if the user has a facepass config file.
- * Used to skip authentication gracefully for unconfigured users.
- */
 bool config_exists(const std::string &username);
 
-// Model types available for inference
-enum ModelType {
-  FACE_DETECTION,
-  FACE_RECOGNITION,
-  FACE_ANTI_SPOOFING,
-};
+// ---------------------------------------------------------------------------
+// Path helpers
+// ---------------------------------------------------------------------------
 
-// Returns the path to the registered face image for a user.
-std::string user_face_path(const std::string &username);
+// Returns the base data directory for a user.
+std::string user_data_dir(const std::string &username);
+
+// Returns the path to the faces directory for a user.
+std::string user_faces_dir(const std::string &username);
+
+// Returns all enrolled face image paths for a user (jpg/png).
+std::vector<std::string> list_user_faces(const std::string &username);
 
 // Returns the path to the debug directory for a user.
 std::string debug_path(const std::string &username);
-
-// Returns the path to a model file by type.
-std::string model_path(const std::string &username, const ModelType &modelType);
 
 // Creates required data directories for a user.
 int setup_config(const std::string &username);

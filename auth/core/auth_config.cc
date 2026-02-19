@@ -4,20 +4,20 @@
 #include <unistd.h>
 #include <yaml-cpp/yaml.h>
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 
 namespace facepass {
+
 std::string get_config_path(const std::string &username) {
-  // Get home directory for the user
   struct passwd *pw = getpwnam(username.c_str());
   if (pw == nullptr) {
-    // Fallback to HOME environment variable
     const char *home = getenv("HOME");
     if (home) {
       return std::string(home) + "/.config/com.ticklab.facepass/config.yaml";
     }
-    return "/etc/com.ticklab.facepass/config.yaml";  // System-wide fallback
+    return "/etc/com.ticklab.facepass/config.yaml";
   }
   return std::string(pw->pw_dir) + "/.config/com.ticklab.facepass/config.yaml";
 }
@@ -27,11 +27,21 @@ bool config_exists(const std::string &username) {
   return f.good();
 }
 
-ExecutionMode parse_mode(const std::string &mode_str) {
-  if (mode_str == "parallel") {
-    return ExecutionMode::Parallel;
+std::string user_data_dir(const std::string &username) {
+  struct passwd *pw = getpwnam(username.c_str());
+  if (pw != nullptr) {
+    return std::string(pw->pw_dir) + "/.local/share/com.ticklab.facepass";
   }
-  return ExecutionMode::Sequential;  // Default
+  const char *home = getenv("HOME");
+  if (home)
+    return std::string(home) + "/.local/share/com.ticklab.facepass";
+  return "";
+}
+
+static ExecutionMode parse_mode(const std::string &mode_str) {
+  if (mode_str == "parallel")
+    return ExecutionMode::Parallel;
+  return ExecutionMode::Sequential;
 }
 
 FacePassConfig load_config(const std::string &username) {
@@ -42,50 +52,89 @@ FacePassConfig load_config(const std::string &username) {
   try {
     YAML::Node yaml = YAML::LoadFile(config_path);
 
-    // 1. Parse Strategy settings
+    // 1. Strategy
     if (yaml["strategy"]) {
-      const auto &strategy = yaml["strategy"];
-
-      if (strategy["execution_mode"]) {
-        config.mode = parse_mode(strategy["execution_mode"].as<std::string>());
-      }
-
-      if (strategy["retries"]) {
-        config.auth.retries = strategy["retries"].as<int>();
-      }
-
-      if (strategy["retry_delay"]) {
-        config.auth.retry_delay_ms = strategy["retry_delay"].as<int>();
-      }
-
-      // Load prioritized order of methods
-      if (strategy["order"] && strategy["order"].IsSequence()) {
+      const auto &s = yaml["strategy"];
+      if (s["execution_mode"])
+        config.mode = parse_mode(s["execution_mode"].as<std::string>());
+      if (s["retries"])
+        config.auth.retries = s["retries"].as<int>();
+      if (s["retry_delay"])
+        config.auth.retry_delay_ms = s["retry_delay"].as<int>();
+      if (s["order"] && s["order"].IsSequence()) {
         config.methods.clear();
-        for (const auto &method : strategy["order"]) {
-          config.methods.push_back(method.as<std::string>());
-        }
+        for (const auto &m : s["order"]) config.methods.push_back(m.as<std::string>());
       }
     }
 
-    // 2. Filter methods based on 'enable' flag in 'methods' block
+    // 2. Methods — enable flags + model paths
     if (yaml["methods"]) {
-      const auto &methods_node = yaml["methods"];
-      std::vector<std::string> enabled_methods;
+      const auto &m = yaml["methods"];
 
-      for (const auto &method_name : config.methods) {
-        if (methods_node[method_name] && methods_node[method_name]["enable"]) {
-          if (methods_node[method_name]["enable"].as<bool>()) {
-            enabled_methods.push_back(method_name);
+      // Face
+      if (m["face"]) {
+        const auto &f = m["face"];
+        if (f["enable"])
+          config.methods_config.face.enable = f["enable"].as<bool>();
+        if (f["detection"]) {
+          if (f["detection"]["model"])
+            config.methods_config.face.detection.model = f["detection"]["model"].as<std::string>();
+          if (f["detection"]["threshold"])
+            config.methods_config.face.detection.threshold =
+                f["detection"]["threshold"].as<float>();
+        }
+        if (f["recognition"]) {
+          if (f["recognition"]["model"])
+            config.methods_config.face.recognition.model =
+                f["recognition"]["model"].as<std::string>();
+          if (f["recognition"]["threshold"])
+            config.methods_config.face.recognition.threshold =
+                f["recognition"]["threshold"].as<float>();
+        }
+        if (f["anti_spoofing"]) {
+          if (f["anti_spoofing"]["enable"]) {
+            config.methods_config.face.anti_spoofing.enable =
+                f["anti_spoofing"]["enable"].as<bool>();
+            config.auth.anti_spoof = config.methods_config.face.anti_spoofing.enable;
           }
+          if (f["anti_spoofing"]["model"])
+            config.methods_config.face.anti_spoofing.model =
+                f["anti_spoofing"]["model"].as<std::string>();
+          if (f["anti_spoofing"]["threshold"])
+            config.methods_config.face.anti_spoofing.threshold =
+                f["anti_spoofing"]["threshold"].as<float>();
         }
       }
-      config.methods = enabled_methods;
 
-      // Check anti-spoofing specifically for face if available
-      if (methods_node["face"] && methods_node["face"]["anti_spoofing"] &&
-          methods_node["face"]["anti_spoofing"]["enable"]) {
-        config.auth.anti_spoof = methods_node["face"]["anti_spoofing"]["enable"].as<bool>();
+      // Voice
+      if (m["voice"]) {
+        const auto &v = m["voice"];
+        if (v["enable"])
+          config.methods_config.voice.enable = v["enable"].as<bool>();
+        if (v["model"])
+          config.methods_config.voice.model = v["model"].as<std::string>();
+        if (v["threshold"])
+          config.methods_config.voice.threshold = v["threshold"].as<float>();
       }
+
+      // Fingerprint
+      if (m["fingerprint"]) {
+        const auto &fp = m["fingerprint"];
+        if (fp["enable"])
+          config.methods_config.fingerprint.enable = fp["enable"].as<bool>();
+      }
+
+      // Filter method list to only enabled methods
+      std::vector<std::string> enabled;
+      for (const auto &name : config.methods) {
+        if (name == "face" && config.methods_config.face.enable)
+          enabled.push_back(name);
+        else if (name == "voice" && config.methods_config.voice.enable)
+          enabled.push_back(name);
+        else if (name == "fingerprint" && config.methods_config.fingerprint.enable)
+          enabled.push_back(name);
+      }
+      config.methods = enabled;
     }
 
     std::cout << "FacePass: Loaded config from " << config_path << std::endl;
@@ -99,6 +148,10 @@ FacePassConfig load_config(const std::string &username) {
 
   return config;
 }
+
+// ---------------------------------------------------------------------------
+// Directory / path helpers
+// ---------------------------------------------------------------------------
 
 static int mkdir_p(const std::string &path) {
   size_t pos = 0;
@@ -122,37 +175,39 @@ static int mkdir_p(const std::string &path) {
   return 0;
 }
 
-std::string user_face_path(const std::string &username) {
-  return std::string("/home/") + username + "/.local/share/com.ticklab.facepass/faces/face.jpg";
+std::string user_faces_dir(const std::string &username) {
+  return user_data_dir(username) + "/faces";
 }
 
-std::string debug_path(const std::string &username) {
-  return std::string("/home/") + username + "/.local/share/com.ticklab.facepass/debugs";
-}
+std::vector<std::string> list_user_faces(const std::string &username) {
+  std::vector<std::string> faces;
+  std::string dir = user_faces_dir(username);
+  DIR *dp = opendir(dir.c_str());
+  if (!dp)
+    return faces;
 
-std::string model_path(const std::string &username, const ModelType &modelType) {
-  std::string modelTypeStr;
-  switch (modelType) {
-    case FACE_DETECTION:
-      modelTypeStr = "yolov11n-face.torchscript";
-      break;
-    case FACE_RECOGNITION:
-      modelTypeStr = "edgeface_s_gamma_05_ts.pt";
-      break;
-    case FACE_ANTI_SPOOFING:
-      modelTypeStr = "mobilenetv3_antispoof_ts.pt";
-      break;
+  struct dirent *entry;
+  while ((entry = readdir(dp)) != nullptr) {
+    std::string name(entry->d_name);
+    if (name.size() > 4) {
+      std::string ext = name.substr(name.size() - 4);
+      if (ext == ".jpg" || ext == ".JPG" || ext == ".png" || ext == ".PNG") {
+        faces.push_back(dir + "/" + name);
+      }
+    }
   }
-  return std::string(getenv("HOME")) + "/.local/share/com.ticklab.facepass/models/" + modelTypeStr;
+  closedir(dp);
+  std::sort(faces.begin(), faces.end());
+  return faces;
 }
+
+std::string debug_path(const std::string &username) { return user_data_dir(username) + "/debugs"; }
 
 int setup_config(const std::string &username) {
-  const std::string dataDir = std::string(getenv("HOME")) + "/.local/share/com.ticklab.facepass";
-  const std::string faceDir = dataDir + "/faces";
-  if (mkdir_p(faceDir) != 0)
+  const std::string dataDir = user_data_dir(username);
+  if (mkdir_p(dataDir + "/faces") != 0)
     return 1;
-  std::string debugDir = dataDir + "/debugs";
-  return mkdir_p(debugDir);
+  return mkdir_p(dataDir + "/debugs");
 }
 
 }  // namespace facepass

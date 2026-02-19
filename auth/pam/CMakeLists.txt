@@ -9,7 +9,6 @@ target_include_directories(${PAM} PRIVATE
     ${FaceDetection_INCLUDE_DIRS}
     ${FaceAntiSpoof_INCLUDE_DIRS}
     ${FaceRecognition_INCLUDE_DIRS}
-    ${FaceConfig_INCLUDE_DIRS}
     ${CMAKE_SOURCE_DIR}/core
     ${CMAKE_SOURCE_DIR}/face
     ${CMAKE_SOURCE_DIR}/voice

@@ -2,8 +2,6 @@
 #include <security/pam_misc.h>
 #include <stdio.h>
 
-#include "face_config.h"
-
 const struct pam_conv conv = {misc_conv, NULL};
 
 int main(int argc, char *argv[]) {

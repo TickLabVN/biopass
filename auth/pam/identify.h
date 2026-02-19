@@ -12,8 +12,8 @@
 #include <sstream>
 #include <thread>
 
+#include "auth_config.h"
 #include "face_as.h"
-#include "face_config.h"
 #include "face_detection.h"
 #include "face_recognition.h"
 

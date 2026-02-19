@@ -36,8 +36,6 @@ AuthResult FaceAuth::authenticate(const std::string &username, const AuthConfig 
 
   std::string recogModelPath = face_config_.recognition.model;
   std::string detectModelPath = face_config_.detection.model;
-  std::cout << "FaceAuth: detection model path: " << detectModelPath << std::endl;
-  std::cout << "FaceAuth: recognition model path: " << recogModelPath << std::endl;
   if (!std::ifstream(recogModelPath).good() || !std::ifstream(detectModelPath).good()) {
     std::cerr << "FaceAuth: Model files not found for user " << username << ", skipping"
               << std::endl;
@@ -107,7 +105,7 @@ AuthResult FaceAuth::authenticate(const std::string &username, const AuthConfig 
     }
   }
 
-  return AuthResult::Failure;
+  return AuthResult::Retry;
 }
 
 }  // namespace facepass

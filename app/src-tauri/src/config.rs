@@ -6,9 +6,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager};
 
-// XDG user directories via Tauri path API
-// Config: ~/.config/facepass/config.yaml (or AppData on Windows)
-// Data: ~/.local/share/facepass/faces and voices (or AppData on Windows)
 const CONFIG_FILE: &str = "config.yaml";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

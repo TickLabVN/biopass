@@ -24,6 +24,10 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
   }
 
   // Load configuration from file
+  if (!facepass::config_exists(pUsername)) {
+    // User has not configured facepass — skip this module transparently
+    return PAM_IGNORE;
+  }
   facepass::FacePassConfig config = facepass::load_config(pUsername);
 
   // Create and configure AuthManager

@@ -36,7 +36,6 @@ find_package(OpenCV REQUIRED)
 # yaml-cpp for config parsing
 find_package(yaml-cpp REQUIRED)
 
-add_subdirectory(config)
 add_subdirectory(core)
 add_subdirectory(face)
 add_subdirectory(voice)
@@ -46,14 +45,13 @@ add_subdirectory(pam)
 set(FaceDetection_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/face/detection)
 set(FaceRecognition_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/face/recognition)
 set(FaceAntiSpoof_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/face/antispoofing)
-set(FaceConfig_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/config)
 
 add_subdirectory(test/face_engine)
 add_subdirectory(test/pam)
 add_subdirectory(test/fingerprint)
 
 install(
-    TARGETS facepass_cfg facepass_det facepass_reg facepass_as
+    TARGETS facepass_det facepass_reg facepass_as
     COMPONENT applications
     RUNTIME DESTINATION "/usr/bin"
     LIBRARY DESTINATION "/usr/lib"
@@ -70,10 +68,6 @@ install(
     FILES_MATCHING PATTERN "*.so"
 )
 
-install(
-    FILES face/models/edgeface_s_gamma_05_ts.pt face/models/yolov11n-face.torchscript face/models/mobilenetv3_antispoof_ts.pt
-    DESTINATION /etc/xdg/${PROJECT_NAME}/models
-)
 
 SET(CPACK_GENERATOR "DEB")
 SET(CPACK_PACKAGE_NAME ${PROJECT_NAME})

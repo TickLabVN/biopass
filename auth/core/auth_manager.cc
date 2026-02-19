@@ -33,6 +33,7 @@ int AuthManager::authenticate(const std::string &username) {
 
 int AuthManager::run_sequential(const std::string &username) {
   RetryStrategy retry_strategy(this->config_.retries);
+  bool any_attempted = false;
 
   for (auto &method : this->methods_) {
     if (!method->is_available()) {
@@ -61,18 +62,27 @@ int AuthManager::run_sequential(const std::string &username) {
       case AuthResult::Success:
         std::cout << "AuthManager: " << method->name() << " authentication succeeded" << std::endl;
         return PAM_SUCCESS;
+      case AuthResult::Unavailable:
+        std::cerr << "AuthManager: " << method->name() << " became unavailable, skipping"
+                  << std::endl;
+        break;
       case AuthResult::Failure:
+        any_attempted = true;
         std::cerr << "AuthManager: " << method->name() << " authentication failed, trying next"
                   << std::endl;
         break;
       case AuthResult::Retry:
+        any_attempted = true;
         std::cerr << "AuthManager: " << method->name()
                   << " requested retry but max retries exceeded" << std::endl;
         break;
-      case AuthResult::Unavailable:
-        std::cerr << "AuthManager: " << method->name() << " became unavailable" << std::endl;
-        break;
     }
+  }
+
+  if (!any_attempted) {
+    std::cerr << "AuthManager: No methods were able to run for this user, skipping module"
+              << std::endl;
+    return PAM_IGNORE;
   }
 
   std::cerr << "AuthManager: All authentication methods failed" << std::endl;
@@ -127,17 +137,33 @@ int AuthManager::run_parallel(const std::string &username) {
         }));
   }
 
+  // If no method was launched at all, skip this module
+  if (futures.empty()) {
+    std::cerr << "AuthManager: No methods were able to run for this user, skipping module"
+              << std::endl;
+    return PAM_IGNORE;
+  }
+
   // Wait for all futures and check results
   bool any_success = false;
+  bool any_attempted = false;
   for (auto &future : futures) {
     AuthResult result = future.get();
     if (result == AuthResult::Success) {
       any_success = true;
+    } else if (result != AuthResult::Unavailable) {
+      any_attempted = true;
     }
   }
 
   if (any_success) {
     return PAM_SUCCESS;
+  }
+
+  if (!any_attempted) {
+    std::cerr << "AuthManager: All parallel methods became unavailable, skipping module"
+              << std::endl;
+    return PAM_IGNORE;
   }
 
   std::cerr << "AuthManager: All parallel authentication methods failed" << std::endl;

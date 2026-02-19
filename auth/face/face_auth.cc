@@ -1,12 +1,13 @@
 #include "face_auth.h"
 
 #include <chrono>
+#include <fstream>
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <thread>
 
+#include "auth_config.h"
 #include "face_as.h"
-#include "face_config.h"
 #include "face_detection.h"
 #include "face_recognition.h"
 
@@ -27,15 +28,28 @@ AuthResult FaceAuth::authenticate(const std::string &username, const AuthConfig 
     return AuthResult::Unavailable;
   }
 
-  std::string userFacePath = user_face_path(username);
+  std::string userFacePath = facepass::user_face_path(username);
+  // If face not enrolled for this user, skip transparently
+  if (!std::ifstream(userFacePath).good()) {
+    std::cerr << "FaceAuth: No face enrolled for user " << username << ", skipping" << std::endl;
+    return AuthResult::Unavailable;
+  }
   cv::Mat preparedFace = cv::imread(userFacePath);
   if (preparedFace.empty()) {
     std::cerr << "FaceAuth: Face not registered for user " << username << std::endl;
-    return AuthResult::Failure;
+    return AuthResult::Unavailable;
   }
 
-  FaceRecognition faceReg(model_path(username, FACE_RECOGNITION));
-  FaceDetection faceDetector(model_path(username, FACE_DETECTION));
+  std::string recogModelPath = facepass::model_path(username, facepass::FACE_RECOGNITION);
+  std::string detectModelPath = facepass::model_path(username, facepass::FACE_DETECTION);
+  // If models are missing, skip transparently (they live in user data)
+  if (!std::ifstream(recogModelPath).good() || !std::ifstream(detectModelPath).good()) {
+    std::cerr << "FaceAuth: Model files not found for user " << username << ", skipping"
+              << std::endl;
+    return AuthResult::Unavailable;
+  }
+  FaceRecognition faceReg(recogModelPath);
+  FaceDetection faceDetector(detectModelPath);
 
   cv::Mat loginFace;
   camera >> loginFace;
@@ -53,7 +67,7 @@ AuthResult FaceAuth::authenticate(const std::string &username, const AuthConfig 
   cv::Mat face = detectedImages[0].image;
 
   if (config.anti_spoof) {
-    FaceAntiSpoofing faceAs(model_path(username, FACE_ANTI_SPOOFING));
+    FaceAntiSpoofing faceAs(facepass::model_path(username, facepass::FACE_ANTI_SPOOFING));
     SpoofResult spoofCheck = faceAs.inference(face);
     if (spoofCheck.spoof) {
       std::cerr << "FaceAuth: Spoof detected, score: " << spoofCheck.score << std::endl;

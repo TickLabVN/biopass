@@ -5,11 +5,10 @@
 #include <string>
 
 namespace facepass {
-
 /**
  * Result of an authentication attempt.
  */
-enum class AuthResult {
+enum AuthResult {
   Success,     // Authentication succeeded
   Failure,     // Authentication failed
   Retry,       // Should retry (transient error)

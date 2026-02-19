@@ -31,7 +31,7 @@ string v4() {
 
 namespace {
 bool save_failed_face(const string &username, const cv::Mat &face, const string &reason) {
-  string failedFacePath = debug_path(username) + "/" + reason + "." + uuid::v4() + ".jpg";
+  string failedFacePath = facepass::debug_path(username) + "/" + reason + "." + uuid::v4() + ".jpg";
   if (!cv::imwrite(failedFacePath, face)) {
     cerr << "ERROR: Could not save failed face to " << failedFacePath << endl;
     return false;
@@ -57,19 +57,20 @@ int scan_face(const string &username, int8_t retries, const int gap, bool anti_s
     return PAM_AUTH_ERR;
   }
 
-  string userFacePath = user_face_path(username);
+  string userFacePath = facepass::user_face_path(username);
   cv::Mat preparedFace = cv::imread(userFacePath);
   if (preparedFace.empty()) {
     cerr << "ERROR: Face not register for user " << username << endl;
     return PAM_AUTH_ERR;
   }
 
-  FaceRecognition faceReg(model_path(username, FACE_RECOGNITION));
-  FaceDetection faceDetector(model_path(username, FACE_DETECTION));
+  FaceRecognition faceReg(facepass::model_path(username, facepass::FACE_RECOGNITION));
+  FaceDetection faceDetector(facepass::model_path(username, facepass::FACE_DETECTION));
   std::unique_ptr<FaceAntiSpoofing> faceAs = nullptr;
 
   if (anti_spoofing) {
-    faceAs = std::make_unique<FaceAntiSpoofing>(model_path(username, FACE_ANTI_SPOOFING));
+    faceAs = std::make_unique<FaceAntiSpoofing>(
+        facepass::model_path(username, facepass::FACE_ANTI_SPOOFING));
   }
 
   bool success = false;

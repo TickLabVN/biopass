@@ -16,46 +16,26 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
+# Dependencies Configuration
+include(Dependencies.cmake)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} ${OpenCV_CFLAGS_OTHER}")
-
-# Find dependencies
-set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/libtorch")
-SET(Torch_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/libtorch/share/cmake/Torch)
-
-# Hack to silence shadowing warnings by telling CMake this is an "implicit" directory
-list(APPEND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/external/libtorch/lib")
-
-find_package(Torch REQUIRED NO_DEFAULT_PATH)
-
-# Ensure we use full paths to libraries to avoid shadowing warnings
-cmake_policy(SET CMP0060 NEW)
-
-find_package(OpenCV REQUIRED)
-
-# yaml-cpp for config parsing
-find_package(yaml-cpp REQUIRED)
-
-# spdlog for logging
-include(FetchContent)
-FetchContent_Declare(
-    spdlog
-    GIT_REPOSITORY https://github.com/gabime/spdlog.git
-    GIT_TAG v1.13.0
-)
-FetchContent_MakeAvailable(spdlog)
-
+# Application Directories
 add_subdirectory(core)
 add_subdirectory(face)
 add_subdirectory(voice)
 add_subdirectory(fingerprint)
 add_subdirectory(pam)
 
+# Export Face Includes dynamically from Source
 set(FaceDetection_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/face/detection)
 set(FaceRecognition_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/face/recognition)
 set(FaceAntiSpoof_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/face/antispoofing)
 
+# Testing Directories
 add_subdirectory(test/face_engine)
+
+# CXX Flags Configuration
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} ${OpenCV_CFLAGS_OTHER}")
 
 install(
     TARGETS facepass_det facepass_reg facepass_as
@@ -70,7 +50,7 @@ install(
 
 # Install libtorch libraries
 install(
-    DIRECTORY external/libtorch/lib/
+    DIRECTORY ${libtorch_SOURCE_DIR}/lib/
     DESTINATION "/usr/lib"
     FILES_MATCHING PATTERN "*.so"
 )

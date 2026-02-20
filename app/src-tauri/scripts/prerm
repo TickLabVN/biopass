@@ -1,0 +1,27 @@
+#!/bin/bash
+# prerm — Debian package pre-removal maintainer script.
+# Runs before any files in the .deb package are removed.
+
+set -e
+
+case "$1" in
+    remove|upgrade|deconfigure)
+        PAM_CONFIG="/etc/pam.d/common-auth"
+        BACKUP="${PAM_CONFIG}.bak"
+
+        if [ -f "$PAM_CONFIG" ] && grep -q "libbiopass_pam\.so" "$PAM_CONFIG"; then
+            echo "Biopass: Removing libbiopass_pam.so from $PAM_CONFIG ..."
+            cp "$PAM_CONFIG" "$BACKUP"
+            sed -i '/libbiopass_pam\.so/d' "$PAM_CONFIG"
+            echo "Biopass: PAM auth module disabled. Backup saved to $BACKUP"
+        fi
+        ;;
+    failed-upgrade)
+        ;;
+    *)
+        echo "prerm called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

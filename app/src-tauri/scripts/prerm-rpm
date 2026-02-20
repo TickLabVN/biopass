@@ -1,0 +1,19 @@
+#!/bin/bash
+# prerm-rpm — RPM package pre-removal maintainer script.
+# In RPM, the first argument ($1) is the number of versions of the package 
+# that will be installed after the operation. 
+# $1 == 0 means this is a complete uninstallation.
+
+if [ "$1" -eq 0 ]; then
+    PAM_CONFIG="/etc/pam.d/common-auth"
+    BACKUP="${PAM_CONFIG}.bak"
+
+    if [ -f "$PAM_CONFIG" ] && grep -q "libbiopass_pam\.so" "$PAM_CONFIG"; then
+        echo "Biopass: Removing libbiopass_pam.so from $PAM_CONFIG ..."
+        cp "$PAM_CONFIG" "$BACKUP"
+        sed -i '/libbiopass_pam\.so/d' "$PAM_CONFIG"
+        echo "Biopass: PAM auth module disabled. Backup saved to $BACKUP"
+    fi
+fi
+
+exit 0

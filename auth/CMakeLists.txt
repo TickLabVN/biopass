@@ -32,7 +32,10 @@ set(FaceRecognition_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/face/recognition)
 set(FaceAntiSpoof_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/face/antispoofing)
 
 # Testing Directories
-add_subdirectory(test/face_engine)
+option(BUILD_TESTS "Build test configurations" OFF)
+if(BUILD_TESTS)
+    add_subdirectory(test/face_engine)
+endif()
 
 # CXX Flags Configuration
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} ${OpenCV_CFLAGS_OTHER}")

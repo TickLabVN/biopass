@@ -3,14 +3,7 @@ import { RotateCcw, Save } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+
 import type { FacepassConfig } from "@/types/config";
 import { defaultConfig } from "@/types/config";
 import { MethodsSection } from "./MethodsSection.tsx";
@@ -22,7 +15,6 @@ export function ConfigPage() {
   const [savedConfig, setSavedConfig] = useState<FacepassConfig>(defaultConfig);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showPamConfirm, setShowPamConfirm] = useState(false);
 
   const initConfig = useCallback(async () => {
     try {
@@ -46,19 +38,8 @@ export function ConfigPage() {
     const isValid = await validateConfig(config);
     if (!isValid) return;
 
-    // If PAM integration is enabled, show confirmation first
-    if (config.strategy.pam_enabled && !showPamConfirm) {
-      setShowPamConfirm(true);
-      return;
-    }
-
-    await performSave();
-  }
-
-  async function performSave() {
     try {
       setSaving(true);
-      setShowPamConfirm(false);
       await invoke("save_config", { config });
       setSavedConfig(config);
 
@@ -142,27 +123,6 @@ export function ConfigPage() {
           }
         />
       </div>
-
-      <Dialog open={showPamConfirm} onOpenChange={setShowPamConfirm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Elevated Permissions Required</DialogTitle>
-            <DialogDescription>
-              To enable System Sign-in Integration, FacePass needs to modify
-              system files (PAM configuration). You will be asked for your
-              password to authorize this change.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPamConfirm(false)}>
-              Cancel
-            </Button>
-            <Button onClick={performSave} disabled={saving}>
-              {saving ? "Authorizing..." : "Continue"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -6,7 +6,10 @@
 
 extern "C" {
 
-void* fingerprint_auth_new(void) { return static_cast<void*>(new facepass::FingerprintAuth()); }
+void* fingerprint_auth_new(void) {
+  facepass::FingerprintMethodConfig default_config;
+  return static_cast<void*>(new facepass::FingerprintAuth(default_config));
+}
 
 void fingerprint_auth_free(void* auth) {
   if (!auth)
@@ -26,7 +29,6 @@ int fingerprint_authenticate(void* auth, const char* username, FingerprintAuthCo
   auto* fp_auth = static_cast<facepass::FingerprintAuth*>(auth);
 
   facepass::AuthConfig cpp_config;
-  cpp_config.retries = config.retries;
 
   facepass::AuthResult result = fp_auth->authenticate(username, cpp_config);
 

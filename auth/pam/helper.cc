@@ -42,10 +42,11 @@ int main(int argc, char **argv) {
       manager.add_method(std::make_unique<facepass::FaceAuth>(config.methods_config.face));
       methods_count++;
     } else if (method_name == "voice") {
-      manager.add_method(std::make_unique<facepass::VoiceAuth>());
+      manager.add_method(std::make_unique<facepass::VoiceAuth>(config.methods_config.voice));
       methods_count++;
     } else if (method_name == "fingerprint") {
-      manager.add_method(std::make_unique<facepass::FingerprintAuth>());
+      manager.add_method(
+          std::make_unique<facepass::FingerprintAuth>(config.methods_config.fingerprint));
       methods_count++;
     }
   }

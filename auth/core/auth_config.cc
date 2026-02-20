@@ -61,10 +61,6 @@ FacePassConfig load_config(const std::string &username) {
       }
       if (s["execution_mode"])
         config.mode = parse_mode(s["execution_mode"].as<std::string>());
-      if (s["retries"])
-        config.auth.retries = s["retries"].as<int>();
-      if (s["retry_delay"])
-        config.auth.retry_delay_ms = s["retry_delay"].as<int>();
       if (s["order"] && s["order"].IsSequence()) {
         config.methods.clear();
         for (const auto &m : s["order"]) config.methods.push_back(m.as<std::string>());
@@ -80,6 +76,10 @@ FacePassConfig load_config(const std::string &username) {
         const auto &f = m["face"];
         if (f["enable"])
           config.methods_config.face.enable = f["enable"].as<bool>();
+        if (f["retries"])
+          config.methods_config.face.retries = f["retries"].as<int>();
+        if (f["retry_delay"])
+          config.methods_config.face.retry_delay_ms = f["retry_delay"].as<int>();
         if (f["detection"]) {
           if (f["detection"]["model"])
             config.methods_config.face.detection.model = f["detection"]["model"].as<std::string>();
@@ -115,6 +115,10 @@ FacePassConfig load_config(const std::string &username) {
         const auto &v = m["voice"];
         if (v["enable"])
           config.methods_config.voice.enable = v["enable"].as<bool>();
+        if (v["retries"])
+          config.methods_config.voice.retries = v["retries"].as<int>();
+        if (v["retry_delay"])
+          config.methods_config.voice.retry_delay_ms = v["retry_delay"].as<int>();
         if (v["model"])
           config.methods_config.voice.model = v["model"].as<std::string>();
         if (v["threshold"])
@@ -126,6 +130,10 @@ FacePassConfig load_config(const std::string &username) {
         const auto &fp = m["fingerprint"];
         if (fp["enable"])
           config.methods_config.fingerprint.enable = fp["enable"].as<bool>();
+        if (fp["retries"])
+          config.methods_config.fingerprint.retries = fp["retries"].as<int>();
+        if (fp["retry_delay"])
+          config.methods_config.fingerprint.retry_delay_ms = fp["retry_delay"].as<int>();
       }
 
       // Filter method list to only enabled methods

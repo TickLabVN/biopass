@@ -20,8 +20,6 @@ enum AuthResult {
  */
 struct AuthConfig {
   bool debug = false;
-  int retries = 10;
-  int retry_delay_ms = 200;
   bool anti_spoof = false;
 };
 
@@ -42,6 +40,16 @@ struct IAuthMethod {
    * For example, returns false if no camera is available for face auth.
    */
   virtual bool is_available() const = 0;
+
+  /**
+   * Get the maximum number of retries for this method.
+   */
+  virtual int get_retries() const = 0;
+
+  /**
+   * Get the delay in milliseconds between retries for this method.
+   */
+  virtual int get_retry_delay_ms() const = 0;
 
   /**
    * Perform authentication for the given user.

@@ -22,8 +22,6 @@ pub struct StrategyConfig {
     pub debug: bool,
     pub execution_mode: String,
     pub order: Vec<String>,
-    pub retries: u32,
-    pub retry_delay: u32,
     #[serde(default)]
     pub pam_enabled: bool,
 }
@@ -38,6 +36,10 @@ pub struct MethodsConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FaceMethodConfig {
     pub enable: bool,
+    #[serde(default = "default_face_retries")]
+    pub retries: u32,
+    #[serde(default = "default_face_delay")]
+    pub retry_delay: u32,
     pub detection: DetectionConfig,
     pub recognition: RecognitionConfig,
     pub anti_spoofing: AntiSpoofingConfig,
@@ -72,6 +74,10 @@ pub struct AntiSpoofingConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FingerprintMethodConfig {
     pub enable: bool,
+    #[serde(default = "default_fingerprint_retries")]
+    pub retries: u32,
+    #[serde(default = "default_fingerprint_delay")]
+    pub retry_delay: u32,
     #[serde(default)]
     pub fingers: Vec<FingerConfig>,
 }
@@ -85,6 +91,10 @@ pub struct FingerConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VoiceMethodConfig {
     pub enable: bool,
+    #[serde(default = "default_voice_retries")]
+    pub retries: u32,
+    #[serde(default = "default_voice_delay")]
+    pub retry_delay: u32,
     pub model: String,
     pub threshold: f32,
 }
@@ -95,6 +105,25 @@ pub struct ModelConfig {
     pub name: Option<String>,
     #[serde(rename = "type")]
     pub model_type: String,
+}
+
+fn default_face_retries() -> u32 {
+    5
+}
+fn default_face_delay() -> u32 {
+    200
+}
+fn default_fingerprint_retries() -> u32 {
+    1
+}
+fn default_fingerprint_delay() -> u32 {
+    5000
+}
+fn default_voice_retries() -> u32 {
+    3
+}
+fn default_voice_delay() -> u32 {
+    500
 }
 
 fn get_config_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -135,13 +164,13 @@ fn get_default_config() -> FacepassConfig {
                 "fingerprint".to_string(),
                 "voice".to_string(),
             ],
-            retries: 3,
-            retry_delay: 500,
             pam_enabled: false,
         },
         methods: MethodsConfig {
             face: FaceMethodConfig {
                 enable: true,
+                retries: 5,
+                retry_delay: 200,
                 detection: DetectionConfig {
                     model: "models/face_detection.onnx".to_string(),
                     threshold: 0.8,
@@ -162,10 +191,14 @@ fn get_default_config() -> FacepassConfig {
             },
             fingerprint: FingerprintMethodConfig {
                 enable: true,
+                retries: 3,
+                retry_delay: 1000,
                 fingers: vec![],
             },
             voice: VoiceMethodConfig {
                 enable: true,
+                retries: 3,
+                retry_delay: 500,
                 model: "models/voice.onnx".to_string(),
                 threshold: 0.8,
             },

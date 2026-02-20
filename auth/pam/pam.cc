@@ -14,6 +14,17 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
   (void)argv;
 
   int retval;
+
+  const char *service = nullptr;
+  retval = pam_get_item(pamh, PAM_SERVICE, (const void **)&service);
+  if (retval == PAM_SUCCESS && service != nullptr) {
+    // Polkit/pkexec require explicit password prompts in most DEs.
+    // We bypass Facepass for these services to prevent auth hangs.
+    if (strcmp(service, "polkit-1") == 0 || strcmp(service, "pkexec") == 0) {
+      return PAM_IGNORE;
+    }
+  }
+
   const char *pUsername;
   retval = pam_get_user(pamh, &pUsername, NULL);
   if (retval != PAM_SUCCESS) {

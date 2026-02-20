@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Fingerprint, Mic, ScanFace, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -89,6 +90,55 @@ export function MethodsSection({ methods, models, onChange }: Props) {
           }
         >
           <div className="grid gap-4">
+            {/* Retries and Delay */}
+            <div className="grid grid-cols-2 gap-6 p-4 rounded-lg bg-muted/50 border border-border/50">
+              <div className="grid gap-2">
+                <Label
+                  htmlFor="face-max-retries"
+                  className="text-sm font-medium text-muted-foreground"
+                >
+                  Max Retries
+                </Label>
+                <Input
+                  id="face-max-retries"
+                  type="number"
+                  min="0"
+                  max="10"
+                  value={methods.face.retries}
+                  onChange={(e) =>
+                    updateFace({
+                      ...methods.face,
+                      retries: parseInt(e.target.value, 10) || 0,
+                    })
+                  }
+                  className="h-10"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label
+                  htmlFor="face-retry-delay"
+                  className="text-sm font-medium text-muted-foreground"
+                >
+                  Retry Delay (ms)
+                </Label>
+                <Input
+                  id="face-retry-delay"
+                  type="number"
+                  min="0"
+                  max="5000"
+                  step="100"
+                  value={methods.face.retry_delay}
+                  onChange={(e) =>
+                    updateFace({
+                      ...methods.face,
+                      retry_delay: parseInt(e.target.value, 10) || 0,
+                    })
+                  }
+                  className="h-10"
+                />
+              </div>
+            </div>
+
             {/* Face Capture */}
             <FaceCaptureSection />
             {/* Detection */}
@@ -296,11 +346,62 @@ export function MethodsSection({ methods, models, onChange }: Props) {
             )
           }
         >
-          <div className="pt-4 overflow-hidden">
-            <FingerprintSection
-              config={methods.fingerprint}
-              onUpdate={(fingerprint) => updateFingerprint(fingerprint)}
-            />
+          <div className="grid gap-4 pt-4">
+            {/* Retries and Delay */}
+            <div className="grid grid-cols-2 gap-6 p-4 rounded-lg bg-muted/50 border border-border/50">
+              <div className="grid gap-2">
+                <Label
+                  htmlFor="fingerprint-max-retries"
+                  className="text-sm font-medium text-muted-foreground"
+                >
+                  Max Retries
+                </Label>
+                <Input
+                  id="fingerprint-max-retries"
+                  type="number"
+                  min="0"
+                  max="10"
+                  value={methods.fingerprint.retries}
+                  onChange={(e) =>
+                    updateFingerprint({
+                      ...methods.fingerprint,
+                      retries: parseInt(e.target.value, 10) || 0,
+                    })
+                  }
+                  className="h-10"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label
+                  htmlFor="fingerprint-retry-delay"
+                  className="text-sm font-medium text-muted-foreground"
+                >
+                  Retry Delay (ms)
+                </Label>
+                <Input
+                  id="fingerprint-retry-delay"
+                  type="number"
+                  min="0"
+                  max="5000"
+                  step="100"
+                  value={methods.fingerprint.retry_delay}
+                  onChange={(e) =>
+                    updateFingerprint({
+                      ...methods.fingerprint,
+                      retry_delay: parseInt(e.target.value, 10) || 0,
+                    })
+                  }
+                  className="h-10"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-hidden">
+              <FingerprintSection
+                config={methods.fingerprint}
+                onUpdate={(fingerprint) => updateFingerprint(fingerprint)}
+              />
+            </div>
           </div>
         </MethodCard>
 
@@ -317,6 +418,55 @@ export function MethodsSection({ methods, models, onChange }: Props) {
           }
         >
           <div className="grid gap-4 pt-4">
+            {/* Retries and Delay */}
+            <div className="grid grid-cols-2 gap-6 p-4 rounded-lg bg-muted/50 border border-border/50">
+              <div className="grid gap-2">
+                <Label
+                  htmlFor="voice-max-retries"
+                  className="text-sm font-medium text-muted-foreground"
+                >
+                  Max Retries
+                </Label>
+                <Input
+                  id="voice-max-retries"
+                  type="number"
+                  min="0"
+                  max="10"
+                  value={methods.voice.retries}
+                  onChange={(e) =>
+                    updateVoice({
+                      ...methods.voice,
+                      retries: parseInt(e.target.value, 10) || 0,
+                    })
+                  }
+                  className="h-10"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label
+                  htmlFor="voice-retry-delay"
+                  className="text-sm font-medium text-muted-foreground"
+                >
+                  Retry Delay (ms)
+                </Label>
+                <Input
+                  id="voice-retry-delay"
+                  type="number"
+                  min="0"
+                  max="5000"
+                  step="100"
+                  value={methods.voice.retry_delay}
+                  onChange={(e) =>
+                    updateVoice({
+                      ...methods.voice,
+                      retry_delay: parseInt(e.target.value, 10) || 0,
+                    })
+                  }
+                  className="h-10"
+                />
+              </div>
+            </div>
+
             {/* Voice Recording */}
             <VoiceRecordingSection />
 

@@ -27,7 +27,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["deb", "rpm"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,12 +37,43 @@
     ],
     "linux": {
       "rpm": {
-        "preInstallScript": "scripts/download_models.sh"
-      },
-      "deb": {
+        "preInstallScript": "scripts/download_models.sh",
+        "preRemoveScript": "scripts/prerm-rpm",
         "files": {
           "/usr/share/com.ticklab.biopass/download_models.sh": "scripts/download_models.sh",
-          "/DEBIAN/postinst": "scripts/postinst"
+          "/lib/security/libbiopass_pam.so": "../../auth/build/pam/libbiopass_pam.so",
+          "/usr/local/bin/biopass-helper": "../../auth/build/pam/biopass-helper",
+          "/usr/lib/biopass/libbiopass_det.so": "../../auth/build/face/detection/libbiopass_det.so",
+          "/usr/lib/biopass/libbiopass_reg.so": "../../auth/build/face/recognition/libbiopass_reg.so",
+          "/usr/lib/biopass/libbiopass_as.so": "../../auth/build/face/antispoofing/libbiopass_as.so",
+          "/usr/lib/biopass/libc10.so": "../../auth/build/_deps/libtorch-src/lib/libc10.so",
+          "/usr/lib/biopass/libtorch.so": "../../auth/build/_deps/libtorch-src/lib/libtorch.so",
+          "/usr/lib/biopass/libtorch_cpu.so": "../../auth/build/_deps/libtorch-src/lib/libtorch_cpu.so",
+          "/usr/lib/biopass/libtorch_global_deps.so": "../../auth/build/_deps/libtorch-src/lib/libtorch_global_deps.so",
+          "/usr/lib/biopass/libbackend_with_compiler.so": "../../auth/build/_deps/libtorch-src/lib/libbackend_with_compiler.so",
+          "/usr/lib/biopass/libnnapi_backend.so": "../../auth/build/_deps/libtorch-src/lib/libnnapi_backend.so",
+          "/usr/lib/biopass/libshm.so": "../../auth/build/_deps/libtorch-src/lib/libshm.so",
+          "/etc/ld.so.conf.d/biopass.conf": "scripts/biopass-ldconf"
+        }
+      },
+      "deb": {
+        "postInstallScript": "scripts/postinst",
+        "preRemoveScript": "scripts/prerm",
+        "files": {
+          "/usr/share/com.ticklab.biopass/download_models.sh": "scripts/download_models.sh",
+          "/lib/security/libbiopass_pam.so": "../../auth/build/pam/libbiopass_pam.so",
+          "/usr/local/bin/biopass-helper": "../../auth/build/pam/biopass-helper",
+          "/usr/lib/biopass/libbiopass_det.so": "../../auth/build/face/detection/libbiopass_det.so",
+          "/usr/lib/biopass/libbiopass_reg.so": "../../auth/build/face/recognition/libbiopass_reg.so",
+          "/usr/lib/biopass/libbiopass_as.so": "../../auth/build/face/antispoofing/libbiopass_as.so",
+          "/usr/lib/biopass/libc10.so": "../../auth/build/_deps/libtorch-src/lib/libc10.so",
+          "/usr/lib/biopass/libtorch.so": "../../auth/build/_deps/libtorch-src/lib/libtorch.so",
+          "/usr/lib/biopass/libtorch_cpu.so": "../../auth/build/_deps/libtorch-src/lib/libtorch_cpu.so",
+          "/usr/lib/biopass/libtorch_global_deps.so": "../../auth/build/_deps/libtorch-src/lib/libtorch_global_deps.so",
+          "/usr/lib/biopass/libbackend_with_compiler.so": "../../auth/build/_deps/libtorch-src/lib/libbackend_with_compiler.so",
+          "/usr/lib/biopass/libnnapi_backend.so": "../../auth/build/_deps/libtorch-src/lib/libnnapi_backend.so",
+          "/usr/lib/biopass/libshm.so": "../../auth/build/_deps/libtorch-src/lib/libshm.so",
+          "/etc/ld.so.conf.d/biopass.conf": "scripts/biopass-ldconf"
         }
       }
     }

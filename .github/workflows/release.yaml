@@ -1,15 +1,14 @@
-# This starter workflow is for a CMake project running on a single platform. There is a different starter workflow if you need cross-platform coverage.
-# See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-multi-platform.yml
 name: Release
 
 on:
   push:
     tags:
-      - "*" # Push events to matching v*, i.e. v1.0, v20.15.10
+      - "*"
+
 permissions:
   contents: write
+
 env:
-  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
 
 jobs:
@@ -24,38 +23,61 @@ jobs:
         with:
           lfs: true
 
-      - name: Install dependencies
+      # ── System dependencies ──────────────────────────────────────────────
+      - name: Install system dependencies
         run: |
-          sudo apt install libopencv-dev libpam0g-dev libcli11-dev
-          mkdir -p external && cd external
-          wget -O libtorch.zip https://download.pytorch.org/libtorch/nightly/cpu/libtorch-cxx11-abi-shared-without-deps-2.2.0.dev20231031%2Bcpu.zip
-          unzip libtorch.zip
+          sudo apt-get update
+          sudo apt-get install -y \
+            libopencv-dev libpam0g-dev libcli11-dev \
+            libwebkit2gtk-4.1-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev \
+            patchelf
 
-      - name: Configure CMake
+      # ── Rust ────────────────────────────────────────────────────────────
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            app/src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('app/src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      # ── Bun ─────────────────────────────────────────────────────────────
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      # ── Build (auth first, then Tauri which bundles auth inside) ────────
+      - name: Build & package
         env:
-          PROJECT_VERSION: ${{github.ref_name}}
-        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+          PROJECT_VERSION: ${{ github.ref_name }}
+        run: make package BUILD_TYPE=${{ env.BUILD_TYPE }} VERSION=${{ github.ref_name }}
 
-      - name: Build
-        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
-
-      - name: Test
-        working-directory: ${{github.workspace}}/build
-        run: ctest -C ${{env.BUILD_TYPE}}
-
-      - name: Package
-        working-directory: ${{github.workspace}}/build
+      # ── Collect & rename artifacts ───────────────────────────────────────
+      - name: Rename packages with OS suffix
         run: |
-          cpack
-          mv facepass-${{ github.ref_name }}-Linux.deb facepass-${{ github.ref_name }}-${{ matrix.os }}.deb
+          VERSION="${{ github.ref_name }}"
+          OS="${{ matrix.os }}"
 
-      
-      - name: Release
+          for f in app/src-tauri/target/release/bundle/deb/*.deb; do
+            [ -f "$f" ] && mv "$f" "biopass-${VERSION}-${OS}.deb"
+          done
+          for f in app/src-tauri/target/release/bundle/rpm/*.rpm; do
+            [ -f "$f" ] && mv "$f" "biopass-${VERSION}-${OS}.rpm"
+          done
+
+      # ── GitHub Release ───────────────────────────────────────────────────
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           files: |
-            ${{github.workspace}}/build/facepass-*.deb
-          token: ${{secrets.GITHUB_TOKEN}}
-          tag_name: ${{github.ref_name}}
-          name: ${{github.ref_name}}
+            biopass-*.deb
+            biopass-*.rpm

@@ -55,6 +55,10 @@ FacePassConfig load_config(const std::string &username) {
     // 1. Strategy
     if (yaml["strategy"]) {
       const auto &s = yaml["strategy"];
+      if (s["debug"]) {
+        config.debug = s["debug"].as<bool>();
+        config.auth.debug = config.debug;
+      }
       if (s["execution_mode"])
         config.mode = parse_mode(s["execution_mode"].as<std::string>());
       if (s["retries"])

@@ -1,6 +1,7 @@
 #include "fingerprint_auth.h"
 
 #include <gio/gio.h>
+#include <spdlog/spdlog.h>
 
 #include <iostream>
 #include <thread>
@@ -19,6 +20,7 @@ struct AuthContext {
   GMainLoop* loop;
   AuthResult result;
   std::string error_msg;
+  bool debug;
 };
 
 void on_verify_status(GDBusConnection* connection, const gchar* sender_name,
@@ -31,7 +33,7 @@ void on_verify_status(GDBusConnection* connection, const gchar* sender_name,
   g_variant_get(parameters, "(&sb)", &result, &done);
   std::string res_str = result;
 
-  std::cout << "Fingerprint status: " << res_str << ", done: " << done << std::endl;
+  spdlog::debug("Fingerprint status: {}, done: {}", res_str, done);
 
   if (res_str == "verify-match") {
     ctx->result = AuthResult::Success;
@@ -219,12 +221,13 @@ AuthResult FingerprintAuth::authenticate(const std::string& username, const Auth
   AuthContext ctx;
   ctx.loop = g_main_loop_new(nullptr, FALSE);
   ctx.result = AuthResult::Failure;  // Default
+  ctx.debug = config.debug;
 
   guint sub_id = g_dbus_connection_signal_subscribe(
       connection, FPRINT_SERVICE, FPRINT_DEVICE_INTERFACE, "VerifyStatus", dev_path_str.c_str(),
       nullptr, G_DBUS_SIGNAL_FLAGS_NONE, on_verify_status, &ctx, nullptr);
 
-  std::cout << "Waiting for fingerprint..." << std::endl;
+  spdlog::debug("Waiting for fingerprint...");
   g_main_loop_run(ctx.loop);
 
   g_dbus_connection_signal_unsubscribe(connection, sub_id);

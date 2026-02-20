@@ -146,7 +146,7 @@ export function MethodsSection({ methods, models, onChange }: Props) {
                   <ModelSelectField
                     label="Model"
                     value={methods.face.detection.model}
-                    models={models.filter((m) => m.type === "face")}
+                    models={models.filter((m) => m.type === "detection")}
                     error={methods.face.enable}
                     onChange={(model) =>
                       updateFace({
@@ -178,7 +178,7 @@ export function MethodsSection({ methods, models, onChange }: Props) {
                   <ModelSelectField
                     label="Model"
                     value={methods.face.recognition.model}
-                    models={models.filter((m) => m.type === "face")}
+                    models={models.filter((m) => m.type === "recognition")}
                     error={methods.face.enable}
                     onChange={(model) =>
                       updateFace({
@@ -224,7 +224,7 @@ export function MethodsSection({ methods, models, onChange }: Props) {
                     <ModelSelectField
                       label="Model"
                       value={methods.face.anti_spoofing.model}
-                      models={models.filter((m) => m.type === "face")}
+                      models={models.filter((m) => m.type === "anti-spoofing")}
                       error={methods.face.anti_spoofing.enable}
                       onChange={(model) =>
                         updateFace({

@@ -238,7 +238,6 @@ dependencies = [
  "serde_yml",
  "tauri",
  "tauri-build",
- "tauri-plugin-dialog",
  "tauri-plugin-fs",
  "tauri-plugin-opener",
  "tempfile",
@@ -740,8 +739,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89a09f22a6c6069a18470eb92d2298acf25463f14256d24778e1230d789a2aec"
 dependencies = [
  "bitflags 2.10.0",
- "block2",
- "libc",
  "objc2",
 ]
 
@@ -2953,30 +2950,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rfd"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a15ad77d9e70a92437d8f74c35d99b4e4691128df018833e99f90bcd36152672"
-dependencies = [
- "block2",
- "dispatch2",
- "glib-sys",
- "gobject-sys",
- "gtk-sys",
- "js-sys",
- "log",
- "objc2",
- "objc2-app-kit",
- "objc2-core-foundation",
- "objc2-foundation",
- "raw-window-handle",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "windows-sys 0.60.2",
-]
-
-[[package]]
 name = "rustc_version"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3697,24 +3670,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tauri-plugin-dialog"
-version = "2.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9204b425d9be8d12aa60c2a83a289cf7d1caae40f57f336ed1155b3a5c0e359b"
-dependencies = [
- "log",
- "raw-window-handle",
- "rfd",
- "serde",
- "serde_json",
- "tauri",
- "tauri-plugin",
- "tauri-plugin-fs",
- "thiserror 2.0.18",
- "url",
-]
-
-[[package]]
 name = "tauri-plugin-fs"
 version = "2.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3973,23 +3928,9 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
- "parking_lot",
  "pin-project-lite",
- "signal-hook-registry",
  "socket2",
- "tokio-macros",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "tokio-macros"
-version = "2.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af407857209536a95c8e56f8231ef2c2e2aff839b22e07a1ffcbc617e9db9fa5"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.114",
 ]
 
 [[package]]

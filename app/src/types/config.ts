@@ -64,56 +64,5 @@ export interface VoiceMethodConfig {
 export interface ModelConfig {
   path: string;
   name?: string;
-  type: "face" | "voice";
+  type: "detection" | "recognition" | "anti-spoofing" | "voice";
 }
-
-export const defaultConfig: BiopassConfig = {
-  strategy: {
-    debug: false,
-    execution_mode: "sequential",
-    order: ["face", "fingerprint", "voice"],
-    pam_enabled: false,
-  },
-  methods: {
-    face: {
-      enable: true,
-      retries: 5,
-      retry_delay: 200,
-      detection: {
-        model: "models/face_detection.onnx",
-        threshold: 0.8,
-      },
-      recognition: {
-        model: "models/face.onnx",
-        threshold: 0.8,
-      },
-      anti_spoofing: {
-        enable: true,
-        model: "models/face_anti_spoofing.onnx",
-        threshold: 0.8,
-      },
-      ir_camera: {
-        enable: false,
-        device_id: 1,
-      },
-    },
-    fingerprint: {
-      enable: true,
-      retries: 3,
-      retry_delay: 1000,
-      fingers: [],
-    },
-    voice: {
-      enable: true,
-      retries: 3,
-      retry_delay: 500,
-      model: "models/voice.onnx",
-      threshold: 0.8,
-    },
-  },
-  models: [
-    { path: "models/face.onnx", name: "Onnx", type: "face" },
-    { path: "models/voice.onnx", type: "voice" },
-  ],
-  appearance: "system",
-};

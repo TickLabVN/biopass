@@ -5,14 +5,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 import type { BiopassConfig } from "@/types/config";
-import { defaultConfig } from "@/types/config";
 import { MethodsSection } from "./MethodsSection.tsx";
 import { StrategySection } from "./StrategySection.tsx";
 import { validateConfig } from "./validation";
 
 export function ConfigPage() {
-  const [config, setConfig] = useState<BiopassConfig>(defaultConfig);
-  const [savedConfig, setSavedConfig] = useState<BiopassConfig>(defaultConfig);
+  const [config, setConfig] = useState<BiopassConfig | null>(null);
+  const [savedConfig, setSavedConfig] = useState<BiopassConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -35,6 +34,7 @@ export function ConfigPage() {
   }, [initConfig]);
 
   async function saveConfig() {
+    if (!config) return;
     const isValid = await validateConfig(config);
     if (!isValid) return;
 
@@ -65,11 +65,12 @@ export function ConfigPage() {
   }
 
   function resetConfig() {
+    if (!savedConfig) return;
     setConfig(savedConfig);
     toast.info("Configuration reset to last saved state");
   }
 
-  if (loading) {
+  if (loading || !config) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />

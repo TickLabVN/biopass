@@ -148,7 +148,13 @@ fn get_voices_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(get_data_dir(app)?.join("voices"))
 }
 
-fn get_default_config() -> BiopassConfig {
+fn get_default_config(app: &AppHandle) -> BiopassConfig {
+    let models_dir = get_data_dir(app)
+        .map(|d| d.join("models"))
+        .unwrap_or_else(|_| PathBuf::from("models"));
+
+    let model_path = |name: &str| -> String { models_dir.join(name).to_string_lossy().to_string() };
+
     BiopassConfig {
         strategy: StrategyConfig {
             debug: false,
@@ -166,16 +172,16 @@ fn get_default_config() -> BiopassConfig {
                 retries: 5,
                 retry_delay: 200,
                 detection: DetectionConfig {
-                    model: "models/yolov11n-face.torchscript".to_string(),
+                    model: model_path("yolov11n-face.torchscript"),
                     threshold: 0.8,
                 },
                 recognition: RecognitionConfig {
-                    model: "models/edgeface_s_gamma_05_ts.pt".to_string(),
+                    model: model_path("edgeface_s_gamma_05_ts.pt"),
                     threshold: 0.8,
                 },
                 anti_spoofing: AntiSpoofingConfig {
                     enable: true,
-                    model: "models/mobilenetv3_antispoof_ts.pt".to_string(),
+                    model: model_path("mobilenetv3_antispoof_ts.pt"),
                     threshold: 0.8,
                 },
                 ir_camera: IRCameraConfig {
@@ -199,17 +205,17 @@ fn get_default_config() -> BiopassConfig {
         },
         models: vec![
             ModelConfig {
-                path: "models/yolov11n-face.torchscript".to_string(),
+                path: model_path("yolov11n-face.torchscript"),
                 name: Some("Face Detection".to_string()),
                 model_type: "detection".to_string(),
             },
             ModelConfig {
-                path: "models/edgeface_s_gamma_05_ts.pt".to_string(),
+                path: model_path("edgeface_s_gamma_05_ts.pt"),
                 name: Some("Face Recognition".to_string()),
                 model_type: "recognition".to_string(),
             },
             ModelConfig {
-                path: "models/mobilenetv3_antispoof_ts.pt".to_string(),
+                path: model_path("mobilenetv3_antispoof_ts.pt"),
                 name: Some("Face Anti-spoofing".to_string()),
                 model_type: "anti-spoofing".to_string(),
             },
@@ -230,7 +236,7 @@ pub fn load_config(app: AppHandle) -> Result<BiopassConfig, String> {
     let config_path = get_config_path(&app)?;
 
     if !config_path.exists() {
-        return Ok(get_default_config());
+        return Ok(get_default_config(&app));
     }
 
     let content = fs::read_to_string(&config_path)

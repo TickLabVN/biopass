@@ -18,7 +18,6 @@
           "path": "$DATA/com.ticklab.biopass/**"
         }
       ]
-    },
-    "dialog:default"
+    }
   ]
 }

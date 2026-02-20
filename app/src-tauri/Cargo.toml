@@ -1,8 +1,8 @@
 [package]
 name = "biopass"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Biometric Authentication System"
+authors = ["phucvinh57"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -31,8 +31,7 @@ base64 = "0.22"
 webkit2gtk = "2.0.1"
 
 gtk = "0.18.2"
-tauri-plugin-dialog = "2"
-tokio = { version = "1.36.0", features = ["full"] }
+tokio = { version = "1", features = ["rt"] }
 
 [dev-dependencies]
 tempfile = "3"

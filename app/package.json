@@ -26,7 +26,6 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-dialog": "~2",
     "@tauri-apps/plugin-fs": "^2.4.5",
     "@tauri-apps/plugin-opener": "^2",
     "class-variance-authority": "^0.7.1",

@@ -1,4 +1,4 @@
-set(PAM facepass_pam)
+set(PAM biopass_pam)
 add_library(${PAM} SHARED
     pam.cc
 )
@@ -9,11 +9,11 @@ target_link_libraries(${PAM}
 )
 
 # New helper binary that contains the actual heavy ML logic
-add_executable(facepass-helper
+add_executable(biopass-helper
     helper.cc
 )
 
-target_include_directories(facepass-helper PRIVATE
+target_include_directories(biopass-helper PRIVATE
     ${OpenCV_INCLUDE_DIRS}
     ${TORCH_INCLUDE_DIRS}
     ${FaceDetection_INCLUDE_DIRS}
@@ -25,15 +25,15 @@ target_include_directories(facepass-helper PRIVATE
     ${CMAKE_SOURCE_DIR}/fingerprint
 )
 
-target_link_libraries(facepass-helper
+target_link_libraries(biopass-helper
     ${OpenCV_LIBS}
     ${TORCH_LIBRARIES}
-    facepass_core
-    facepass_face
-    facepass_voice
-    facepass_fingerprint
+    biopass_core
+    biopass_face
+    biopass_voice
+    biopass_fingerprint
     spdlog::spdlog_header_only
 )
 
 # Install rules
-install(TARGETS facepass-helper DESTINATION bin)
+install(TARGETS biopass-helper DESTINATION bin)

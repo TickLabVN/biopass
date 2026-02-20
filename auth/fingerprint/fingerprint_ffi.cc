@@ -7,39 +7,39 @@
 extern "C" {
 
 void* fingerprint_auth_new(void) {
-  facepass::FingerprintMethodConfig default_config;
-  return static_cast<void*>(new facepass::FingerprintAuth(default_config));
+  biopass::FingerprintMethodConfig default_config;
+  return static_cast<void*>(new biopass::FingerprintAuth(default_config));
 }
 
 void fingerprint_auth_free(void* auth) {
   if (!auth)
     return;
-  delete static_cast<facepass::FingerprintAuth*>(auth);
+  delete static_cast<biopass::FingerprintAuth*>(auth);
 }
 
 bool fingerprint_is_available(void* auth) {
   if (!auth)
     return false;
-  return static_cast<facepass::FingerprintAuth*>(auth)->is_available();
+  return static_cast<biopass::FingerprintAuth*>(auth)->is_available();
 }
 
 int fingerprint_authenticate(void* auth, const char* username, FingerprintAuthConfig config) {
   if (!auth || !username)
     return AUTH_UNAVAILABLE;
-  auto* fp_auth = static_cast<facepass::FingerprintAuth*>(auth);
+  auto* fp_auth = static_cast<biopass::FingerprintAuth*>(auth);
 
-  facepass::AuthConfig cpp_config;
+  biopass::AuthConfig cpp_config;
 
-  facepass::AuthResult result = fp_auth->authenticate(username, cpp_config);
+  biopass::AuthResult result = fp_auth->authenticate(username, cpp_config);
 
   switch (result) {
-    case facepass::AuthResult::Success:
+    case biopass::AuthResult::Success:
       return AUTH_SUCCESS;
-    case facepass::AuthResult::Failure:
+    case biopass::AuthResult::Failure:
       return AUTH_FAILURE;
-    case facepass::AuthResult::Unavailable:
+    case biopass::AuthResult::Unavailable:
       return AUTH_UNAVAILABLE;
-    case facepass::AuthResult::Retry:
+    case biopass::AuthResult::Retry:
       return AUTH_RETRY;
     default:
       return AUTH_UNAVAILABLE;
@@ -53,7 +53,7 @@ char** fingerprint_list_enrolled_fingers(void* auth, const char* username, int* 
     return nullptr;
   }
 
-  auto* fp_auth = static_cast<facepass::FingerprintAuth*>(auth);
+  auto* fp_auth = static_cast<biopass::FingerprintAuth*>(auth);
   std::vector<std::string> fingers = fp_auth->list_enrolled_fingers(username);
 
   if (fingers.empty()) {
@@ -94,14 +94,14 @@ bool fingerprint_enroll(void* auth, const char* username, const char* finger_nam
                         EnrollProgressCallback callback, void* user_data) {
   if (!auth || !username || !finger_name)
     return false;
-  return static_cast<facepass::FingerprintAuth*>(auth)->enroll(username, finger_name, callback,
-                                                               user_data);
+  return static_cast<biopass::FingerprintAuth*>(auth)->enroll(username, finger_name, callback,
+                                                              user_data);
 }
 
 bool fingerprint_remove_finger(void* auth, const char* username, const char* finger_name) {
   if (!auth || !username || !finger_name)
     return false;
-  return static_cast<facepass::FingerprintAuth*>(auth)->remove_finger(username, finger_name);
+  return static_cast<biopass::FingerprintAuth*>(auth)->remove_finger(username, finger_name);
 }
 
 }  // extern "C"

@@ -7,7 +7,7 @@ use tauri::{AppHandle, Manager};
 const CONFIG_FILE: &str = "config.yaml";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FacepassConfig {
+pub struct BiopassConfig {
     pub strategy: StrategyConfig,
     pub methods: MethodsConfig,
     pub models: Vec<ModelConfig>,
@@ -148,8 +148,8 @@ fn get_voices_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(get_data_dir(app)?.join("voices"))
 }
 
-fn get_default_config() -> FacepassConfig {
-    FacepassConfig {
+fn get_default_config() -> BiopassConfig {
+    BiopassConfig {
         strategy: StrategyConfig {
             debug: false,
             execution_mode: "sequential".to_string(),
@@ -226,7 +226,7 @@ pub fn get_current_username() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn load_config(app: AppHandle) -> Result<FacepassConfig, String> {
+pub fn load_config(app: AppHandle) -> Result<BiopassConfig, String> {
     let config_path = get_config_path(&app)?;
 
     if !config_path.exists() {
@@ -240,7 +240,7 @@ pub fn load_config(app: AppHandle) -> Result<FacepassConfig, String> {
 }
 
 #[tauri::command]
-pub fn save_config(app: AppHandle, config: FacepassConfig) -> Result<(), String> {
+pub fn save_config(app: AppHandle, config: BiopassConfig) -> Result<(), String> {
     let config_dir = get_config_dir(&app)?;
     let config_path = get_config_path(&app)?;
 

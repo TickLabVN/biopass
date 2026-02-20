@@ -11,7 +11,7 @@
 
 #include "auth_manager.h"
 
-namespace facepass {
+namespace biopass {
 
 // ---------------------------------------------------------------------------
 // Per-method config structs (mirrors Tauri config.rs)
@@ -67,10 +67,10 @@ struct MethodsConfig {
 // ---------------------------------------------------------------------------
 
 /**
- * Complete configuration for facepass.
- * Loaded from ~/.config/com.ticklab.facepass/config.yaml
+ * Complete configuration for biopass.
+ * Loaded from ~/.config/com.ticklab.biopass/config.yaml
  */
-struct FacePassConfig {
+struct BiopassConfig {
   bool debug = false;
   ExecutionMode mode = ExecutionMode::Sequential;
   std::vector<std::string> methods = {"face"};
@@ -82,7 +82,7 @@ struct FacePassConfig {
 // Config loading
 // ---------------------------------------------------------------------------
 
-FacePassConfig load_config(const std::string &username);
+BiopassConfig load_config(const std::string &username);
 std::string get_config_path(const std::string &username);
 bool config_exists(const std::string &username);
 
@@ -105,4 +105,4 @@ std::string debug_path(const std::string &username);
 // Creates required data directories for a user.
 int setup_config(const std::string &username);
 
-}  // namespace facepass
+}  // namespace biopass

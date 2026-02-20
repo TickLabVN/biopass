@@ -5,7 +5,7 @@
 #include "auth_config.h"
 #include "auth_method.h"
 
-namespace facepass {
+namespace biopass {
 
 /**
  * Fingerprint authentication method.
@@ -32,4 +32,4 @@ class FingerprintAuth : public IAuthMethod {
   FingerprintMethodConfig config_;
 };
 
-}  // namespace facepass
+}  // namespace biopass

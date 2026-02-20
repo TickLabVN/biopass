@@ -7,7 +7,7 @@
 #include <thread>
 #include <vector>
 
-namespace facepass {
+namespace biopass {
 
 namespace {
 
@@ -604,4 +604,4 @@ bool FingerprintAuth::remove_finger(const std::string& username, const std::stri
   return success;
 }
 
-}  // namespace facepass
+}  // namespace biopass

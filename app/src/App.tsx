@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { FacepassConfig } from "@/types/config";
+import type { BiopassConfig } from "@/types/config";
 import logo from "./assets/logo.png";
 
 type Tab = "config" | "models";
@@ -67,7 +67,7 @@ function App() {
       initialized.current = true;
 
       try {
-        const config = await invoke<FacepassConfig>("load_config");
+        const config = await invoke<BiopassConfig>("load_config");
         if (config.appearance) {
           setTheme(config.appearance);
         }
@@ -84,7 +84,7 @@ function App() {
   useEffect(() => {
     const updateConfigTheme = async () => {
       try {
-        const config = await invoke<FacepassConfig>("load_config");
+        const config = await invoke<BiopassConfig>("load_config");
         if (config.appearance !== theme) {
           config.appearance = theme ?? "dark";
           await invoke("save_config", { config });
@@ -104,9 +104,9 @@ function App() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-8">
               <div className="flex items-center gap-3">
-                <img src={logo} className="h-8" alt="Facepass logo" />
+                <img src={logo} className="h-8" alt="Biopass logo" />
                 <span className="font-bold text-lg hidden sm:inline-block">
-                  Facepass
+                  Biopass
                 </span>
               </div>
 

@@ -1,17 +1,17 @@
 cmake_minimum_required(VERSION 3.28)
 
-add_library(facepass_core STATIC
+add_library(biopass_core STATIC
     auth_manager.cc
     auth_config.cc
 )
 
-set_target_properties(facepass_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(biopass_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-target_include_directories(facepass_core PUBLIC
+target_include_directories(biopass_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(facepass_core
+target_link_libraries(biopass_core
     pthread
     yaml-cpp
     spdlog::spdlog_header_only

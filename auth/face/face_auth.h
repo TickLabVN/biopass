@@ -3,7 +3,7 @@
 #include "auth_config.h"
 #include "auth_method.h"
 
-namespace facepass {
+namespace biopass {
 
 /**
  * Face authentication method.
@@ -24,4 +24,4 @@ class FaceAuth : public IAuthMethod {
   FaceMethodConfig face_config_;
 };
 
-}  // namespace facepass
+}  // namespace biopass

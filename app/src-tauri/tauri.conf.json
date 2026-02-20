@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "facepass",
+  "productName": "biopass",
   "version": "0.1.0",
-  "identifier": "com.ticklab.facepass",
+  "identifier": "com.ticklab.biopass",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Facepass",
+        "title": "Biopass",
         "width": 800,
         "height": 600
       }
@@ -21,7 +21,7 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$HOME/.local/share/com.ticklab.facepass/**", "$DATA/**"]
+        "scope": ["$HOME/.local/share/com.ticklab.biopass/**", "$DATA/**"]
       }
     }
   },
@@ -41,7 +41,7 @@
       },
       "deb": {
         "files": {
-          "/usr/share/com.ticklab.facepass/download_models.sh": "scripts/download_models.sh",
+          "/usr/share/com.ticklab.biopass/download_models.sh": "scripts/download_models.sh",
           "/DEBIAN/postinst": "scripts/postinst"
         }
       }

@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
-import type { FacepassConfig } from "@/types/config";
+import type { BiopassConfig } from "@/types/config";
 
-export async function validateConfig(config: FacepassConfig): Promise<boolean> {
+export async function validateConfig(config: BiopassConfig): Promise<boolean> {
   const registeredModelPaths = new Set(
     (config.models || []).map((m) => m.path),
   );

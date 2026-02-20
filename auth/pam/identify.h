@@ -17,6 +17,6 @@
 #include "face_detection.h"
 #include "face_recognition.h"
 
-int scan_face(const string &username, const facepass::FaceMethodConfig &face_config, int8_t retries,
+int scan_face(const string &username, const biopass::FaceMethodConfig &face_config, int8_t retries,
               const int gap, bool anti_spoofing = false);
 #endif

@@ -3,7 +3,7 @@
 #include "auth_config.h"
 #include "auth_method.h"
 
-namespace facepass {
+namespace biopass {
 
 /**
  * Voice authentication method.
@@ -25,4 +25,4 @@ class VoiceAuth : public IAuthMethod {
   VoiceMethodConfig config_;
 };
 
-}  // namespace facepass
+}  // namespace biopass

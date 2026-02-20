@@ -7,7 +7,7 @@
 
 #include "retry_strategy.h"
 
-namespace facepass {
+namespace biopass {
 
 void AuthManager::add_method(std::unique_ptr<IAuthMethod> method) {
   this->methods_.push_back(std::move(method));
@@ -171,4 +171,4 @@ int AuthManager::run_parallel(const std::string &username) {
   return PAM_AUTH_ERR;
 }
 
-}  // namespace facepass
+}  // namespace biopass

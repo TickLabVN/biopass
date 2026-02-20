@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Cpu } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { FacepassConfig, ModelConfig } from "@/types/config";
+import type { BiopassConfig, ModelConfig } from "@/types/config";
 import { ModelCard } from "./ModelCard";
 
 export function ModelsPage() {
@@ -23,7 +23,7 @@ export function ModelsPage() {
     setStatusMap({ ...newStatuses });
 
     try {
-      const config = await invoke<FacepassConfig>("load_config");
+      const config = await invoke<BiopassConfig>("load_config");
       const inUsePaths = new Set<string>();
 
       // Collect all used paths
@@ -69,7 +69,7 @@ export function ModelsPage() {
   const loadConfig = useCallback(async () => {
     try {
       setLoading(true);
-      const config = await invoke<FacepassConfig>("load_config");
+      const config = await invoke<BiopassConfig>("load_config");
       setModels(config.models || []);
       checkModelsStatus(config.models || []);
     } catch (err) {

@@ -19,7 +19,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
   retval = pam_get_item(pamh, PAM_SERVICE, (const void **)&service);
   if (retval == PAM_SUCCESS && service != nullptr) {
     // Polkit/pkexec require explicit password prompts in most DEs.
-    // We bypass Facepass for these services to prevent auth hangs.
+    // We bypass Biopass for these services to prevent auth hangs.
     if (strcmp(service, "polkit-1") == 0 || strcmp(service, "pkexec") == 0) {
       return PAM_IGNORE;
     }
@@ -42,8 +42,8 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
     // We use a known absolute path to avoid PATH spoofing attacks.
     // In a real production environment, this path should be configurable,
-    // or strictly defined at compile-time (e.g. /usr/local/bin/facepass-helper).
-    execl("/usr/local/bin/facepass-helper", "facepass-helper", pUsername, NULL);
+    // or strictly defined at compile-time (e.g. /usr/local/bin/biopass-helper).
+    execl("/usr/local/bin/biopass-helper", "biopass-helper", pUsername, NULL);
 
     // If execl returns, it failed
     perror("execl failed");

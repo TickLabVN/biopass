@@ -8,18 +8,18 @@
 #include <fstream>
 #include <iostream>
 
-namespace facepass {
+namespace biopass {
 
 std::string get_config_path(const std::string &username) {
   struct passwd *pw = getpwnam(username.c_str());
   if (pw == nullptr) {
     const char *home = getenv("HOME");
     if (home) {
-      return std::string(home) + "/.config/com.ticklab.facepass/config.yaml";
+      return std::string(home) + "/.config/com.ticklab.biopass/config.yaml";
     }
-    return "/etc/com.ticklab.facepass/config.yaml";
+    return "/etc/com.ticklab.biopass/config.yaml";
   }
-  return std::string(pw->pw_dir) + "/.config/com.ticklab.facepass/config.yaml";
+  return std::string(pw->pw_dir) + "/.config/com.ticklab.biopass/config.yaml";
 }
 
 bool config_exists(const std::string &username) {
@@ -30,11 +30,11 @@ bool config_exists(const std::string &username) {
 std::string user_data_dir(const std::string &username) {
   struct passwd *pw = getpwnam(username.c_str());
   if (pw != nullptr) {
-    return std::string(pw->pw_dir) + "/.local/share/com.ticklab.facepass";
+    return std::string(pw->pw_dir) + "/.local/share/com.ticklab.biopass";
   }
   const char *home = getenv("HOME");
   if (home)
-    return std::string(home) + "/.local/share/com.ticklab.facepass";
+    return std::string(home) + "/.local/share/com.ticklab.biopass";
   return "";
 }
 
@@ -44,8 +44,8 @@ static ExecutionMode parse_mode(const std::string &mode_str) {
   return ExecutionMode::Sequential;
 }
 
-FacePassConfig load_config(const std::string &username) {
-  FacePassConfig config;
+BiopassConfig load_config(const std::string &username) {
+  BiopassConfig config;
 
   std::string config_path = get_config_path(username);
 
@@ -149,11 +149,10 @@ FacePassConfig load_config(const std::string &username) {
       config.methods = enabled;
     }
   } catch (const YAML::BadFile &e) {
-    std::cerr << "FacePass: Config file not found at " << config_path << ", using defaults"
+    std::cerr << "Biopass: Config file not found at " << config_path << ", using defaults"
               << std::endl;
   } catch (const YAML::Exception &e) {
-    std::cerr << "FacePass: Failed to parse config: " << e.what() << ", using defaults"
-              << std::endl;
+    std::cerr << "Biopass: Failed to parse config: " << e.what() << ", using defaults" << std::endl;
   }
 
   return config;
@@ -220,4 +219,4 @@ int setup_config(const std::string &username) {
   return mkdir_p(dataDir + "/debugs");
 }
 
-}  // namespace facepass
+}  // namespace biopass

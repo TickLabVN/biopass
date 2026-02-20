@@ -18,11 +18,11 @@ int main(int argc, char **argv) {
   const char *pUsername = argv[1];
 
   // Load configuration from file
-  if (!facepass::config_exists(pUsername)) {
-    // User has not configured facepass — skip this module transparently
+  if (!biopass::config_exists(pUsername)) {
+    // User has not configured biopass — skip this module transparently
     return 2;  // PAM_IGNORE
   }
-  facepass::FacePassConfig config = facepass::load_config(pUsername);
+  biopass::BiopassConfig config = biopass::load_config(pUsername);
 
   if (config.debug) {
     spdlog::set_level(spdlog::level::debug);
@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   }
 
   // Create and configure AuthManager
-  facepass::AuthManager manager;
+  biopass::AuthManager manager;
   manager.set_mode(config.mode);
   manager.set_config(config.auth);
 
@@ -39,14 +39,14 @@ int main(int argc, char **argv) {
   int methods_count = 0;
   for (const auto &method_name : config.methods) {
     if (method_name == "face") {
-      manager.add_method(std::make_unique<facepass::FaceAuth>(config.methods_config.face));
+      manager.add_method(std::make_unique<biopass::FaceAuth>(config.methods_config.face));
       methods_count++;
     } else if (method_name == "voice") {
-      manager.add_method(std::make_unique<facepass::VoiceAuth>(config.methods_config.voice));
+      manager.add_method(std::make_unique<biopass::VoiceAuth>(config.methods_config.voice));
       methods_count++;
     } else if (method_name == "fingerprint") {
       manager.add_method(
-          std::make_unique<facepass::FingerprintAuth>(config.methods_config.fingerprint));
+          std::make_unique<biopass::FingerprintAuth>(config.methods_config.fingerprint));
       methods_count++;
     }
   }

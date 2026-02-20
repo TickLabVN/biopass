@@ -6,14 +6,7 @@
 Run the following commands to install the required dependencies and set up the environment:
 ```bash
 sudo apt install libopencv-dev libpam0g-dev libcli11-dev
-cd auth
-mkdir -p external && cd external
-wget -O libtorch.zip https://download.pytorch.org/libtorch/nightly/cpu/libtorch-cxx11-abi-shared-without-deps-2.2.0.dev20231031%2Bcpu.zip
-unzip libtorch.zip
-rm libtorch.zip
-cd ../..
 ```
-
 ### Step 2: Compile the Project
 Execute the following commands to compile the project:
 ```bash

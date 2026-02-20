@@ -1,4 +1,4 @@
-export interface FacepassConfig {
+export interface BiopassConfig {
   strategy: StrategyConfig;
   methods: MethodsConfig;
   models: ModelConfig[];
@@ -67,7 +67,7 @@ export interface ModelConfig {
   type: "face" | "voice";
 }
 
-export const defaultConfig: FacepassConfig = {
+export const defaultConfig: BiopassConfig = {
   strategy: {
     debug: false,
     execution_mode: "sequential",

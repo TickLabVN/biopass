@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-namespace facepass {
+namespace biopass {
 
 bool VoiceAuth::is_available() const {
   // TODO: Check if microphone is available
@@ -18,4 +18,4 @@ AuthResult VoiceAuth::authenticate(const std::string &username, const AuthConfig
   return AuthResult::Unavailable;
 }
 
-}  // namespace facepass
+}  // namespace biopass

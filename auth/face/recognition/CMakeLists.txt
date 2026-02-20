@@ -1,11 +1,11 @@
-add_library(facepass_reg SHARED
+add_library(biopass_reg SHARED
     face_recognition.cc
 )
 set(FaceRecognition_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(facepass_reg PRIVATE
+target_include_directories(biopass_reg PRIVATE
     ${OpenCV_INCLUDE_DIRS}
     ${TORCH_INCLUDE_DIRS}
 )
-target_include_directories(facepass_reg PUBLIC
+target_include_directories(biopass_reg PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )

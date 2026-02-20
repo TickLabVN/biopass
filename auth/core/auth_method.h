@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace facepass {
+namespace biopass {
 /**
  * Result of an authentication attempt.
  */
@@ -60,4 +60,4 @@ struct IAuthMethod {
   virtual AuthResult authenticate(const std::string& username, const AuthConfig& config) = 0;
 };
 
-}  // namespace facepass
+}  // namespace biopass

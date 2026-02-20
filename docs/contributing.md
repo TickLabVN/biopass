@@ -37,23 +37,23 @@ After successfully compiling the project, follow these steps:
 1. **Add Your Face**:
    Run the following command to register your face (ensure you are in the project root):
    ```bash
-   ./auth/build/cli/facepass register
+   ./auth/build/cli/biopass register
    ```
 
 2. **Copy the PAM Module**:
-   Copy the `libfacepass_pam.so` file to the `/lib/security/` directory:
+   Copy the `libbiopass_pam.so` file to the `/lib/security/` directory:
    ```bash
-   sudo cp auth/build/pam/libfacepass_pam.so /lib/security/
+   sudo cp auth/build/pam/libbiopass_pam.so /lib/security/
    ```
 
 3. **Modify PAM Configuration**:
    Add the following line to the top of the `/etc/pam.d/common-auth` file:
    ```
-   auth sufficient libfacepass_pam.so
+   auth sufficient libbiopass_pam.so
    ```
 
 4. **Test the PAM Module**:
-   Test if the Facepass PAM module works by typing:
+   Test if the Biopass PAM module works by typing:
    ```bash
    sudo -i
    ```

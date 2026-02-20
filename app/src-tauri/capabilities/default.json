@@ -12,10 +12,10 @@
       "identifier": "fs:allow-read",
       "allow": [
         {
-          "path": "$HOME/.local/share/com.ticklab.facepass/**"
+          "path": "$HOME/.local/share/com.ticklab.biopass/**"
         },
         {
-          "path": "$DATA/com.ticklab.facepass/**"
+          "path": "$DATA/com.ticklab.biopass/**"
         }
       ]
     },

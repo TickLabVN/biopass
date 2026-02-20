@@ -33,7 +33,7 @@ string v4() {
 
 namespace {
 bool save_failed_face(const string &username, const cv::Mat &face, const string &reason) {
-  string failedFacePath = facepass::debug_path(username) + "/" + reason + "." + uuid::v4() + ".jpg";
+  string failedFacePath = biopass::debug_path(username) + "/" + reason + "." + uuid::v4() + ".jpg";
   if (!cv::imwrite(failedFacePath, face)) {
     cerr << "ERROR: Could not save failed face to " << failedFacePath << endl;
     return false;
@@ -52,7 +52,7 @@ bool process_anti_spoofing(FaceAntiSpoofing &faceAs, cv::Mat &face) {
 void sleep_for(int ms) { this_thread::sleep_for(chrono::milliseconds(ms)); }
 }  // namespace
 
-int scan_face(const string &username, const facepass::FaceMethodConfig &face_config, int8_t retries,
+int scan_face(const string &username, const biopass::FaceMethodConfig &face_config, int8_t retries,
               const int gap, bool anti_spoofing) {
   cv::VideoCapture camera(0, cv::CAP_V4L2);
   if (!camera.isOpened()) {
@@ -60,7 +60,7 @@ int scan_face(const string &username, const facepass::FaceMethodConfig &face_con
     return PAM_AUTH_ERR;
   }
 
-  std::vector<std::string> enrolledFaces = facepass::list_user_faces(username);
+  std::vector<std::string> enrolledFaces = biopass::list_user_faces(username);
   if (enrolledFaces.empty()) {
     cerr << "ERROR: No face enrolled for user " << username << endl;
     return PAM_AUTH_ERR;

@@ -75,7 +75,7 @@ export function StrategySection({ strategy, onChange }: Props) {
               </span>
             </Label>
             <p className="text-xs text-muted-foreground max-w-[400px]">
-              Use FacePass to unlock your computer and authorize system actions.
+              Use Biopass to unlock your computer and authorize system actions.
             </p>
           </div>
           <Switch

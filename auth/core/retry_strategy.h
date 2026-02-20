@@ -2,7 +2,7 @@
 
 #include "auth_method.h"
 
-namespace facepass {
+namespace biopass {
 
 /**
  * Strategy that retries a fixed number of times if the result is AuthResult::Retry.
@@ -23,4 +23,4 @@ struct RetryStrategy {
   int max_retries_;
 };
 
-}  // namespace facepass
+}  // namespace biopass

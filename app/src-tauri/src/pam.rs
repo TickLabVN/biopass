@@ -3,11 +3,11 @@ use std::path::PathBuf;
 use tauri::AppHandle;
 
 const PAM_CONFIG_PATH: &str = "/etc/pam.d/common-auth";
-const PAM_MODULE_ENTRY: &str = "auth\t[success=2 default=ignore]\tlibfacepass_pam.so";
+const PAM_MODULE_ENTRY: &str = "auth\t[success=2 default=ignore]\tlibbiopass_pam.so";
 
 pub fn modify_pam_lines(lines: &mut Vec<String>, pam_enabled: bool) -> bool {
     let mut changed = false;
-    let existing_index = lines.iter().position(|l| l.contains("libfacepass_pam.so"));
+    let existing_index = lines.iter().position(|l| l.contains("libbiopass_pam.so"));
 
     if pam_enabled {
         if let Some(index) = existing_index {
@@ -47,7 +47,7 @@ pub fn save_pam_config_with_backup(path: &PathBuf, content: &str) -> Result<(), 
     if is_system_path {
         // Create a temporary file in /tmp for the new config
         let temp_dir = std::env::temp_dir();
-        let temp_file = temp_dir.join("facepass_pam_config_tmp");
+        let temp_file = temp_dir.join("biopass_pam_config_tmp");
         fs::write(&temp_file, content)
             .map_err(|e| format!("Failed to write temporary file: {}", e))?;
 
@@ -154,13 +154,13 @@ mod tests {
         let changed = modify_pam_lines(&mut lines, false);
         assert!(changed);
         assert_eq!(lines.len(), 2);
-        assert!(!lines.iter().any(|l| l.contains("libfacepass_pam.so")));
+        assert!(!lines.iter().any(|l| l.contains("libbiopass_pam.so")));
     }
 
     #[test]
     fn test_save_pam_config_with_backup() {
         let dir = tempdir().unwrap();
-        let file_path = dir.path().join("facepass");
+        let file_path = dir.path().join("biopass");
         let content = "test content";
 
         // Initial save

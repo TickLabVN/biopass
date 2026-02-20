@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(facepass)
+project(biopass)
 if(DEFINED ENV{PROJECT_VERSION})
     message(STATUS "Project version: $ENV{PROJECT_VERSION}")
     set(PROJECT_VERSION $ENV{PROJECT_VERSION})
@@ -41,13 +41,13 @@ endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} ${OpenCV_CFLAGS_OTHER}")
 
 install(
-    TARGETS facepass_det facepass_reg facepass_as
+    TARGETS biopass_det biopass_reg biopass_as
     COMPONENT applications
     RUNTIME DESTINATION "/usr/bin"
     LIBRARY DESTINATION "/usr/lib"
 )
 install(
-    TARGETS facepass_pam
+    TARGETS biopass_pam
     LIBRARY DESTINATION "/lib/security"
 )
 
@@ -63,7 +63,7 @@ SET(CPACK_GENERATOR "DEB")
 SET(CPACK_PACKAGE_NAME ${PROJECT_NAME})
 SET(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 SET(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
-SET(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Facepass is a face recognition authentication system.")
+SET(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Biopass is a face recognition authentication system.")
 SET(CPACK_DEBIAN_PACKAGE_DEPENDS "libpam0g-dev, libopencv-dev, libyaml-cpp-dev")
 SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Nguyen Phuc Vinh & Tran Trung Thai") #required
 # SET(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_SOURCE_DIR}/scripts/postinst")

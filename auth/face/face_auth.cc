@@ -12,7 +12,7 @@
 #include "face_detection.h"
 #include "face_recognition.h"
 
-namespace facepass {
+namespace biopass {
 
 bool FaceAuth::is_available() const {
   cv::VideoCapture camera(0, cv::CAP_V4L2);
@@ -28,7 +28,7 @@ AuthResult FaceAuth::authenticate(const std::string &username, const AuthConfig 
     return AuthResult::Unavailable;
   }
 
-  std::vector<std::string> enrolledFaces = facepass::list_user_faces(username);
+  std::vector<std::string> enrolledFaces = biopass::list_user_faces(username);
   if (enrolledFaces.empty()) {
     std::cerr << "FaceAuth: No face enrolled for user " << username << ", skipping" << std::endl;
     return AuthResult::Unavailable;
@@ -108,4 +108,4 @@ AuthResult FaceAuth::authenticate(const std::string &username, const AuthConfig 
   return AuthResult::Retry;
 }
 
-}  // namespace facepass
+}  // namespace biopass

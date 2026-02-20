@@ -7,7 +7,7 @@
 
 #include "auth_method.h"
 
-namespace facepass {
+namespace biopass {
 
 /**
  * Execution mode for authentication methods.
@@ -70,4 +70,4 @@ class AuthManager {
   AuthConfig config_;
 };
 
-}  // namespace facepass
+}  // namespace biopass

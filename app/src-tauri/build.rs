@@ -6,10 +6,10 @@ fn main() {
     let library_dir = PathBuf::from(project_dir).join("../../auth/build/fingerprint");
 
     println!("cargo:rustc-link-search=native={}", library_dir.display());
-    println!("cargo:rustc-link-lib=static=facepass_fingerprint");
+    println!("cargo:rustc-link-lib=static=biopass_fingerprint");
     println!(
         "cargo:rerun-if-changed={}",
-        library_dir.join("libfacepass_fingerprint.a").display()
+        library_dir.join("libbiopass_fingerprint.a").display()
     );
 
     // Link C++ standard library

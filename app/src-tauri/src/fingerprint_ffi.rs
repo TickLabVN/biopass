@@ -9,7 +9,7 @@ pub struct FingerprintAuthConfig {
     pub retries: i32,
 }
 
-#[link(name = "facepass_fingerprint")]
+#[link(name = "biopass_fingerprint")]
 extern "C" {
     // Initialization
     fn fingerprint_auth_new() -> *mut std::ffi::c_void;

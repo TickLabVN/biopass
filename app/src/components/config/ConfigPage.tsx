@@ -4,22 +4,22 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
-import type { FacepassConfig } from "@/types/config";
+import type { BiopassConfig } from "@/types/config";
 import { defaultConfig } from "@/types/config";
 import { MethodsSection } from "./MethodsSection.tsx";
 import { StrategySection } from "./StrategySection.tsx";
 import { validateConfig } from "./validation";
 
 export function ConfigPage() {
-  const [config, setConfig] = useState<FacepassConfig>(defaultConfig);
-  const [savedConfig, setSavedConfig] = useState<FacepassConfig>(defaultConfig);
+  const [config, setConfig] = useState<BiopassConfig>(defaultConfig);
+  const [savedConfig, setSavedConfig] = useState<BiopassConfig>(defaultConfig);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const initConfig = useCallback(async () => {
     try {
       setLoading(true);
-      const loadedConfig = await invoke<FacepassConfig>("load_config");
+      const loadedConfig = await invoke<BiopassConfig>("load_config");
       setConfig(loadedConfig);
       setSavedConfig(loadedConfig);
     } catch (err) {
@@ -82,7 +82,7 @@ export function ConfigPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold bg-linear-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-            Facepass Configuration
+            Biopass Configuration
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Manage your authentication methods and execution strategies

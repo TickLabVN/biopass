@@ -8,18 +8,18 @@ Sample login method using PAM: `sshd`, `sudo`, `ftpd`, or any cloud login method
 
 ## Dev guide
 
-After compile `libfacepass_pam.so`, copy to `/lib/security/`:
+After compile `libbiopass_pam.so`, copy to `/lib/security/`:
 
 ```bash
 sudo mkdir -p /lib/security
-sudo cp ./build/auth/libfacepass_pam.so /lib/security/
+sudo cp ./build/auth/libbiopass_pam.so /lib/security/
 ```
 
 Add the following line on the top of file `/etc/pam.d/common-auth`:
 
 ```bash
-auth    required libfacepass_pam.so
-account required libfacepass_pam.so
+auth    required libbiopass_pam.so
+account required libbiopass_pam.so
 ```
 
 > WARN: This action may crash sudo, make sure your user has permission to edit this file without root permission first.

@@ -2,9 +2,9 @@
 mod config;
 
 use config::{
-    check_file_exists, delete_face_image, delete_file, delete_voice_recording, download_model,
-    get_config_path_str, get_current_username, list_face_images, list_video_devices,
-    list_voice_recordings, load_config, save_config, save_face_image, save_voice_recording,
+    check_file_exists, delete_face_image, delete_file, delete_voice_recording, get_config_path_str,
+    get_current_username, list_face_images, list_video_devices, list_voice_recordings, load_config,
+    save_config, save_face_image, save_voice_recording,
 };
 
 mod fingerprint;
@@ -44,6 +44,7 @@ pub fn run() {
                     });
                 }
             }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -59,7 +60,6 @@ pub fn run() {
             list_video_devices,
             delete_face_image,
             delete_voice_recording,
-            download_model,
             check_file_exists,
             delete_file,
             add_fingerprint,

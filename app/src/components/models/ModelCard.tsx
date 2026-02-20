@@ -1,13 +1,6 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { Cpu, Edit2, MoreVertical, Trash2 } from "lucide-react";
+import { Cpu } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -20,9 +13,6 @@ import { ModelStatus, type ModelStatusType } from "./ModelStatus";
 interface ModelCardProps {
   model: ModelConfig;
   status: ModelStatusType;
-  progress?: number;
-  onEdit: () => void;
-  onDelete: () => void;
 }
 
 function ModelFileFolderButton({ path }: { path: string }) {
@@ -58,13 +48,7 @@ function ModelFileFolderButton({ path }: { path: string }) {
   );
 }
 
-export function ModelCard({
-  model,
-  status,
-  progress = 0,
-  onEdit,
-  onDelete,
-}: ModelCardProps) {
+export function ModelCard({ model, status }: ModelCardProps) {
   return (
     <div className="group relative flex flex-col gap-4 p-5 rounded-xl border border-border bg-linear-to-b from-card to-muted/20 shadow-sm hover:border-primary/30 hover:shadow-md transition-all duration-300">
       <div className="flex sm:flex-row sm:items-start justify-between gap-4">
@@ -91,32 +75,7 @@ export function ModelCard({
         </div>
 
         <div className="flex items-center gap-1">
-          <ModelStatus status={status} progress={progress} />
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-foreground -mr-2"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem className="cursor-pointer" onClick={onEdit}>
-                <Edit2 className="w-4 h-4 mr-2" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
-                onClick={onDelete}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ModelStatus status={status} />
         </div>
       </div>
     </div>

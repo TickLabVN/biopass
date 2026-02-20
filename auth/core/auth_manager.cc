@@ -1,5 +1,7 @@
 #include "auth_manager.h"
 
+#include <spdlog/spdlog.h>
+
 #include <atomic>
 #include <iostream>
 
@@ -17,8 +19,15 @@ void AuthManager::set_config(const AuthConfig &config) { this->config_ = config;
 
 int AuthManager::authenticate(const std::string &username) {
   if (this->methods_.empty()) {
-    std::cerr << "AuthManager: No authentication methods configured" << std::endl;
+    spdlog::error("AuthManager: No authentication methods configured");
     return PAM_AUTH_ERR;
+  }
+
+  // Set default logger level according to debug config
+  if (this->config_.debug) {
+    spdlog::set_level(spdlog::level::debug);
+  } else {
+    spdlog::set_level(spdlog::level::info);
   }
 
   switch (this->mode_) {
@@ -37,7 +46,7 @@ int AuthManager::run_sequential(const std::string &username) {
 
   for (auto &method : this->methods_) {
     if (!method->is_available()) {
-      std::cerr << "AuthManager: " << method->name() << " is not available, skipping" << std::endl;
+      spdlog::debug("AuthManager: {} is not available, skipping", method->name());
       continue;
     }
 
@@ -46,11 +55,11 @@ int AuthManager::run_sequential(const std::string &username) {
 
     do {
       if (attempts > 0) {
-        std::cerr << "AuthManager: Retrying " << method->name() << " (attempt " << attempts + 1
-                  << "/" << this->config_.retries << ")" << std::endl;
+        spdlog::debug("AuthManager: Retrying {} (attempt {}/{})", method->name(), attempts + 1,
+                      this->config_.retries);
         std::this_thread::sleep_for(std::chrono::milliseconds(this->config_.retry_delay_ms));
       } else {
-        std::cout << "AuthManager: Trying " << method->name() << " authentication" << std::endl;
+        spdlog::debug("AuthManager: Trying {} authentication", method->name());
       }
 
       result = method->authenticate(username, this->config_);
@@ -60,32 +69,28 @@ int AuthManager::run_sequential(const std::string &username) {
 
     switch (result) {
       case AuthResult::Success:
-        std::cout << "AuthManager: " << method->name() << " authentication succeeded" << std::endl;
+        spdlog::debug("AuthManager: {} authentication succeeded", method->name());
         return PAM_SUCCESS;
       case AuthResult::Unavailable:
-        std::cerr << "AuthManager: " << method->name() << " became unavailable, skipping"
-                  << std::endl;
+        spdlog::debug("AuthManager: {} became unavailable, skipping", method->name());
         break;
       case AuthResult::Failure:
         any_attempted = true;
-        std::cerr << "AuthManager: " << method->name() << " authentication failed, trying next"
-                  << std::endl;
+        spdlog::debug("AuthManager: {} authentication failed, trying next", method->name());
         break;
       case AuthResult::Retry:
         any_attempted = true;
-        std::cerr << "AuthManager: " << method->name()
-                  << " requested retry but max retries exceeded" << std::endl;
+        spdlog::debug("AuthManager: {} requested retry but max retries exceeded", method->name());
         break;
     }
   }
 
   if (!any_attempted) {
-    std::cerr << "AuthManager: No methods were able to run for this user, skipping module"
-              << std::endl;
+    spdlog::debug("AuthManager: No methods were able to run for this user, skipping module");
     return PAM_IGNORE;
   }
 
-  std::cerr << "AuthManager: All authentication methods failed" << std::endl;
+  spdlog::error("AuthManager: All authentication methods failed");
   return PAM_AUTH_ERR;
 }
 
@@ -96,7 +101,7 @@ int AuthManager::run_parallel(const std::string &username) {
   // Launch all methods in parallel
   for (auto &method : this->methods_) {
     if (!method->is_available()) {
-      std::cerr << "AuthManager: " << method->name() << " is not available, skipping" << std::endl;
+      spdlog::debug("AuthManager: {} is not available, skipping", method->name());
       continue;
     }
 
@@ -115,12 +120,11 @@ int AuthManager::run_parallel(const std::string &username) {
             }
 
             if (attempts > 0) {
-              std::cout << "AuthManager: Retrying " << method->name() << " (parallel attempt "
-                        << attempts + 1 << ")" << std::endl;
+              spdlog::debug("AuthManager: Retrying {} (parallel attempt {})", method->name(),
+                            attempts + 1);
               std::this_thread::sleep_for(std::chrono::milliseconds(config.retry_delay_ms));
             } else {
-              std::cout << "AuthManager: Starting " << method->name()
-                        << " authentication (parallel)" << std::endl;
+              spdlog::debug("AuthManager: Starting {} authentication (parallel)", method->name());
             }
 
             result = method->authenticate(username, config);
@@ -129,8 +133,7 @@ int AuthManager::run_parallel(const std::string &username) {
 
           if (result == AuthResult::Success) {
             success_found.store(true);
-            std::cout << "AuthManager: " << method->name() << " authentication succeeded (parallel)"
-                      << std::endl;
+            spdlog::debug("AuthManager: {} authentication succeeded (parallel)", method->name());
           }
 
           return result;
@@ -139,8 +142,7 @@ int AuthManager::run_parallel(const std::string &username) {
 
   // If no method was launched at all, skip this module
   if (futures.empty()) {
-    std::cerr << "AuthManager: No methods were able to run for this user, skipping module"
-              << std::endl;
+    spdlog::debug("AuthManager: No methods were able to run for this user, skipping module");
     return PAM_IGNORE;
   }
 
@@ -161,12 +163,11 @@ int AuthManager::run_parallel(const std::string &username) {
   }
 
   if (!any_attempted) {
-    std::cerr << "AuthManager: All parallel methods became unavailable, skipping module"
-              << std::endl;
+    spdlog::debug("AuthManager: All parallel methods became unavailable, skipping module");
     return PAM_IGNORE;
   }
 
-  std::cerr << "AuthManager: All parallel authentication methods failed" << std::endl;
+  spdlog::error("AuthManager: All parallel authentication methods failed");
   return PAM_AUTH_ERR;
 }
 

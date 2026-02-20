@@ -65,6 +65,7 @@ struct MethodsConfig {
  * Loaded from ~/.config/com.ticklab.facepass/config.yaml
  */
 struct FacePassConfig {
+  bool debug = false;
   ExecutionMode mode = ExecutionMode::Sequential;
   std::vector<std::string> methods = {"face"};
   AuthConfig auth = {};

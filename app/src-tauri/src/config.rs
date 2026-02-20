@@ -18,6 +18,8 @@ pub struct FacepassConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StrategyConfig {
+    #[serde(default)]
+    pub debug: bool,
     pub execution_mode: String,
     pub order: Vec<String>,
     pub retries: u32,
@@ -126,6 +128,7 @@ fn get_models_dir(app: &AppHandle) -> Result<PathBuf, String> {
 fn get_default_config() -> FacepassConfig {
     FacepassConfig {
         strategy: StrategyConfig {
+            debug: false,
             execution_mode: "sequential".to_string(),
             order: vec![
                 "face".to_string(),

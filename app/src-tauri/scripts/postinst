@@ -1,0 +1,25 @@
+#!/bin/bash
+# postinst — Debian package post-installation maintainer script.
+# Runs after all files in the .deb package have been unpacked.
+
+set -e
+
+case "$1" in
+    configure)
+        # Run the model downloader for the installing user.
+        # On a typical `sudo dpkg -i` install, SUDO_USER is set.
+        SCRIPT="/usr/share/com.ticklab.facepass/download_models.sh"
+        if [ -f "$SCRIPT" ]; then
+            echo "Facepass: Running model downloader..."
+            bash "$SCRIPT" || true   # Non-fatal: don't block install if download fails
+        fi
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        echo "postinst called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

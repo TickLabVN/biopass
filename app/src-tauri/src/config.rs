@@ -1,10 +1,8 @@
 use base64::{engine::general_purpose, Engine as _};
-use reqwest;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::Write;
 use std::path::PathBuf;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 const CONFIG_FILE: &str = "config.yaml";
 
@@ -150,10 +148,6 @@ fn get_voices_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(get_data_dir(app)?.join("voices"))
 }
 
-fn get_models_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(get_data_dir(app)?.join("models"))
-}
-
 fn get_default_config() -> FacepassConfig {
     FacepassConfig {
         strategy: StrategyConfig {
@@ -172,52 +166,52 @@ fn get_default_config() -> FacepassConfig {
                 retries: 5,
                 retry_delay: 200,
                 detection: DetectionConfig {
-                    model: "models/face_detection.onnx".to_string(),
+                    model: "models/yolov11n-face.torchscript".to_string(),
                     threshold: 0.8,
                 },
                 recognition: RecognitionConfig {
-                    model: "models/face.onnx".to_string(),
+                    model: "models/edgeface_s_gamma_05_ts.pt".to_string(),
                     threshold: 0.8,
                 },
                 anti_spoofing: AntiSpoofingConfig {
                     enable: true,
-                    model: "models/face_anti_spoofing.onnx".to_string(),
+                    model: "models/mobilenetv3_antispoof_ts.pt".to_string(),
                     threshold: 0.8,
                 },
                 ir_camera: IRCameraConfig {
                     enable: false,
-                    device_id: 1,
+                    device_id: 0,
                 },
             },
             fingerprint: FingerprintMethodConfig {
-                enable: true,
-                retries: 3,
-                retry_delay: 1000,
+                enable: false,
+                retries: 1,
+                retry_delay: 5000,
                 fingers: vec![],
             },
             voice: VoiceMethodConfig {
-                enable: true,
+                enable: false,
                 retries: 3,
                 retry_delay: 500,
-                model: "models/voice.onnx".to_string(),
+                model: "".to_string(),
                 threshold: 0.8,
             },
         },
         models: vec![
             ModelConfig {
-                path: "models/face.onnx".to_string(),
-                name: Some("Onnx".to_string()),
-                model_type: "face".to_string(),
+                path: "models/yolov11n-face.torchscript".to_string(),
+                name: Some("Face Detection".to_string()),
+                model_type: "detection".to_string(),
             },
             ModelConfig {
-                path: "models/fingerprint.onnx".to_string(),
-                name: None,
-                model_type: "fingerprint".to_string(),
+                path: "models/edgeface_s_gamma_05_ts.pt".to_string(),
+                name: Some("Face Recognition".to_string()),
+                model_type: "recognition".to_string(),
             },
             ModelConfig {
-                path: "models/voice.onnx".to_string(),
-                name: None,
-                model_type: "voice".to_string(),
+                path: "models/mobilenetv3_antispoof_ts.pt".to_string(),
+                name: Some("Face Anti-spoofing".to_string()),
+                model_type: "anti-spoofing".to_string(),
             },
         ],
         appearance: "system".to_string(),
@@ -392,144 +386,6 @@ pub fn delete_face_image(path: String) -> Result<(), String> {
 #[tauri::command]
 pub fn delete_voice_recording(path: String) -> Result<(), String> {
     fs::remove_file(&path).map_err(|e| format!("Failed to delete file: {}", e))
-}
-
-#[derive(Clone, Serialize)]
-struct DownloadProgress {
-    url: String,
-    path: String,
-    progress: f64,
-    total: Option<u64>,
-    downloaded: u64,
-}
-
-#[derive(Clone, Serialize)]
-struct DownloadFinished {
-    url: String,
-    path: Option<String>,
-    error: Option<String>,
-}
-
-#[tauri::command]
-pub async fn download_model(app: AppHandle, url: String) -> Result<String, String> {
-    let models_dir = get_models_dir(&app)?;
-
-    // Create directory if it doesn't exist
-    if !models_dir.exists() {
-        fs::create_dir_all(&models_dir)
-            .map_err(|e| format!("Failed to create models directory: {}", e))?;
-    }
-
-    // Extract filename from URL or use a default, removing query parameters
-    let filename = url
-        .split('/')
-        .last()
-        .unwrap_or("model.onnx")
-        .split('?')
-        .next()
-        .unwrap_or("model.onnx")
-        .to_string();
-
-    if filename.is_empty() {
-        return Err("Could not determine filename from URL".to_string());
-    }
-
-    let mut file_path = models_dir.join(&filename);
-
-    // Ensure unique filename
-    if file_path.exists() {
-        let name_stem = std::path::Path::new(&filename)
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("model");
-        let extension = std::path::Path::new(&filename)
-            .extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or("onnx");
-
-        let mut counter = 1;
-        while file_path.exists() {
-            let new_filename = format!("{} ({}).{}", name_stem, counter, extension);
-            file_path = models_dir.join(new_filename);
-            counter += 1;
-        }
-    }
-
-    let path_str = file_path.to_string_lossy().to_string();
-    let url_clone = url.clone();
-    let path_clone = path_str.clone();
-
-    // Run in background
-    tauri::async_runtime::spawn(async move {
-        let result = async {
-            // Download the file
-            let response = reqwest::get(&url_clone)
-                .await
-                .map_err(|e| format!("Request failed: {}", e))?;
-
-            let total_size = response.content_length();
-            let mut downloaded: u64 = 0;
-
-            let mut file = fs::File::create(&file_path)
-                .map_err(|e| format!("Failed to create file: {}", e))?;
-
-            let mut stream = response.bytes_stream();
-            use futures_util::StreamExt;
-
-            while let Some(item) = stream.next().await {
-                let chunk = item.map_err(|e| format!("Error while downloading: {}", e))?;
-                file.write_all(&chunk)
-                    .map_err(|e| format!("Failed to write to file: {}", e))?;
-
-                downloaded += chunk.len() as u64;
-
-                let progress = if let Some(total) = total_size {
-                    (downloaded as f64 / total as f64) * 100.0
-                } else {
-                    0.0
-                };
-
-                let _ = app.emit(
-                    "download-progress",
-                    DownloadProgress {
-                        url: url_clone.clone(),
-                        path: path_clone.clone(),
-                        progress,
-                        total: total_size,
-                        downloaded,
-                    },
-                );
-            }
-
-            Ok(path_clone)
-        }
-        .await;
-
-        match result {
-            Ok(path) => {
-                let _ = app.emit(
-                    "download-finished",
-                    DownloadFinished {
-                        url: url.clone(),
-                        path: Some(path),
-                        error: None,
-                    },
-                );
-            }
-            Err(e) => {
-                let _ = app.emit(
-                    "download-finished",
-                    DownloadFinished {
-                        url: url.clone(),
-                        path: None,
-                        error: Some(e),
-                    },
-                );
-            }
-        }
-    });
-
-    Ok(path_str)
 }
 
 #[tauri::command]

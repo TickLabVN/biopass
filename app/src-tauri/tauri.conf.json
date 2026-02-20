@@ -21,7 +21,7 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$HOME/.local/share/facepass/**", "$DATA/**"]
+        "scope": ["$HOME/.local/share/com.ticklab.facepass/**", "$DATA/**"]
       }
     }
   },
@@ -34,6 +34,17 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "linux": {
+      "rpm": {
+        "preInstallScript": "scripts/download_models.sh"
+      },
+      "deb": {
+        "files": {
+          "/usr/share/com.ticklab.facepass/download_models.sh": "scripts/download_models.sh",
+          "/DEBIAN/postinst": "scripts/postinst"
+        }
+      }
+    }
   }
 }

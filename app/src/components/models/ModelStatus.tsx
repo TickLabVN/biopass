@@ -1,23 +1,16 @@
 import { AlertCircle, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-export type ModelStatusType =
-  | "checking"
-  | "available"
-  | "missing"
-  | "inuse"
-  | "downloading";
+export type ModelStatusType = "checking" | "available" | "missing" | "inuse";
 
 interface ModelStatusProps {
   status?: ModelStatusType | boolean;
-  progress?: number;
   className?: string;
   size?: "sm" | "default";
 }
 
 export function ModelStatus({
   status,
-  progress = 0,
   className,
   size = "default",
 }: ModelStatusProps) {
@@ -31,19 +24,6 @@ export function ModelStatus({
       <Badge variant="secondary" className={`${badgeClass} ${className}`}>
         <Loader2 size={iconSize} className="animate-spin" />
         {isSmall ? "Wait" : "Checking..."}
-      </Badge>
-    );
-  }
-
-  if (status === "downloading") {
-    return (
-      <Badge
-        className={`bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 dark:text-amber-400 border-amber-200 dark:border-amber-800 ${badgeClass} ${className}`}
-      >
-        <Loader2 size={iconSize} className="animate-spin" />
-        {isSmall
-          ? `${Math.round(progress)}%`
-          : `Downloading ${Math.round(progress)}%`}
       </Badge>
     );
   }

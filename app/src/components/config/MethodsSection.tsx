@@ -16,14 +16,12 @@ import type {
   FingerprintMethodConfig,
   MethodsConfig,
   ModelConfig,
-  VoiceMethodConfig,
 } from "@/types/config";
 import { FaceCaptureSection } from "./methods/FaceCaptureSection";
 import { FingerprintSection } from "./methods/FingerprintSection";
 import { MethodCard } from "./methods/MethodCard";
 import { ModelSelectField } from "./methods/shared/ModelSelectField";
 import { SliderField } from "./methods/shared/SliderField";
-import { VoiceRecordingSection } from "./methods/VoiceRecordingSection";
 
 interface Props {
   methods: MethodsConfig;
@@ -50,8 +48,7 @@ export function MethodsSection({ methods, models, onChange }: Props) {
   }, []);
 
   const updateFace = (face: FaceMethodConfig) => onChange({ ...methods, face });
-  const updateVoice = (voice: VoiceMethodConfig) =>
-    onChange({ ...methods, voice });
+
   const updateFingerprint = (fingerprint: FingerprintMethodConfig) =>
     onChange({ ...methods, fingerprint });
 
@@ -405,96 +402,32 @@ export function MethodsSection({ methods, models, onChange }: Props) {
           </div>
         </MethodCard>
 
-        {/* Voice Authentication */}
+        {/* Voice Authentication — Coming Soon */}
         <MethodCard
           title="Voice Recognition"
           icon={methodIcons.voice}
           color={methodColors.voice}
-          enabled={methods.voice.enable}
-          onToggle={(enable) => updateVoice({ ...methods.voice, enable })}
+          enabled={false}
+          onToggle={() => {}}
           expanded={expandedMethod === "voice"}
           onExpand={() =>
             setExpandedMethod(expandedMethod === "voice" ? null : "voice")
           }
         >
-          <div className="grid gap-4 pt-4">
-            {/* Retries and Delay */}
-            <div className="grid grid-cols-2 gap-6 p-4 rounded-lg bg-muted/50 border border-border/50">
-              <div className="grid gap-2">
-                <Label
-                  htmlFor="voice-max-retries"
-                  className="text-sm font-medium text-muted-foreground"
-                >
-                  Max Retries
-                </Label>
-                <Input
-                  id="voice-max-retries"
-                  type="number"
-                  min="0"
-                  max="10"
-                  value={methods.voice.retries}
-                  onChange={(e) =>
-                    updateVoice({
-                      ...methods.voice,
-                      retries: parseInt(e.target.value, 10) || 0,
-                    })
-                  }
-                  className="h-10"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label
-                  htmlFor="voice-retry-delay"
-                  className="text-sm font-medium text-muted-foreground"
-                >
-                  Retry Delay (ms)
-                </Label>
-                <Input
-                  id="voice-retry-delay"
-                  type="number"
-                  min="0"
-                  max="5000"
-                  step="100"
-                  value={methods.voice.retry_delay}
-                  onChange={(e) =>
-                    updateVoice({
-                      ...methods.voice,
-                      retry_delay: parseInt(e.target.value, 10) || 0,
-                    })
-                  }
-                  className="h-10"
-                />
-              </div>
+          <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+            <div className="w-14 h-14 rounded-full bg-orange-500/10 flex items-center justify-center">
+              <Mic className="w-7 h-7 text-orange-500" />
             </div>
-
-            {/* Voice Recording */}
-            <VoiceRecordingSection />
-
-            <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
-              <h4 className="font-medium mb-3 text-sm">Recognition Settings</h4>
-              <div className="flex gap-6 items-end">
-                <div className="flex-1 min-w-0">
-                  <ModelSelectField
-                    label="Model"
-                    value={methods.voice.model}
-                    models={models.filter((m) => m.type === "voice")}
-                    error={methods.voice.enable}
-                    onChange={(model) =>
-                      updateVoice({ ...methods.voice, model })
-                    }
-                  />
-                </div>
-                <div className="w-48 shrink-0">
-                  <SliderField
-                    label="Threshold"
-                    value={methods.voice.threshold}
-                    onChange={(threshold) =>
-                      updateVoice({ ...methods.voice, threshold })
-                    }
-                  />
-                </div>
-              </div>
+            <div>
+              <p className="font-semibold text-base">Coming Soon</p>
+              <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                Voice recognition is currently under development and will be
+                available in a future update.
+              </p>
             </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-orange-500/10 text-orange-500 border border-orange-500/20">
+              🚧 In Development
+            </span>
           </div>
         </MethodCard>
       </div>

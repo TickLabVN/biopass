@@ -19,6 +19,7 @@ enum AuthResult {
  * Configuration for authentication methods.
  */
 struct AuthConfig {
+  bool debug = false;
   int retries = 10;
   int retry_delay_ms = 200;
   bool anti_spoof = false;

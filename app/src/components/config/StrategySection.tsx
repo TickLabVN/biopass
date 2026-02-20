@@ -87,6 +87,29 @@ export function StrategySection({ strategy, onChange }: Props) {
           />
         </div>
 
+        {/* Debug Logging Toggle */}
+        <div className="flex items-center justify-between p-3 rounded-lg border border-border transition-all">
+          <div className="grid gap-0.5">
+            <Label
+              htmlFor="debug-enabled"
+              className="text-sm font-medium flex items-center gap-2"
+            >
+              Verbose Debug Logging
+            </Label>
+            <p className="text-xs text-muted-foreground max-w-[400px]">
+              Enable detailed console output for authentication methods. Useful
+              for troubleshooting.
+            </p>
+          </div>
+          <Switch
+            id="debug-enabled"
+            checked={strategy.debug}
+            onCheckedChange={(checked) =>
+              onChange({ ...strategy, debug: checked })
+            }
+          />
+        </div>
+
         {/* Execution Mode */}
         <div className="grid gap-2.5">
           <Label className="text-sm font-medium text-muted-foreground">

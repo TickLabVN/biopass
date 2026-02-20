@@ -3,7 +3,17 @@ add_library(${PAM} SHARED
     pam.cc
 )
 
-target_include_directories(${PAM} PRIVATE
+# The PAM module is now lightweight and only needs basic PAM headers
+target_link_libraries(${PAM}
+    pam
+)
+
+# New helper binary that contains the actual heavy ML logic
+add_executable(facepass-helper
+    helper.cc
+)
+
+target_include_directories(facepass-helper PRIVATE
     ${OpenCV_INCLUDE_DIRS}
     ${TORCH_INCLUDE_DIRS}
     ${FaceDetection_INCLUDE_DIRS}
@@ -15,11 +25,15 @@ target_include_directories(${PAM} PRIVATE
     ${CMAKE_SOURCE_DIR}/fingerprint
 )
 
-target_link_libraries(${PAM}
+target_link_libraries(facepass-helper
     ${OpenCV_LIBS}
     ${TORCH_LIBRARIES}
     facepass_core
     facepass_face
     facepass_voice
     facepass_fingerprint
+    spdlog::spdlog_header_only
 )
+
+# Install rules
+install(TARGETS facepass-helper DESTINATION bin)

@@ -14,4 +14,5 @@ target_include_directories(facepass_core PUBLIC
 target_link_libraries(facepass_core
     pthread
     yaml-cpp
+    spdlog::spdlog_header_only
 )

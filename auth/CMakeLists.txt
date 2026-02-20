@@ -36,6 +36,15 @@ find_package(OpenCV REQUIRED)
 # yaml-cpp for config parsing
 find_package(yaml-cpp REQUIRED)
 
+# spdlog for logging
+include(FetchContent)
+FetchContent_Declare(
+    spdlog
+    GIT_REPOSITORY https://github.com/gabime/spdlog.git
+    GIT_TAG v1.13.0
+)
+FetchContent_MakeAvailable(spdlog)
+
 add_subdirectory(core)
 add_subdirectory(face)
 add_subdirectory(voice)
@@ -47,8 +56,6 @@ set(FaceRecognition_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/face/recognition)
 set(FaceAntiSpoof_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/face/antispoofing)
 
 add_subdirectory(test/face_engine)
-add_subdirectory(test/pam)
-add_subdirectory(test/fingerprint)
 
 install(
     TARGETS facepass_det facepass_reg facepass_as

@@ -6,6 +6,7 @@ export interface FacepassConfig {
 }
 
 export interface StrategyConfig {
+  debug: boolean;
   execution_mode: "sequential" | "parallel";
   order: string[];
   retries: number;
@@ -64,6 +65,7 @@ export interface ModelConfig {
 
 export const defaultConfig: FacepassConfig = {
   strategy: {
+    debug: false,
     execution_mode: "sequential",
     order: ["face", "fingerprint", "voice"],
     retries: 3,

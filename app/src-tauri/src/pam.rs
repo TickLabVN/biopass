@@ -40,43 +40,34 @@ pub fn modify_pam_lines(lines: &mut Vec<String>, pam_enabled: bool) -> bool {
 pub fn save_pam_config_with_backup(path: &PathBuf, content: &str) -> Result<(), String> {
     let is_system_path = path.to_string_lossy().starts_with("/etc/");
 
-    // 1. Create backup if file exists
-    if path.exists() {
-        let mut backup_path = path.clone();
-        backup_path.set_extension("bak");
+    // Setup backup path
+    let mut backup_path = path.clone();
+    backup_path.set_extension("bak");
 
-        if is_system_path {
-            // Use pkexec to create backup
-            let status = std::process::Command::new("pkexec")
-                .arg("cp")
-                .arg(path)
-                .arg(&backup_path)
-                .status()
-                .map_err(|e| format!("Failed to execute pkexec for backup: {}", e))?;
-
-            if !status.success() {
-                return Err("Failed to create backup with elevated privileges".to_string());
-            }
-        } else {
-            fs::copy(path, &backup_path).map_err(|e| format!("Failed to create backup: {}", e))?;
-        }
-    }
-
-    // 2. Write new content
     if is_system_path {
-        // Create a temporary file in /tmp
+        // Create a temporary file in /tmp for the new config
         let temp_dir = std::env::temp_dir();
         let temp_file = temp_dir.join("facepass_pam_config_tmp");
         fs::write(&temp_file, content)
             .map_err(|e| format!("Failed to write temporary file: {}", e))?;
 
-        // Use pkexec to copy the temporary file to the final destination
+        // Prepare the shell script to run as root
+        let backup_cmd = format!("cp {} {}", path.display(), backup_path.display());
+        let copy_cmd = format!("cp {} {}", temp_file.display(), path.display());
+
+        let script = if path.exists() {
+            format!("{} && {}", backup_cmd, copy_cmd)
+        } else {
+            copy_cmd
+        };
+
+        // Use a single pkexec call to backup and write the new file simultaneously
         let status = std::process::Command::new("pkexec")
-            .arg("cp")
-            .arg(&temp_file)
-            .arg(path)
+            .arg("sh")
+            .arg("-c")
+            .arg(&script)
             .status()
-            .map_err(|e| format!("Failed to execute pkexec for writing config: {}", e))?;
+            .map_err(|e| format!("Failed to execute pkexec: {}", e))?;
 
         // Cleanup temporary file
         let _ = fs::remove_file(&temp_file);
@@ -88,6 +79,11 @@ pub fn save_pam_config_with_backup(path: &PathBuf, content: &str) -> Result<(), 
             );
         }
     } else {
+        // Fallback for local testing (non-system files)
+        if path.exists() {
+            fs::copy(path, &backup_path).map_err(|e| format!("Failed to create backup: {}", e))?;
+        }
+
         fs::write(path, content).map_err(|e| {
             format!(
                 "Failed to write PAM config: {}. Try running with sudo if targeting /etc/pam.d/",

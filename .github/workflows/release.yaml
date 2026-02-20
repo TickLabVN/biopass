@@ -40,40 +40,64 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update --fix-missing
-          for i in {1..3}; do
-            sudo apt-get install -y --fix-missing \
-              libopencv-dev libpam0g-dev libcli11-dev \
-              libwebkit2gtk-4.1-dev libssl-dev \
-              libayatana-appindicator3-dev librsvg2-dev \
-              patchelf && break || sleep 5
+          sudo apt-get install -y --fix-missing \
+            libopencv-dev libpam0g-dev libcli11-dev \
+            libwebkit2gtk-4.1-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev \
+            libyaml-cpp-dev \
+            patchelf
+
+      # ── Rust ────────────────────────────────────────────────────────────
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            app/src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('app/src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      # ── Bun ─────────────────────────────────────────────────────────────
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Extract Version
+        id: get_version
+        run: |
+          if [ -n "${{ inputs.release_name }}" ]; then
+            VERSION="${{ inputs.release_name }}"
+          else
+            VERSION=$(grep '"version":' app/src-tauri/tauri.conf.json | cut -d '"' -f 4)
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      # ── Build (auth first, then Tauri which bundles auth inside) ────────
+      - name: Build & package
+        run: make package BUILD_TYPE=${{ env.BUILD_TYPE }} VERSION=${{ steps.get_version.outputs.version }}
+
+      # ── Collect & rename artifacts ───────────────────────────────────────
+      - name: Rename packages
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          for f in app/src-tauri/target/release/bundle/deb/*.deb; do
+            [ -f "$f" ] && mv "$f" "biopass-${VERSION}.deb"
+          done
+          for f in app/src-tauri/target/release/bundle/rpm/*.rpm; do
+            [ -f "$f" ] && mv "$f" "biopass-${VERSION}.rpm"
           done
 
-      - name: Configure CMake
-        env:
-          PROJECT_VERSION: ${{ inputs.release_name || github.ref_name }}
-        run: make package BUILD_TYPE=${{ env.BUILD_TYPE }} VERSION=${{ env.PROJECT_VERSION }}
-
-      - name: Build
-        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
-
-      - name: Test
-        working-directory: ${{github.workspace}}/build
-        run: ctest -C ${{env.BUILD_TYPE}}
-
-      - name: Package
-        working-directory: ${{github.workspace}}/build
-        run: |
-          VERSION="${{ inputs.release_name || github.ref_name }}"
-          OS="${{ matrix.os }}"
-
-      
+      # ── GitHub Release ───────────────────────────────────────────────────
       - name: Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ inputs.release_name || github.ref_name }}
-          name: ${{ inputs.release_name || github.ref_name }}
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: ${{ steps.get_version.outputs.version }}
           files: |
             biopass-*.deb
             biopass-*.rpm

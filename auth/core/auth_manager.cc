@@ -41,7 +41,6 @@ int AuthManager::authenticate(const std::string &username) {
 }
 
 int AuthManager::run_sequential(const std::string &username) {
-  RetryStrategy retry_strategy(this->config_.retries);
   bool any_attempted = false;
 
   for (auto &method : this->methods_) {
@@ -50,14 +49,15 @@ int AuthManager::run_sequential(const std::string &username) {
       continue;
     }
 
+    RetryStrategy retry_strategy(method->get_retries());
     int attempts = 0;
     AuthResult result;
 
     do {
       if (attempts > 0) {
         spdlog::debug("AuthManager: Retrying {} (attempt {}/{})", method->name(), attempts + 1,
-                      this->config_.retries);
-        std::this_thread::sleep_for(std::chrono::milliseconds(this->config_.retry_delay_ms));
+                      method->get_retries());
+        std::this_thread::sleep_for(std::chrono::milliseconds(method->get_retry_delay_ms()));
       } else {
         spdlog::debug("AuthManager: Trying {} authentication", method->name());
       }
@@ -109,7 +109,7 @@ int AuthManager::run_parallel(const std::string &username) {
     // authenticate()
     futures.push_back(std::async(
         std::launch::async, [&method, &username, &config = this->config_, &success_found]() {
-          RetryStrategy retry_strategy(config.retries);
+          RetryStrategy retry_strategy(method->get_retries());
           int attempts = 0;
           AuthResult result;
 
@@ -122,7 +122,7 @@ int AuthManager::run_parallel(const std::string &username) {
             if (attempts > 0) {
               spdlog::debug("AuthManager: Retrying {} (parallel attempt {})", method->name(),
                             attempts + 1);
-              std::this_thread::sleep_for(std::chrono::milliseconds(config.retry_delay_ms));
+              std::this_thread::sleep_for(std::chrono::milliseconds(method->get_retry_delay_ms()));
             } else {
               spdlog::debug("AuthManager: Starting {} authentication (parallel)", method->name());
             }

@@ -16,7 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Zap } from "lucide-react";
-import { Input } from "@/components/ui/input";
+
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -174,55 +174,6 @@ export function StrategySection({ strategy, onChange }: Props) {
             </DndContext>
           </div>
         )}
-
-        {/* Retries and Delay */}
-        <div className="grid grid-cols-2 gap-6 mt-2">
-          <div className="grid gap-2">
-            <Label
-              htmlFor="max-retries"
-              className="text-sm font-medium text-muted-foreground"
-            >
-              Max Retries
-            </Label>
-            <Input
-              id="max-retries"
-              type="number"
-              min="0"
-              max="10"
-              value={strategy.retries}
-              onChange={(e) =>
-                onChange({
-                  ...strategy,
-                  retries: parseInt(e.target.value, 10) || 0,
-                })
-              }
-              className="h-10"
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label
-              htmlFor="retry-delay"
-              className="text-sm font-medium text-muted-foreground"
-            >
-              Retry Delay (ms)
-            </Label>
-            <Input
-              id="retry-delay"
-              type="number"
-              min="0"
-              max="5000"
-              step="100"
-              value={strategy.retry_delay}
-              onChange={(e) =>
-                onChange({
-                  ...strategy,
-                  retry_delay: parseInt(e.target.value, 10) || 0,
-                })
-              }
-              className="h-10"
-            />
-          </div>
-        </div>
       </div>
     </div>
   );

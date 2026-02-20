@@ -9,8 +9,6 @@ export interface StrategyConfig {
   debug: boolean;
   execution_mode: "sequential" | "parallel";
   order: string[];
-  retries: number;
-  retry_delay: number;
   pam_enabled: boolean;
 }
 
@@ -22,6 +20,8 @@ export interface MethodsConfig {
 
 export interface FaceMethodConfig {
   enable: boolean;
+  retries: number;
+  retry_delay: number;
   detection: {
     model: string;
     threshold: number;
@@ -43,6 +43,8 @@ export interface FaceMethodConfig {
 
 export interface FingerprintMethodConfig {
   enable: boolean;
+  retries: number;
+  retry_delay: number;
   fingers: FingerConfig[];
 }
 
@@ -53,6 +55,8 @@ export interface FingerConfig {
 
 export interface VoiceMethodConfig {
   enable: boolean;
+  retries: number;
+  retry_delay: number;
   model: string;
   threshold: number;
 }
@@ -68,13 +72,13 @@ export const defaultConfig: FacepassConfig = {
     debug: false,
     execution_mode: "sequential",
     order: ["face", "fingerprint", "voice"],
-    retries: 3,
-    retry_delay: 500,
     pam_enabled: false,
   },
   methods: {
     face: {
       enable: true,
+      retries: 5,
+      retry_delay: 200,
       detection: {
         model: "models/face_detection.onnx",
         threshold: 0.8,
@@ -95,10 +99,14 @@ export const defaultConfig: FacepassConfig = {
     },
     fingerprint: {
       enable: true,
+      retries: 3,
+      retry_delay: 1000,
       fingers: [],
     },
     voice: {
       enable: true,
+      retries: 3,
+      retry_delay: 500,
       model: "models/voice.onnx",
       threshold: 0.8,
     },

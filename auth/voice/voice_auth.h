@@ -1,5 +1,6 @@
 #pragma once
 
+#include "auth_config.h"
 #include "auth_method.h"
 
 namespace facepass {
@@ -11,12 +12,17 @@ namespace facepass {
  */
 class VoiceAuth : public IAuthMethod {
  public:
-  VoiceAuth() = default;
+  explicit VoiceAuth(const VoiceMethodConfig &config) : config_(config) {}
   ~VoiceAuth() override = default;
 
   std::string name() const override { return "Voice"; }
   bool is_available() const override;
+  int get_retries() const override { return config_.retries; }
+  int get_retry_delay_ms() const override { return config_.retry_delay_ms; }
   AuthResult authenticate(const std::string &username, const AuthConfig &config) override;
+
+ private:
+  VoiceMethodConfig config_;
 };
 
 }  // namespace facepass

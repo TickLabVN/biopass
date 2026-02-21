@@ -210,7 +210,7 @@ pub fn load_config(app: AppHandle) -> Result<BiopassConfig, String> {
     let content = fs::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config file: {}", e))?;
 
-    serde_yml::from_str(&content).map_err(|e| format!("Failed to parse config file: {}", e))
+    serde_yaml::from_str(&content).map_err(|e| format!("Failed to parse config file: {}", e))
 }
 
 #[tauri::command]
@@ -219,7 +219,7 @@ pub fn save_config(app: AppHandle, config: BiopassConfig) -> Result<(), String> 
     let config_path = get_config_path(&app)?;
 
     let yaml_content =
-        serde_yml::to_string(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;
+        serde_yaml::to_string(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;
 
     // Create directory if needed
     if !config_dir.exists() {

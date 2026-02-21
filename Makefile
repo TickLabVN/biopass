@@ -11,7 +11,7 @@
 # ---------------------------------------------------------------------------
 
 .PHONY: all build build-auth build-app \
-        package package-auth package-app \
+        package package-app \
         clean clean-auth clean-app \
         install-deps
 
@@ -37,10 +37,6 @@ build-auth:
 	@echo "==> [auth] Building…"
 	cmake --build $(AUTH_BUILD) --config $(BUILD_TYPE) --parallel
 
-package-auth: build-auth
-	@echo "==> [auth] Packaging with CPack…"
-	cd $(AUTH_BUILD) && cpack
-	@echo "==> [auth] Package ready in $(AUTH_BUILD)/"
 
 clean-auth:
 	@echo "==> [auth] Cleaning build directory…"

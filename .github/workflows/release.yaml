@@ -74,6 +74,7 @@ jobs:
 
       - name: Build & package
         run: |
+          rm -rf app/src-tauri/target/release/bundle/
           make package BUILD_TYPE=${{ env.BUILD_TYPE }} VERSION=${{ steps.get_version.outputs.version }}
           ls -R app/src-tauri/target/release/bundle/
 

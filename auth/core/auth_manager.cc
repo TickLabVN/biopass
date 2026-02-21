@@ -127,7 +127,7 @@ int AuthManager::run_parallel(const std::string &username) {
               spdlog::debug("AuthManager: Starting {} authentication (parallel)", method->name());
             }
 
-            result = method->authenticate(username, config);
+            result = method->authenticate(username, config, &success_found);
             attempts++;
           } while (retry_strategy.should_retry(result, attempts) && !success_found.load());
 

@@ -57,7 +57,8 @@ struct IAuthMethod {
    * @param config Configuration options (retries, delays, etc.)
    * @return AuthResult indicating success, failure, or other states.
    */
-  virtual AuthResult authenticate(const std::string& username, const AuthConfig& config) = 0;
+  virtual AuthResult authenticate(const std::string& username, const AuthConfig& config,
+                                  std::atomic<bool>* cancel_signal = nullptr) = 0;
 };
 
 }  // namespace biopass

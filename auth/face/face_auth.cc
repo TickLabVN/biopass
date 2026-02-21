@@ -21,7 +21,8 @@ bool FaceAuth::is_available() const {
   return available;
 }
 
-AuthResult FaceAuth::authenticate(const std::string &username, const AuthConfig &config) {
+AuthResult FaceAuth::authenticate(const std::string &username, const AuthConfig &config,
+                                  std::atomic<bool> *cancel_signal) {
   cv::VideoCapture camera(0, cv::CAP_V4L2);
   if (!camera.isOpened()) {
     std::cerr << "FaceAuth: Could not open camera" << std::endl;
@@ -65,6 +66,9 @@ AuthResult FaceAuth::authenticate(const std::string &username, const AuthConfig 
   }
 
   cv::Mat loginFace;
+  if (cancel_signal && cancel_signal->load()) {
+    return AuthResult::Failure;
+  }
   camera >> loginFace;
   if (loginFace.empty()) {
     std::cerr << "FaceAuth: Could not read frame" << std::endl;

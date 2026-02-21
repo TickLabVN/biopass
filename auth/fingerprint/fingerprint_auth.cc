@@ -21,6 +21,7 @@ struct AuthContext {
   AuthResult result;
   std::string error_msg;
   bool debug;
+  std::atomic<bool>* cancel_signal;
 };
 
 void on_verify_status(GDBusConnection* connection, const gchar* sender_name,
@@ -59,6 +60,17 @@ void on_verify_status(GDBusConnection* connection, const gchar* sender_name,
   }
 }
 
+gboolean on_cancel_timeout(gpointer user_data) {
+  AuthContext* ctx = static_cast<AuthContext*>(user_data);
+  if (ctx->cancel_signal && ctx->cancel_signal->load()) {
+    spdlog::debug("FingerprintAuth: Cancelled by another method");
+    ctx->result = AuthResult::Failure;
+    g_main_loop_quit(ctx->loop);
+    return G_SOURCE_REMOVE;
+  }
+  return G_SOURCE_CONTINUE;
+}
+
 }  // namespace
 
 bool FingerprintAuth::is_available() const {
@@ -93,7 +105,8 @@ bool FingerprintAuth::is_available() const {
   return available;
 }
 
-AuthResult FingerprintAuth::authenticate(const std::string& username, const AuthConfig& config) {
+AuthResult FingerprintAuth::authenticate(const std::string& username, const AuthConfig& config,
+                                         std::atomic<bool>* cancel_signal) {
   GError* error = nullptr;
   GDBusConnection* connection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, nullptr, &error);
   if (!connection) {
@@ -222,14 +235,19 @@ AuthResult FingerprintAuth::authenticate(const std::string& username, const Auth
   ctx.loop = g_main_loop_new(nullptr, FALSE);
   ctx.result = AuthResult::Failure;  // Default
   ctx.debug = config.debug;
+  ctx.cancel_signal = cancel_signal;
 
   guint sub_id = g_dbus_connection_signal_subscribe(
       connection, FPRINT_SERVICE, FPRINT_DEVICE_INTERFACE, "VerifyStatus", dev_path_str.c_str(),
       nullptr, G_DBUS_SIGNAL_FLAGS_NONE, on_verify_status, &ctx, nullptr);
 
+  // Poll cancel token every 50ms (prevent hanging forever)
+  guint timeout_id = g_timeout_add(50, on_cancel_timeout, &ctx);
+
   spdlog::debug("Waiting for fingerprint...");
   g_main_loop_run(ctx.loop);
 
+  g_source_remove(timeout_id);
   g_dbus_connection_signal_unsubscribe(connection, sub_id);
   g_main_loop_unref(ctx.loop);
 

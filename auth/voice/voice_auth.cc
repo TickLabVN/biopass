@@ -10,7 +10,8 @@ bool VoiceAuth::is_available() const {
   return false;
 }
 
-AuthResult VoiceAuth::authenticate(const std::string &username, const AuthConfig &config) {
+AuthResult VoiceAuth::authenticate(const std::string &username, const AuthConfig &config,
+                                   std::atomic<bool> *cancel_signal) {
   (void)username;  // Suppress unused parameter warning
   (void)config;
 

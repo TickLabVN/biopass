@@ -1,15 +1,21 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-mod config;
+pub mod config;
+pub mod face;
+pub mod file_utils;
+pub mod paths;
+pub mod system;
+pub mod voice;
 
-use config::{
-    check_file_exists, delete_face_image, delete_file, delete_voice_recording, get_config_path_str,
-    get_current_username, list_face_images, list_video_devices, list_voice_recordings, load_config,
-    save_config, save_face_image, save_voice_recording,
-};
+use config::{get_config_path_str, load_config, save_config};
+use face::{delete_face_image, list_face_images, save_face_image};
+use file_utils::{check_file_exists, delete_file};
+use system::{get_current_username, list_video_devices};
+use voice::{delete_voice_recording, list_voice_recordings, save_voice_recording};
 
-mod fingerprint;
-mod fingerprint_ffi;
-mod pam;
+pub mod fingerprint;
+pub mod fingerprint_ffi;
+pub mod pam;
+
 use fingerprint::{
     add_fingerprint, authenticate_fingerprint, delete_fingerprint, enroll_fingerprint,
     fingerprint_is_available, list_enrolled_fingerprints, list_fingerprint_devices,

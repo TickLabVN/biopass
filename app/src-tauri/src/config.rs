@@ -1,10 +1,9 @@
-use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
-const CONFIG_FILE: &str = "config.yaml";
+use crate::paths::{get_config_dir, get_config_path, get_data_dir};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BiopassConfig {
@@ -124,30 +123,6 @@ fn default_voice_delay() -> u32 {
     500
 }
 
-fn get_config_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_config_dir()
-        .map_err(|e| format!("Failed to get config dir: {}", e))
-}
-
-fn get_config_path(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(get_config_dir(app)?.join(CONFIG_FILE))
-}
-
-fn get_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get data dir: {}", e))
-}
-
-fn get_faces_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(get_data_dir(app)?.join("faces"))
-}
-
-fn get_voices_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(get_data_dir(app)?.join("voices"))
-}
-
 fn get_default_config(app: &AppHandle) -> BiopassConfig {
     let models_dir = get_data_dir(app)
         .map(|d| d.join("models"))
@@ -225,13 +200,6 @@ fn get_default_config(app: &AppHandle) -> BiopassConfig {
 }
 
 #[tauri::command]
-pub fn get_current_username() -> Result<String, String> {
-    std::env::var("USER")
-        .or_else(|_| std::env::var("USERNAME"))
-        .map_err(|_| "Could not determine current username".to_string())
-}
-
-#[tauri::command]
 pub fn load_config(app: AppHandle) -> Result<BiopassConfig, String> {
     let config_path = get_config_path(&app)?;
 
@@ -266,165 +234,4 @@ pub fn save_config(app: AppHandle, config: BiopassConfig) -> Result<(), String> 
 #[tauri::command]
 pub fn get_config_path_str(app: AppHandle) -> Result<String, String> {
     Ok(get_config_path(&app)?.to_string_lossy().to_string())
-}
-
-#[tauri::command]
-pub fn save_face_image(app: AppHandle, image_data: String) -> Result<String, String> {
-    let faces_dir = get_faces_dir(&app)?;
-
-    // Decode base64 image data
-    let image_bytes = general_purpose::STANDARD
-        .decode(&image_data)
-        .map_err(|e| format!("Failed to decode image: {}", e))?;
-
-    // Generate filename with timestamp
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| format!("Failed to get timestamp: {}", e))?
-        .as_millis();
-    let filename = format!("face_{}.jpg", timestamp);
-    let file_path = faces_dir.join(&filename);
-
-    // Create directory if needed
-    if !faces_dir.exists() {
-        fs::create_dir_all(&faces_dir)
-            .map_err(|e| format!("Failed to create faces directory: {}", e))?;
-    }
-
-    // Write file
-    fs::write(&file_path, image_bytes).map_err(|e| format!("Failed to write image: {}", e))?;
-
-    Ok(file_path.to_string_lossy().to_string())
-}
-
-#[tauri::command]
-pub fn save_voice_recording(app: AppHandle, audio_data: String) -> Result<String, String> {
-    let voices_dir = get_voices_dir(&app)?;
-
-    // Decode base64 audio data
-    let audio_bytes = general_purpose::STANDARD
-        .decode(&audio_data)
-        .map_err(|e| format!("Failed to decode audio: {}", e))?;
-
-    // Generate filename with timestamp
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| format!("Failed to get timestamp: {}", e))?
-        .as_millis();
-    let filename = format!("voice_{}.wav", timestamp);
-    let file_path = voices_dir.join(&filename);
-
-    // Create directory if needed
-    if !voices_dir.exists() {
-        fs::create_dir_all(&voices_dir)
-            .map_err(|e| format!("Failed to create voices directory: {}", e))?;
-    }
-
-    // Write file
-    fs::write(&file_path, audio_bytes).map_err(|e| format!("Failed to write audio: {}", e))?;
-
-    Ok(file_path.to_string_lossy().to_string())
-}
-
-#[tauri::command]
-pub fn list_face_images(app: AppHandle) -> Result<Vec<String>, String> {
-    let faces_dir = get_faces_dir(&app)?;
-
-    if !faces_dir.exists() {
-        return Ok(vec![]);
-    }
-
-    let entries =
-        fs::read_dir(&faces_dir).map_err(|e| format!("Failed to read faces directory: {}", e))?;
-
-    let mut files: Vec<String> = entries
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path()
-                .extension()
-                .map_or(false, |ext| ext == "jpg" || ext == "png")
-        })
-        .map(|e| e.path().to_string_lossy().to_string())
-        .collect();
-
-    files.sort();
-    Ok(files)
-}
-
-#[tauri::command]
-pub fn list_voice_recordings(app: AppHandle) -> Result<Vec<String>, String> {
-    let voices_dir = get_voices_dir(&app)?;
-
-    if !voices_dir.exists() {
-        return Ok(vec![]);
-    }
-
-    let entries =
-        fs::read_dir(&voices_dir).map_err(|e| format!("Failed to read voices directory: {}", e))?;
-
-    let mut files: Vec<String> = entries
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path()
-                .extension()
-                .map_or(false, |ext| ext == "webm" || ext == "wav" || ext == "mp3")
-        })
-        .map(|e| e.path().to_string_lossy().to_string())
-        .collect();
-
-    files.sort();
-    Ok(files)
-}
-
-#[tauri::command]
-pub fn delete_file(path: String) -> Result<(), String> {
-    if !std::path::Path::new(&path).exists() {
-        return Ok(());
-    }
-    fs::remove_file(&path).map_err(|e| format!("Failed to delete file: {}", e))
-}
-
-#[tauri::command]
-pub fn delete_face_image(path: String) -> Result<(), String> {
-    fs::remove_file(&path).map_err(|e| format!("Failed to delete file: {}", e))
-}
-
-#[tauri::command]
-pub fn delete_voice_recording(path: String) -> Result<(), String> {
-    fs::remove_file(&path).map_err(|e| format!("Failed to delete file: {}", e))
-}
-
-#[tauri::command]
-pub fn check_file_exists(path: String) -> bool {
-    std::path::Path::new(&path).exists()
-}
-
-#[tauri::command]
-pub fn list_video_devices() -> Result<Vec<String>, String> {
-    let mut devices = Vec::new();
-    let entries = fs::read_dir("/dev").map_err(|e| format!("Failed to read /dev: {}", e))?;
-
-    for entry in entries {
-        if let Ok(entry) = entry {
-            let file_name = entry.file_name().to_string_lossy().to_string();
-            if file_name.starts_with("video") {
-                devices.push(format!("/dev/{}", file_name));
-            }
-        }
-    }
-
-    // Sort naturally video0, video1, video2...
-    devices.sort_by(|a, b| {
-        let a_num = a
-            .trim_start_matches("/dev/video")
-            .parse::<i32>()
-            .unwrap_or(-1);
-        let b_num = b
-            .trim_start_matches("/dev/video")
-            .parse::<i32>()
-            .unwrap_or(-1);
-        a_num.cmp(&b_num)
-    });
-
-    Ok(devices)
 }

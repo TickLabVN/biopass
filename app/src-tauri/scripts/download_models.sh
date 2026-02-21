@@ -41,3 +41,8 @@ for entry in "${MODELS[@]}"; do
 done
 
 echo "Biopass: Model download complete."
+
+# Fix ownership back to the actual user if running under sudo
+if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
+    chown -R "$SUDO_USER:$SUDO_USER" "${USER_HOME}/.local/share/com.ticklab.biopass"
+fi

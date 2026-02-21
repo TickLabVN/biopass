@@ -33,11 +33,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies
+      - name: Install system dependencies (cached)
         if: contains(matrix.os, 'ubuntu')
-        run: |
-          sudo apt update
-          sudo apt install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libyaml-cpp-dev libopencv-dev libpam0g-dev 
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libyaml-cpp-dev libopencv-dev libpam0g-dev libcli11-dev
+          version: 1.0
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable

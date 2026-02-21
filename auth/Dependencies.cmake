@@ -31,6 +31,9 @@ find_package(OpenCV REQUIRED)
 # yaml-cpp for config parsing
 find_package(yaml-cpp REQUIRED)
 
+# CLI11 for command line parsing
+find_package(CLI11 REQUIRED)
+
 # spdlog for logging
 FetchContent_Declare(
     spdlog

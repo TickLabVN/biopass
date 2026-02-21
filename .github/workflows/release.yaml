@@ -33,12 +33,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies (cached)
+      - name: Install system dependencies
         if: contains(matrix.os, 'ubuntu')
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: librsvg2-dev libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev libyaml-cpp-dev libopencv-dev libpam0g-dev libcli11-dev libarmadillo-dev libopenblas-dev liblapack-dev libarpack2-dev libsuperlu-dev
-          version: 1.0
+        run: |
+          sudo apt update
+          sudo apt install -y librsvg2-dev libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev libyaml-cpp-dev libopencv-dev libpam0g-dev libcli11-dev
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable

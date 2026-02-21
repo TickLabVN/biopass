@@ -55,9 +55,21 @@ std::vector<Detection> FaceDetection::inference(cv::Mat &image) {
     float conf = keep[i][4].item().toFloat();
     int cls = keep[i][5].item().toInt();
 
+    // Clip bounding box to image boundaries to prevent OpenCV assertion failures
+    x1 = std::max(0, x1);
+    y1 = std::max(0, y1);
+    x2 = std::min(image.cols, x2);
+    y2 = std::min(image.rows, y2);
+
     cv::Rect box(x1, y1, x2 - x1, y2 - y1);
     cv::Scalar color(0, 255, 0);
     Box xyxy_box(x1, y1, x2, y2);
+
+    // Ensure the box has positive area after clipping
+    if (box.width <= 0 || box.height <= 0) {
+      continue;
+    }
+
     cv::Mat crop_face = image(box);
     Detection det(cls, std::string("face"), conf, box, xyxy_box, crop_face, color);
     results.push_back(det);

@@ -5,7 +5,7 @@
 set -e
 
 case "$1" in
-    remove|upgrade|deconfigure)
+    remove)
         PAM_CONFIG="/etc/pam.d/common-auth"
         BACKUP="${PAM_CONFIG}.bak"
 
@@ -15,6 +15,9 @@ case "$1" in
             sed -i '/libbiopass_pam\.so/d' "$PAM_CONFIG"
             echo "Biopass: PAM auth module disabled. Backup saved to $BACKUP"
         fi
+        ;;
+    upgrade|deconfigure)
+        # Do nothing on upgrade to preserve PAM config
         ;;
     failed-upgrade)
         ;;

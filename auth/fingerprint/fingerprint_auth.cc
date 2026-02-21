@@ -66,7 +66,6 @@ gboolean on_cancel_timeout(gpointer user_data) {
     spdlog::debug("FingerprintAuth: Cancelled by another method");
     ctx->result = AuthResult::Failure;
     g_main_loop_quit(ctx->loop);
-    return G_SOURCE_REMOVE;
   }
   return G_SOURCE_CONTINUE;
 }

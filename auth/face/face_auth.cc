@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <opencv2/opencv.hpp>
+#include <sstream>
 #include <thread>
 
 #include "auth_config.h"
@@ -14,6 +15,20 @@
 
 namespace biopass {
 
+std::string get_timestamp_string() {
+  auto now = std::chrono::system_clock::now().time_since_epoch();
+  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+  return std::to_string(ms);
+}
+
+void save_failed_face(const std::string &username, const cv::Mat &face, const std::string &reason) {
+  biopass::setup_config(username);  // Ensure debugs dir exists
+  std::string failedFacePath =
+      biopass::debug_path(username) + "/" + reason + "." + get_timestamp_string() + ".jpg";
+  if (!cv::imwrite(failedFacePath, face)) {
+    std::cerr << "FaceAuth: Could not save failed face to " << failedFacePath << std::endl;
+  }
+}
 bool FaceAuth::is_available() const {
   cv::VideoCapture camera(0, cv::CAP_V4L2);
   bool available = camera.isOpened();
@@ -90,6 +105,9 @@ AuthResult FaceAuth::authenticate(const std::string &username, const AuthConfig 
       SpoofResult spoofCheck = faceAs.inference(face);
       if (spoofCheck.spoof) {
         std::cerr << "FaceAuth: Spoof detected, score: " << spoofCheck.score << std::endl;
+        if (config.debug) {
+          save_failed_face(username, face, "spoof");
+        }
         return AuthResult::Retry;
       }
     } catch (const std::exception &e) {
@@ -107,6 +125,11 @@ AuthResult FaceAuth::authenticate(const std::string &username, const AuthConfig 
     if (match.similar) {
       return AuthResult::Success;
     }
+  }
+
+  // No match found
+  if (config.debug) {
+    save_failed_face(username, face, "not_similar");
   }
 
   return AuthResult::Retry;

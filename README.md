@@ -1,4 +1,4 @@
-# Biopass
+# Biopass - An alternative to Howdy
 
 <p align="center">
     <img src="https://public-r2.ticklab.site/media/tc1oN21KXhMM1B2jOecRhk=" alt="Biopass Logo" width="120" />

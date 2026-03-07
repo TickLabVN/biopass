@@ -53,4 +53,10 @@ Feel free to request new features or report bugs by opening an issue. For contri
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/image?repos=TickLabVN/biopass&type=date&legend=top-left)](https://www.star-history.com/?repos=TickLabVN%2Fbiopass&type=date&legend=top-left)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=TickLabVN/biopass&type=Date&theme=dark" />
+  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=TickLabVN/biopass&type=Date" />
+  <img alt="Star History Chart" src="https://api.star-history.com/image?repos=TickLabVN/biopass&type=Date" />
+</picture>
+
+

@@ -42,8 +42,8 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
     // We use a known absolute path to avoid PATH spoofing attacks.
     // In a real production environment, this path should be configurable,
-    // or strictly defined at compile-time (e.g. /usr/local/bin/biopass-helper).
-    execl("/usr/local/bin/biopass-helper", "biopass-helper", pUsername, NULL);
+    // or strictly defined at compile-time (e.g. /usr/bin/biopass-helper).
+    execl("/usr/bin/biopass-helper", "biopass-helper", pUsername, NULL);
 
     // If execl returns, it failed
     perror("execl failed");

@@ -36,4 +36,4 @@ target_link_libraries(biopass-helper
 )
 
 # Install rules
-install(TARGETS biopass-helper DESTINATION bin)
+install(TARGETS biopass-helper DESTINATION /usr/bin)

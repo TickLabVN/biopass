@@ -1,0 +1,28 @@
+pkgbase = biopass-bin
+	pkgdesc = Modern multi-modal biometric login for Linux
+	pkgver = 0.3.0
+	pkgrel = 1
+	url = https://github.com/TickLabVN/biopass
+	arch = x86_64
+	license = MIT
+	makedepends = perl
+	depends = desktop-file-utils
+	depends = fprintd
+	depends = gcc-libs
+	depends = glib2
+	depends = gtk3
+	depends = hicolor-icon-theme
+	depends = opencv
+	depends = pam
+	depends = webkit2gtk-4.1
+	depends = yaml-cpp
+	optdepends = curl: download AI models with /usr/share/com.ticklab.biopass/download_models.sh
+	provides = biopass=0.3.0
+	conflicts = biopass
+	install = biopass-bin.install
+	source = biopass-bin-0.3.0.deb::https://github.com/TickLabVN/biopass/releases/download/0.3.0/biopass_0.3.0_amd64.deb
+	source = biopass::git+https://github.com/TickLabVN/biopass.git#tag=0.3.0
+	sha256sums = 62ec61518269e928019b12dcea64c36ab6a664c3672ff356b86170eade8051fc
+	sha256sums = SKIP
+
+pkgname = biopass-bin

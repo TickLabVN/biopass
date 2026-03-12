@@ -1,0 +1,31 @@
+_refresh_biopass_caches() {
+  ldconfig
+
+  if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database -q /usr/share/applications
+  fi
+
+  if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor
+  fi
+}
+
+post_install() {
+  _refresh_biopass_caches
+
+  cat <<'EOF'
+Biopass models are not downloaded automatically on Arch.
+Run this as your regular user after install:
+  /usr/share/com.ticklab.biopass/download_models.sh
+
+Only enable the PAM module from the Biopass UI after verifying you have a recovery path.
+EOF
+}
+
+post_upgrade() {
+  _refresh_biopass_caches
+}
+
+post_remove() {
+  _refresh_biopass_caches
+}

@@ -11,7 +11,7 @@
 # ---------------------------------------------------------------------------
 
 .PHONY: all build build-auth build-app \
-        package package-app \
+        package package-app package-aur \
         clean clean-auth clean-app \
         install-deps
 
@@ -27,6 +27,10 @@ all: build
 build: build-auth build-app
 
 package: package-app
+
+package-aur:
+	@echo "==> [aur] Building the AUR package from packaging/aur/biopass-bin/"
+	cd packaging/aur/biopass-bin && makepkg -si
 
 # ── auth (CMake / C++) ────────────────────────────────────────────────────
 build-auth:
@@ -77,6 +81,7 @@ help:
 	@echo "    build-app      Install JS deps + build the Tauri app only"
 	@echo "    package        Build + package everything into combined Linux bundles"
 	@echo "    package-app    Show Tauri combined bundle output paths"
+	@echo "    package-aur    Build the Arch AUR package from packaging/aur/biopass-bin/"
 	@echo "    clean          Remove all build output"
 	@echo "    clean-auth     Remove auth/build/"
 	@echo "    clean-app      Remove app build artifacts"

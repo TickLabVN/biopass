@@ -46,8 +46,8 @@ pub fn save_face_image(app: AppHandle, image_data: String) -> Result<String, Str
     let appimage_helper = env::var_os("APPDIR")
         .map(std::path::PathBuf::from)
         .map(|path| path.join("usr/bin/biopass-helper"));
-    let helper_bin = if std::path::Path::new("/usr/local/bin/biopass-helper").exists() {
-        "/usr/local/bin/biopass-helper".to_string()
+    let helper_bin = if std::path::Path::new("/usr/bin/biopass-helper").exists() {
+        "/usr/bin/biopass-helper".to_string()
     } else if appimage_helper.as_ref().is_some_and(|path| path.exists()) {
         appimage_helper.unwrap().to_string_lossy().to_string()
     } else if std::path::Path::new("../../auth/build/pam/biopass-helper").exists() {

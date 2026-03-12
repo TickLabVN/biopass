@@ -1,0 +1,57 @@
+pkgname=biopass-bin
+pkgver=0.3.0
+pkgrel=1
+pkgdesc="Modern multi-modal biometric login for Linux"
+arch=('x86_64')
+url="https://github.com/TickLabVN/biopass"
+license=('MIT')
+depends=(
+  'desktop-file-utils'
+  'fprintd'
+  'gcc-libs'
+  'glib2'
+  'gtk3'
+  'hicolor-icon-theme'
+  'opencv'
+  'pam'
+  'webkit2gtk-4.1'
+  'yaml-cpp'
+)
+makedepends=('perl')
+optdepends=(
+  'curl: download AI models with /usr/share/com.ticklab.biopass/download_models.sh'
+)
+provides=("biopass=${pkgver}")
+conflicts=('biopass')
+install="${pkgname}.install"
+source=(
+  "${pkgname}-${pkgver}.deb::https://github.com/TickLabVN/biopass/releases/download/${pkgver}/biopass_${pkgver}_amd64.deb"
+  "biopass::git+https://github.com/TickLabVN/biopass.git#tag=${pkgver}"
+)
+sha256sums=(
+  '62ec61518269e928019b12dcea64c36ab6a664c3672ff356b86170eade8051fc'
+  'SKIP'
+)
+
+package() {
+  local _debdir="${srcdir}/deb"
+  local _datatar
+
+  mkdir -p "${_debdir}"
+  bsdtar -xf "${srcdir}/${pkgname}-${pkgver}.deb" -C "${_debdir}"
+  _datatar="$(find "${_debdir}" -maxdepth 1 -type f -name 'data.tar.*' -print -quit)"
+  bsdtar -xf "${_datatar}" -C "${pkgdir}"
+
+  if [[ -f "${pkgdir}/usr/local/bin/biopass-helper" ]]; then
+    install -d "${pkgdir}/usr/bin"
+    mv "${pkgdir}/usr/local/bin/biopass-helper" "${pkgdir}/usr/bin/biopass-helper"
+    rmdir -p --ignore-fail-on-non-empty "${pkgdir}/usr/local/bin"
+  fi
+
+  if [[ -f "${pkgdir}/lib/security/libbiopass_pam.so" ]]; then
+    perl -0pi -e 's{\Q/usr/local/bin/biopass-helper\E}{"/usr/bin/biopass-helper" . "\0"x6}ge' \
+      "${pkgdir}/lib/security/libbiopass_pam.so"
+  fi
+
+  install -Dm644 "${srcdir}/biopass/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

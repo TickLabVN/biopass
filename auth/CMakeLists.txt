@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.22)
 project(biopass)
 if(DEFINED ENV{PROJECT_VERSION})
     message(STATUS "Project version: $ENV{PROJECT_VERSION}")
@@ -12,7 +12,7 @@ endif()
 set(CMAKE_CXX_STANDARD          17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 
-# Avoid RPATH warnings about shadowed libraries in non-system directories (like libtorch)
+# Avoid RPATH warnings about shadowed libraries in non-system directories
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
@@ -38,7 +38,7 @@ if(BUILD_TESTS)
 endif()
 
 # CXX Flags Configuration
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} ${OpenCV_CFLAGS_OTHER}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenCV_CFLAGS_OTHER}")
 
 install(
     TARGETS biopass_det biopass_reg biopass_as
@@ -51,9 +51,9 @@ install(
     LIBRARY DESTINATION "/lib/security"
 )
 
-# Install libtorch libraries
+# Install ONNX Runtime libraries
 install(
-    DIRECTORY ${libtorch_SOURCE_DIR}/lib/
+    DIRECTORY ${ONNXRUNTIME_LIB_DIR}/
     DESTINATION "/usr/lib/biopass"
-    FILES_MATCHING PATTERN "*.so"
+    FILES_MATCHING PATTERN "*.so*"
 )

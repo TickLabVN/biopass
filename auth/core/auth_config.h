@@ -18,18 +18,18 @@ namespace biopass {
 // ---------------------------------------------------------------------------
 
 struct DetectionConfig {
-  std::string model = "models/yolov11n-face.torchscript";
+  std::string model = "models/yolov8n-face.onnx";
   float threshold = 0.5f;
 };
 
 struct RecognitionConfig {
-  std::string model = "models/edgeface_s_gamma_05_ts.pt";
+  std::string model = "models/edgeface_s_gamma_05.onnx";
   float threshold = 0.8f;
 };
 
 struct AntiSpoofingConfig {
   bool enable = false;
-  std::string model = "models/mobilenetv3_antispoof_ts.pt";
+  std::string model = "models/mobilenetv3_antispoof.onnx";
   float threshold = 0.8f;
 };
 

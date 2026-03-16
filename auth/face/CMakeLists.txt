@@ -13,7 +13,7 @@ target_include_directories(biopass_face PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/core
     ${OpenCV_INCLUDE_DIRS}
-    ${TORCH_INCLUDE_DIRS}
+    ${ONNXRUNTIME_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/detection
     ${CMAKE_CURRENT_SOURCE_DIR}/recognition
     ${CMAKE_CURRENT_SOURCE_DIR}/antispoofing
@@ -25,5 +25,5 @@ target_link_libraries(biopass_face
     biopass_reg
     biopass_as
     ${OpenCV_LIBS}
-    ${TORCH_LIBRARIES}
+    ${ONNXRUNTIME_LIB}
 )

@@ -2,29 +2,20 @@
 # Dependency Management
 # ==============================================================================
 
-# Fetch libtorch
+# ONNX Runtime
+set(ONNXRUNTIME_VERSION "1.19.2")
 include(FetchContent)
 FetchContent_Declare(
-    libtorch
-    URL https://download.pytorch.org/libtorch/nightly/cpu/libtorch-cxx11-abi-shared-without-deps-2.2.0.dev20231031%2Bcpu.zip
+    onnxruntime
+    URL https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}.tgz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
-# CMake 3.28+ deprecation warning workaround: Since libtorch is precompiled, we must populate it manually.
-FetchContent_GetProperties(libtorch)
-if(NOT libtorch_POPULATED)
-    FetchContent_Populate(libtorch)
-endif()
+FetchContent_MakeAvailable(onnxruntime)
 
-# Find dependencies
-set(CMAKE_PREFIX_PATH "${libtorch_SOURCE_DIR}")
-set(Torch_DIR ${libtorch_SOURCE_DIR}/share/cmake/Torch)
-
-# Hack to silence shadowing warnings by telling CMake this is an "implicit" directory
-list(APPEND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${libtorch_SOURCE_DIR}/lib")
-
-find_package(Torch REQUIRED NO_DEFAULT_PATH)
-
-# Ensure we use full paths to libraries to avoid shadowing warnings
-cmake_policy(SET CMP0060 NEW)
+set(ONNXRUNTIME_ROOT "${onnxruntime_SOURCE_DIR}")
+set(ONNXRUNTIME_INCLUDE_DIRS "${ONNXRUNTIME_ROOT}/include")
+set(ONNXRUNTIME_LIB_DIR "${ONNXRUNTIME_ROOT}/lib")
+find_library(ONNXRUNTIME_LIB onnxruntime PATHS ${ONNXRUNTIME_LIB_DIR} NO_DEFAULT_PATH)
 
 find_package(OpenCV REQUIRED)
 

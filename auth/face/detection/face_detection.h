@@ -11,9 +11,8 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 
-// Libtorch
-#include <torch/script.h>
-#include <torch/torch.h>
+// ONNX Runtime
+#include <onnxruntime_cxx_api.h>
 
 struct Box {
   int x1, y1, x2, y2;
@@ -56,7 +55,7 @@ class FaceDetection {
 
   void load_model(const std::string& ckpt);
   std::vector<Detection> inference(cv::Mat& image);
-  torch::Tensor preprocess(cv::Mat& image);
+  std::vector<float> preprocess(cv::Mat& image);
 
  private:
   bool cuda;
@@ -64,9 +63,15 @@ class FaceDetection {
   float iou;
   cv::Size imgsz;
   std::string ckpt{};
-  torch::jit::script::Module model;
   std::vector<std::string> classes{"face"};
-  torch::Device device = torch::Device(torch::kCPU);
+
+  Ort::Env env{ORT_LOGGING_LEVEL_WARNING, "FaceDetection"};
+  std::unique_ptr<Ort::Session> session;
+  Ort::AllocatorWithDefaultOptions allocator;
+  std::vector<std::string> input_names_str;
+  std::vector<std::string> output_names_str;
+  std::vector<const char*> input_names_cstr;
+  std::vector<const char*> output_names_cstr;
 };
 
 #endif  // FACE_DET_H

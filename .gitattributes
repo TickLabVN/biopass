@@ -1,3 +1,1 @@
-public/edgeface_s_gamma_05_ts.pt filter=lfs diff=lfs merge=lfs -text
-public/mobilenetv3_antispoof_ts.pt filter=lfs diff=lfs merge=lfs -text
-public/yolov11n-face.torchscript filter=lfs diff=lfs merge=lfs -text
+auth/face/models/*.onnx filter=lfs diff=lfs merge=lfs -text

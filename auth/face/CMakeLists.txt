@@ -2,12 +2,13 @@ add_subdirectory(detection)
 add_subdirectory(recognition)
 add_subdirectory(antispoofing)
 
-# stb image library (JPEG/PNG/BMP/TGA read+write)
+# stb image library (JPEG/PNG/BMP/TGA read+write, vendored via FetchContent)
 add_library(biopass_stb STATIC
-    stb/stb_impl.cc
+    stb_impl.cc
 )
 set_target_properties(biopass_stb PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(biopass_stb PUBLIC
+    ${STB_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 

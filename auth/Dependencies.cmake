@@ -27,6 +27,15 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(openpnp-capture)
 unset(CMAKE_POLICY_VERSION_MINIMUM CACHE)
 
+# stb (header-only image I/O: JPEG/PNG/BMP/TGA read+write)
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG        master
+)
+FetchContent_MakeAvailable(stb)
+set(STB_INCLUDE_DIRS "${stb_SOURCE_DIR}")
+
 # yaml-cpp for config parsing
 find_package(yaml-cpp REQUIRED)
 

@@ -31,7 +31,7 @@ function ModelFileFolderButton({ path }: { path: string }) {
           <button
             type="button"
             onClick={() => handleOpenFileFolder(path)}
-            className="text-[10px] font-mono text-muted-foreground opacity-60 truncate max-w-[150px] bg-muted/50 px-1.5 py-0.5 rounded hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all cursor-pointer"
+            className="text-[10px] font-mono text-muted-foreground opacity-60 truncate max-w-37.5 bg-muted/50 px-1.5 py-0.5 rounded hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all cursor-pointer"
           >
             {path.split(/[/]/).pop()}
           </button>
@@ -39,7 +39,7 @@ function ModelFileFolderButton({ path }: { path: string }) {
         <TooltipContent
           side="bottom"
           align="end"
-          className="max-w-[300px] break-all"
+          className="max-w-75 break-all"
         >
           <p className="font-mono text-xs">{path}</p>
         </TooltipContent>
@@ -59,7 +59,7 @@ export function ModelCard({ model, status }: ModelCardProps) {
           <div>
             <div className="flex items-center gap-4">
               <h3
-                className="font-semibold leading-none truncate max-w-[140px]"
+                className="font-semibold leading-none truncate max-w-100"
                 title={model.name}
               >
                 {model.name || (
@@ -67,7 +67,7 @@ export function ModelCard({ model, status }: ModelCardProps) {
                 )}
               </h3>
               <p className="text-xs text-muted-foreground capitalize mt-1 block">
-                {model.type} Recognition
+                {model.type}
               </p>
             </div>
             <ModelFileFolderButton path={model.path} />

@@ -2,13 +2,19 @@
     "configurations": [
         {
             "name": "Linux",
-            "compileCommands": [
-                "${workspaceFolder}/auth/build/compile_commands.json"
-            ],
+            "compilerPath": "/usr/bin/gcc",
             "intelliSenseMode": "linux-gcc-x64",
             "includePath": [
                 "${default}",
-                "${workspaceFolder}/auth/face"
+                "${workspaceFolder}/auth/face",
+                "${workspaceFolder}/auth/build/_deps/spdlog-src/include",
+                "${workspaceFolder}/auth/core",
+                "${workspaceFolder}/auth/face/detection",
+                "${workspaceFolder}/auth/build/_deps/onnxruntime-src/include",
+                "${workspaceFolder}/auth/fingerprint",
+                "${workspaceFolder}/auth/face/antispoofing",
+                "${workspaceFolder}/auth/face/recognition",
+                "/usr/include/glib-2.0"
             ]
         }
     ],

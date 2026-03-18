@@ -74,7 +74,7 @@ export function StrategySection({ strategy, onChange }: Props) {
                 Recommended
               </span>
             </Label>
-            <p className="text-xs text-muted-foreground max-w-[400px]">
+            <p className="text-xs text-muted-foreground max-w-100">
               Use Biopass to unlock your computer and authorize system actions.
             </p>
           </div>
@@ -96,7 +96,7 @@ export function StrategySection({ strategy, onChange }: Props) {
             >
               Verbose Debug Logging
             </Label>
-            <p className="text-xs text-muted-foreground max-w-[400px]">
+            <p className="text-xs text-muted-foreground max-w-100">
               Enable detailed console output for authentication methods. Useful
               for troubleshooting.
             </p>

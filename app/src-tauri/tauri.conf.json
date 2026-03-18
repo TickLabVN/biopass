@@ -36,11 +36,7 @@
     ],
     "linux": {
       "deb": {
-        "depends": [
-          "libyaml-cpp-dev",
-          "fprintd",
-          "libwebkit2gtk-4.1-0"
-        ],
+        "depends": ["libyaml-cpp-dev", "fprintd", "libwebkit2gtk-4.1-0"],
         "postInstallScript": "scripts/deb/postinst",
         "preRemoveScript": "scripts/deb/prerm",
         "files": {

@@ -1,6 +1,9 @@
 #include "identify.h"
 
 #include <memory>
+#include <unistd.h>
+
+#include <openpnp-capture.h>
 
 namespace uuid {
 static std::random_device rd;
@@ -32,16 +35,16 @@ string v4() {
 }  // namespace uuid
 
 namespace {
-bool save_failed_face(const string &username, const cv::Mat &face, const string &reason) {
-  string failedFacePath = biopass::debug_path(username) + "/" + reason + "." + uuid::v4() + ".jpg";
-  if (!cv::imwrite(failedFacePath, face)) {
+bool save_failed_face(const string &username, const ImageRGB &face, const string &reason) {
+  string failedFacePath = biopass::debug_path(username) + "/" + reason + "." + uuid::v4() + ".bmp";
+  if (!image_save_bmp(failedFacePath, face)) {
     cerr << "ERROR: Could not save failed face to " << failedFacePath << endl;
     return false;
   }
   return true;
 }
 
-bool process_anti_spoofing(FaceAntiSpoofing &faceAs, cv::Mat &face) {
+bool process_anti_spoofing(FaceAntiSpoofing &faceAs, ImageRGB &face) {
   SpoofResult spoofCheck = faceAs.inference(face);
   if (spoofCheck.spoof) {
     cerr << "ERROR: Spoof detected, score: " << spoofCheck.score << endl;
@@ -50,19 +53,64 @@ bool process_anti_spoofing(FaceAntiSpoofing &faceAs, cv::Mat &face) {
   return true;
 }
 void sleep_for(int ms) { this_thread::sleep_for(chrono::milliseconds(ms)); }
+
+ImageRGB capture_frame(CapContext ctx, CapStream stream, uint32_t width, uint32_t height) {
+  uint32_t buf_size = width * height * 3;
+  std::vector<uint8_t> buf(buf_size);
+
+  for (int i = 0; i < 1000; i++) {
+    if (Cap_hasNewFrame(ctx, stream)) {
+      if (Cap_captureFrame(ctx, stream, buf.data(), buf_size) == CAPRESULT_OK) {
+        return ImageRGB((int)width, (int)height, buf.data());
+      }
+    }
+    usleep(10000);
+  }
+  return {};
+}
 }  // namespace
 
 int scan_face(const string &username, const biopass::FaceMethodConfig &face_config, int8_t retries,
               const int gap, bool anti_spoofing) {
-  cv::VideoCapture camera(0, cv::CAP_V4L2);
-  if (!camera.isOpened()) {
-    cerr << "ERROR: Could not open camera" << endl;
+  CapContext ctx = Cap_createContext();
+  if (!ctx) {
+    cerr << "ERROR: Could not create capture context" << endl;
     return PAM_AUTH_ERR;
+  }
+
+  uint32_t device_count = Cap_getDeviceCount(ctx);
+  if (device_count == 0) {
+    cerr << "ERROR: No camera found" << endl;
+    Cap_releaseContext(ctx);
+    return PAM_AUTH_ERR;
+  }
+
+  CapFormatInfo fmt;
+  Cap_getFormatInfo(ctx, 0, 0, &fmt);
+  CapStream stream = Cap_openStream(ctx, 0, 0);
+  if (stream < 0 || !Cap_isOpenStream(ctx, stream)) {
+    cerr << "ERROR: Could not open camera stream" << endl;
+    Cap_releaseContext(ctx);
+    return PAM_AUTH_ERR;
+  }
+
+  // Warmup frames
+  for (int i = 0, got = 0; got < 5 && i < 2000; i++) {
+    uint32_t buf_size = fmt.width * fmt.height * 3;
+    std::vector<uint8_t> tmp(buf_size);
+    if (Cap_hasNewFrame(ctx, stream)) {
+      Cap_captureFrame(ctx, stream, tmp.data(), buf_size);
+      got++;
+    } else {
+      usleep(10000);
+    }
   }
 
   std::vector<std::string> enrolledFaces = biopass::list_user_faces(username);
   if (enrolledFaces.empty()) {
     cerr << "ERROR: No face enrolled for user " << username << endl;
+    Cap_closeStream(ctx, stream);
+    Cap_releaseContext(ctx);
     return PAM_AUTH_ERR;
   }
 
@@ -77,6 +125,8 @@ int scan_face(const string &username, const biopass::FaceMethodConfig &face_conf
     if (first_line != std::string::npos)
       msg = msg.substr(0, first_line);
     cerr << "ERROR: Failed to load detection model: " << msg << endl;
+    Cap_closeStream(ctx, stream);
+    Cap_releaseContext(ctx);
     return PAM_AUTH_ERR;
   }
   try {
@@ -87,6 +137,8 @@ int scan_face(const string &username, const biopass::FaceMethodConfig &face_conf
     if (first_line != std::string::npos)
       msg = msg.substr(0, first_line);
     cerr << "ERROR: Failed to load recognition model: " << msg << endl;
+    Cap_closeStream(ctx, stream);
+    Cap_releaseContext(ctx);
     return PAM_AUTH_ERR;
   }
   if (anti_spoofing) {
@@ -98,16 +150,15 @@ int scan_face(const string &username, const biopass::FaceMethodConfig &face_conf
       if (first_line != std::string::npos)
         msg = msg.substr(0, first_line);
       cerr << "ERROR: Failed to load anti-spoofing model: " << msg << endl;
-      // Continue without anti-spoofing if it fails?
-      // identify.cc seems to depend on it if anti_spoofing is true.
+      Cap_closeStream(ctx, stream);
+      Cap_releaseContext(ctx);
       return PAM_AUTH_ERR;
     }
   }
 
   bool success = false;
   while (retries--) {
-    cv::Mat loginFace;
-    camera >> loginFace;
+    ImageRGB loginFace = capture_frame(ctx, stream, fmt.width, fmt.height);
     if (loginFace.empty()) {
       cerr << "ERROR: Could not read frame" << endl;
       break;
@@ -120,7 +171,7 @@ int scan_face(const string &username, const biopass::FaceMethodConfig &face_conf
       continue;
     }
 
-    cv::Mat face = detectedImages[0].image;
+    ImageRGB face = detectedImages[0].image;
     if (anti_spoofing && !process_anti_spoofing(*faceAs, face)) {
       save_failed_face(username, face, "spoof");
       sleep_for(gap);
@@ -130,7 +181,7 @@ int scan_face(const string &username, const biopass::FaceMethodConfig &face_conf
     // Match against all enrolled faces — succeed if any match
     bool matched = false;
     for (const auto &facePath : enrolledFaces) {
-      cv::Mat preparedFace = cv::imread(facePath);
+      ImageRGB preparedFace = image_load_bmp(facePath);
       if (preparedFace.empty())
         continue;
       MatchResult match = faceReg->match(preparedFace, face);
@@ -149,5 +200,7 @@ int scan_face(const string &username, const biopass::FaceMethodConfig &face_conf
     sleep_for(gap);
   }
 
+  Cap_closeStream(ctx, stream);
+  Cap_releaseContext(ctx);
   return success ? PAM_SUCCESS : PAM_AUTH_ERR;
 }

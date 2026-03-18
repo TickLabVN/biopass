@@ -18,12 +18,14 @@ set(ONNXRUNTIME_LIB_DIR "${ONNXRUNTIME_ROOT}/lib")
 find_library(ONNXRUNTIME_LIB onnxruntime PATHS ${ONNXRUNTIME_LIB_DIR} NO_DEFAULT_PATH)
 
 # openpnp-capture (vendored, replaces OpenCV for camera capture)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
 FetchContent_Declare(
     openpnp-capture
     GIT_REPOSITORY https://github.com/openpnp/openpnp-capture.git
     GIT_TAG        v0.0.30
 )
 FetchContent_MakeAvailable(openpnp-capture)
+unset(CMAKE_POLICY_VERSION_MINIMUM CACHE)
 
 # yaml-cpp for config parsing
 find_package(yaml-cpp REQUIRED)

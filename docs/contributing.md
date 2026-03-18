@@ -10,10 +10,10 @@ Biopass consists of a backend C++ authentication module and a frontend Tauri des
 
 **For the C++ Backend:**
 
-You need to install CMake, Make, OpenCV, PAM headers, and CLI11.
+You need to install CMake, Make, PAM headers, and CLI11.
 ```bash
 sudo apt update
-sudo apt install cmake make g++ libopencv-dev libpam0g-dev libcli11-dev
+sudo apt install cmake make g++ libpam0g-dev libcli11-dev
 ```
 
 **For the Tauri Application:**
@@ -65,8 +65,8 @@ Biopass is built using modern and reliable technologies across both the backend 
 ### Backend Authentication Module (`auth/`)
 - **C++17**: High performance system-level execution.
 - **CMake**: Build system.
-- **OpenCV**: Image and frame processing for face authentication.
-- **LibTorch (PyTorch C++)**: Running the machine learning models (YOLO for detection, EdgeFace for recognition, MobileNetV3 for anti-spoofing).
+- **openpnp-capture**: Camera capture (vendored via CMake FetchContent).
+- **ONNX Runtime**: Running the machine learning models (YOLO for detection, EdgeFace for recognition, MobileNetV3 for anti-spoofing).
 - **Linux PAM**: Pluggable Authentication Module integration for the OS.
 
 ### Desktop Application (`app/`)
@@ -136,7 +136,7 @@ biopass/
 
 ## 4. Development Warnings and Debugging
 
-When you need to modify the C++ PAM logic, we recommend you enable the `debug` flag in the configuration. You may open the UI app and toggle **Debug Mode** to ON, or manually edit `~/.config/com.ticklab.biopass/config.yaml`. When the debug flag is enabled, detailed logs are printed, and face captures that fail authentication (or get caught spoofing) are saved as `.jpg` images to `~/.local/share/com.ticklab.biopass/debugs/`.
+When you need to modify the C++ PAM logic, we recommend you enable the `debug` flag in the configuration. You may open the UI app and toggle **Debug Mode** to ON, or manually edit `~/.config/com.ticklab.biopass/config.yaml`. When the debug flag is enabled, detailed logs are printed, and face captures that fail authentication (or get caught spoofing) are saved as `.bmp` images to `~/.local/share/com.ticklab.biopass/debugs/`.
 
 ### ⚠️ System Lockout Warnings
 

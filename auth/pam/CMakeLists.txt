@@ -14,7 +14,6 @@ add_executable(biopass-helper
 )
 
 target_include_directories(biopass-helper PRIVATE
-    ${OpenCV_INCLUDE_DIRS}
     ${ONNXRUNTIME_INCLUDE_DIRS}
     ${FaceDetection_INCLUDE_DIRS}
     ${FaceAntiSpoof_INCLUDE_DIRS}
@@ -26,8 +25,8 @@ target_include_directories(biopass-helper PRIVATE
 )
 
 target_link_libraries(biopass-helper
-    ${OpenCV_LIBS}
     ${ONNXRUNTIME_LIB}
+    openpnp-capture
     biopass_core
     biopass_face
     biopass_voice

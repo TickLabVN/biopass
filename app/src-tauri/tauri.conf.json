@@ -37,7 +37,6 @@
     "linux": {
       "deb": {
         "depends": [
-          "libopencv-dev",
           "libyaml-cpp-dev",
           "fprintd",
           "libwebkit2gtk-4.1-0"
@@ -51,18 +50,12 @@
           "/usr/lib/biopass/libbiopass_det.so": "../../auth/build/face/detection/libbiopass_det.so",
           "/usr/lib/biopass/libbiopass_reg.so": "../../auth/build/face/recognition/libbiopass_reg.so",
           "/usr/lib/biopass/libbiopass_as.so": "../../auth/build/face/antispoofing/libbiopass_as.so",
-          "/usr/lib/biopass/libc10.so": "../../auth/build/_deps/libtorch-src/lib/libc10.so",
-          "/usr/lib/biopass/libtorch.so": "../../auth/build/_deps/libtorch-src/lib/libtorch.so",
-          "/usr/lib/biopass/libtorch_cpu.so": "../../auth/build/_deps/libtorch-src/lib/libtorch_cpu.so",
-          "/usr/lib/biopass/libtorch_global_deps.so": "../../auth/build/_deps/libtorch-src/lib/libtorch_global_deps.so",
-          "/usr/lib/biopass/libbackend_with_compiler.so": "../../auth/build/_deps/libtorch-src/lib/libbackend_with_compiler.so",
-          "/usr/lib/biopass/libnnapi_backend.so": "../../auth/build/_deps/libtorch-src/lib/libnnapi_backend.so",
-          "/usr/lib/biopass/libshm.so": "../../auth/build/_deps/libtorch-src/lib/libshm.so",
+          "/usr/lib/biopass/libonnxruntime.so": "../../auth/build/_deps/onnxruntime-src/lib/libonnxruntime.so",
           "/etc/ld.so.conf.d/biopass.conf": "scripts/biopass-ldconf"
         }
       },
       "rpm": {
-        "depends": ["fprintd", "yaml-cpp-devel", "opencv-devel"],
+        "depends": ["fprintd", "yaml-cpp-devel"],
         "postInstallScript": "scripts/rpm/postinst",
         "preRemoveScript": "scripts/rpm/prerm",
         "postRemoveScript": "scripts/rpm/postrm",
@@ -73,13 +66,7 @@
           "/usr/lib/biopass/libbiopass_det.so": "../../auth/build/face/detection/libbiopass_det.so",
           "/usr/lib/biopass/libbiopass_reg.so": "../../auth/build/face/recognition/libbiopass_reg.so",
           "/usr/lib/biopass/libbiopass_as.so": "../../auth/build/face/antispoofing/libbiopass_as.so",
-          "/usr/lib/biopass/libc10.so": "../../auth/build/_deps/libtorch-src/lib/libc10.so",
-          "/usr/lib/biopass/libtorch.so": "../../auth/build/_deps/libtorch-src/lib/libtorch.so",
-          "/usr/lib/biopass/libtorch_cpu.so": "../../auth/build/_deps/libtorch-src/lib/libtorch_cpu.so",
-          "/usr/lib/biopass/libtorch_global_deps.so": "../../auth/build/_deps/libtorch-src/lib/libtorch_global_deps.so",
-          "/usr/lib/biopass/libbackend_with_compiler.so": "../../auth/build/_deps/libtorch-src/lib/libbackend_with_compiler.so",
-          "/usr/lib/biopass/libnnapi_backend.so": "../../auth/build/_deps/libtorch-src/lib/libnnapi_backend.so",
-          "/usr/lib/biopass/libshm.so": "../../auth/build/_deps/libtorch-src/lib/libshm.so",
+          "/usr/lib/biopass/libonnxruntime.so": "../../auth/build/_deps/onnxruntime-src/lib/libonnxruntime.so",
           "/etc/ld.so.conf.d/biopass.conf": "scripts/biopass-ldconf"
         }
       }

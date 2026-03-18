@@ -8,9 +8,7 @@
             "intelliSenseMode": "linux-gcc-x64",
             "includePath": [
                 "${default}",
-                "/usr/include/opencv4",
-                "${workspaceFolder}/auth/external/libtorch/include/torch/csrc/api/include",
-                "${workspaceFolder}/auth/external/libtorch/include"
+                "${workspaceFolder}/auth/face"
             ]
         }
     ],

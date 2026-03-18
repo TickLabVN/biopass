@@ -6,7 +6,7 @@
 #    app/   → Tauri desktop application
 #
 #  Prerequisites
-#    auth : cmake, ninja/make, libopencv-dev, libpam0g-dev, libcli11-dev
+#    auth : cmake, ninja/make, libpam0g-dev, libcli11-dev
 #    app  : bun, rustup/cargo, tauri-cli v2, webkit2gtk, libssl-dev …
 # ---------------------------------------------------------------------------
 

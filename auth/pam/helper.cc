@@ -6,12 +6,12 @@
 #include <CLI/CLI.hpp>
 #include <iostream>
 #include <memory>
-#include <opencv2/opencv.hpp>
 
 #include "auth_config.h"
 #include "auth_manager.h"
 #include "face_auth.h"
 #include "fingerprint_auth.h"
+#include "image_utils.h"
 #include "voice_auth.h"
 
 // Included from auth/face/detection
@@ -19,7 +19,7 @@
 
 int handle_crop_face(const std::string& inputPath, const std::string& outputPath,
                      const std::string& modelPath) {
-  cv::Mat image = cv::imread(inputPath);
+  ImageRGB image = image_load_bmp(inputPath);
   if (image.empty()) {
     std::cerr << "Error: Could not read input image: " << inputPath << std::endl;
     return 1;
@@ -39,8 +39,8 @@ int handle_crop_face(const std::string& inputPath, const std::string& outputPath
     return 2;  // Special exit code for "no face detected"
   }
 
-  cv::Mat faceCrop = detectedFaces[0].image;
-  if (!cv::imwrite(outputPath, faceCrop)) {
+  ImageRGB faceCrop = detectedFaces[0].image;
+  if (!image_save_bmp(outputPath, faceCrop)) {
     std::cerr << "Error: Could not save cropped image to: " << outputPath << std::endl;
     return 1;
   }

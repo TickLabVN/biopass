@@ -4,12 +4,13 @@
 
 set -euo pipefail
 
-BASE_URL="https://media.githubusercontent.com/media/TickLabVN/biopass/refs/heads/facelib/auth/face/models"
+BASE_URL="https://biopass.ticklab.site/models"
 
 MODELS=(
-    "${BASE_URL}/yolov8n-face.onnx?download=true|yolov8n-face.onnx"
-    "${BASE_URL}/edgeface_s_gamma_05.onnx?download=true|edgeface_s_gamma_05.onnx"
-    "${BASE_URL}/mobilenetv3_antispoof.onnx?download=true|mobilenetv3_antispoof.onnx"
+    "${BASE_URL}/yolov8n-face.onnx"
+    "${BASE_URL}/edgeface_s_gamma_05.onnx"
+    "${BASE_URL}/edgeface_xs_gamma_06.onnx"
+    "${BASE_URL}/mobilenetv3_antispoof.onnx"
 )
 
 LEGACY_MODELS=(

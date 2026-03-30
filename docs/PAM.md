@@ -45,14 +45,6 @@ Typical include files by distro family:
 - Arch/Manjaro/EndeavourOS: `/etc/pam.d/system-auth`
 - openSUSE/SLES: usually `common-auth*` include stacks under `/etc/pam.d/`
 
-If unsure, inspect target service files first (`sudo`, `login`, `sshd`, display manager):
-
-```bash
-grep -R "@include" /etc/pam.d/{sudo,login,sshd,gdm-password,sddm,lightdm} 2>/dev/null
-```
-
-Find which include file they reference, then edit that include file.
-
 ## 3. Backup PAM File
 
 Example (replace with your chosen file):
@@ -73,6 +65,11 @@ auth    [success=1 default=ignore]      pam_unix.so nullok
 auth    requisite                       pam_deny.so
 ```
 
+- Keep the control flags exactly as shown.
+- Do not remove existing `pam_unix.so`, `pam_deny.so`, or other mandatory modules.
+- Please remove `pam_fprintd.so` if it conflict with `libbiopass_pam.so`
+- `[success=<n> default=ignore]` may not work on some distros, like Fedora. In this case, use `sufficient` flag instead.
+
 ### What `[success=2 default=ignore]` means
 
 - `success=2`: if Biopass succeeds, PAM skips the next 2 `auth` lines.
@@ -89,9 +86,6 @@ auth    requisite                       pam_deny.so
 4. Both fail -> `pam_deny.so` is reached -> authentication is denied.
 
 Notes:
-
-- Keep the control flags exactly as shown.
-- Do not remove existing `pam_unix.so`, `pam_deny.so`, or other mandatory modules.
 
 ## 5. Distro-Specific Notes
 

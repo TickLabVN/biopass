@@ -43,7 +43,17 @@ FetchContent_MakeAvailable(stb)
 set(STB_INCLUDE_DIRS "${stb_SOURCE_DIR}")
 
 # yaml-cpp for config parsing
-find_package(yaml-cpp REQUIRED)
+set(YAML_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    yaml-cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+    GIT_TAG        0.8.0
+)
+FetchContent_MakeAvailable(yaml-cpp)
 
 # CLI11 for command line parsing
 find_package(CLI11 REQUIRED)

@@ -36,12 +36,12 @@
     ],
     "linux": {
       "deb": {
-        "depends": ["libyaml-cpp-dev", "fprintd", "libwebkit2gtk-4.1-0"],
+        "depends": ["fprintd", "libwebkit2gtk-4.1-0"],
         "postInstallScript": "scripts/deb/postinst",
         "files": {
           "/usr/share/com.ticklab.biopass/download_models.sh": "scripts/download_models.sh",
           "/lib/security/libbiopass_pam.so": "../../auth/build/pam/libbiopass_pam.so",
-          "/usr/local/bin/biopass-helper": "../../auth/build/pam/biopass-helper",
+          "/usr/bin/biopass-helper": "../../auth/build/pam/biopass-helper",
           "/usr/lib/biopass/libbiopass_det.so": "../../auth/build/face/detection/libbiopass_det.so",
           "/usr/lib/biopass/libbiopass_reg.so": "../../auth/build/face/recognition/libbiopass_reg.so",
           "/usr/lib/biopass/libbiopass_as.so": "../../auth/build/face/antispoofing/libbiopass_as.so",
@@ -51,13 +51,13 @@
         }
       },
       "rpm": {
-        "depends": ["fprintd", "yaml-cpp-devel"],
+        "depends": ["fprintd"],
         "postInstallScript": "scripts/rpm/postinst",
         "postRemoveScript": "scripts/rpm/postrm",
         "files": {
           "/usr/share/com.ticklab.biopass/download_models.sh": "scripts/download_models.sh",
           "/lib64/security/libbiopass_pam.so": "../../auth/build/pam/libbiopass_pam.so",
-          "/usr/local/bin/biopass-helper": "../../auth/build/pam/biopass-helper",
+          "/usr/bin/biopass-helper": "../../auth/build/pam/biopass-helper",
           "/usr/lib/biopass/libbiopass_det.so": "../../auth/build/face/detection/libbiopass_det.so",
           "/usr/lib/biopass/libbiopass_reg.so": "../../auth/build/face/recognition/libbiopass_reg.so",
           "/usr/lib/biopass/libbiopass_as.so": "../../auth/build/face/antispoofing/libbiopass_as.so",

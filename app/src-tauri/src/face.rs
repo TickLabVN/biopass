@@ -42,8 +42,8 @@ pub fn save_face_image(app: AppHandle, image_data: String) -> Result<String, Str
     let detect_model = app_config.methods.face.detection.model;
 
     // Resolve the helper from installed, development, then PATH locations.
-    let helper_bin = if std::path::Path::new("/usr/local/bin/biopass-helper").exists() {
-        "/usr/local/bin/biopass-helper".to_string()
+    let helper_bin = if std::path::Path::new("/usr/bin/biopass-helper").exists() {
+        "/usr/bin/biopass-helper".to_string()
     } else if std::path::Path::new("../../auth/build/pam/biopass-helper").exists() {
         "../../auth/build/pam/biopass-helper".to_string()
     } else {

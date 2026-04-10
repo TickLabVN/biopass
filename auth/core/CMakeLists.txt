@@ -13,6 +13,6 @@ target_include_directories(biopass_core PUBLIC
 
 target_link_libraries(biopass_core
     pthread
-    yaml-cpp
+    yaml-cpp::yaml-cpp
     spdlog::spdlog_header_only
 )

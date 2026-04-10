@@ -9,12 +9,11 @@ pub mod voice;
 use config::{get_config_path_str, load_config, save_config};
 use face::{delete_face_image, list_face_images, save_face_image};
 use file_utils::{check_file_exists, delete_file};
-use system::{get_current_username, list_video_devices, supports_system_signin_integration};
+use system::{get_current_username, list_video_devices};
 use voice::{delete_voice_recording, list_voice_recordings, save_voice_recording};
 
 pub mod fingerprint;
 pub mod fingerprint_ffi;
-pub mod pam;
 
 use fingerprint::{
     add_fingerprint, authenticate_fingerprint, delete_fingerprint, enroll_fingerprint,
@@ -63,7 +62,6 @@ pub fn run() {
             list_face_images,
             list_voice_recordings,
             list_video_devices,
-            supports_system_signin_integration,
             delete_face_image,
             delete_voice_recording,
             check_file_exists,
@@ -75,8 +73,7 @@ pub fn run() {
             fingerprint_is_available,
             list_enrolled_fingerprints,
             authenticate_fingerprint,
-            list_fingerprint_devices,
-            pam::apply_pam_config
+            list_fingerprint_devices
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

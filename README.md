@@ -42,7 +42,7 @@ Biopass was developed by [@phucvinh57](https://github.com/phucvinh57) and [@thai
 - Debian and RPM package: https://github.com/TickLabVN/biopass/releases
 - AUR package: https://aur.archlinux.org/packages/biopass-bin
 
-Manual PAM setup (all Linux distributions): [docs/PAM.md](docs/PAM.md)
+System sign-in setup is manual on all Linux distributions: [docs/PAM.md](docs/PAM.md)
 
 ## Features
 

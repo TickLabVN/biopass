@@ -4,9 +4,7 @@ This guide explains how to integrate Biopass with PAM manually across Linux dist
 
 ## Why Manual Setup
 
-PAM stacks vary by distro, release, desktop manager, and local hardening tools (for example `authselect` on Fedora-family systems).  
-Currently, Biopass only provides in-app "System Sign-in Integration" for **Ubuntu** and **Pop!_OS**.  
-For other distros, use this manual guide.
+PAM stacks vary by distro, release, desktop manager, and local hardening tools (for example `authselect` on Fedora-family systems). For safety, Biopass does not edit `/etc/pam.d/*` automatically. Please use this guide to configure system sign-in manually on any Linux distribution.
 
 ## Safety First (Important)
 
@@ -15,8 +13,7 @@ Incorrect PAM edits can lock you out of your system.
 Before editing anything:
 
 1. Keep an existing root shell open (`sudo -s`) until testing is complete.
-2. Work in a VM/snapshot when possible.
-3. Always create backups of PAM files before edits.
+2. Always create backups of PAM files before edits.
 
 ## 1. Verify Biopass PAM Module Exists
 
@@ -131,6 +128,8 @@ sudo cp /etc/pam.d/common-auth.bak.YYYYMMDDHHMMSS /etc/pam.d/common-auth
 ```
 
 (Adjust path to your actual PAM file and backup name.)
+
+Before uninstalling Biopass, remove the `libbiopass_pam.so` line from PAM or restore your backup first.
 
 ## 8. Recovery (If Locked Out)
 

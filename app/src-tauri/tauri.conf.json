@@ -38,7 +38,6 @@
       "deb": {
         "depends": ["libyaml-cpp-dev", "fprintd", "libwebkit2gtk-4.1-0"],
         "postInstallScript": "scripts/deb/postinst",
-        "preRemoveScript": "scripts/deb/prerm",
         "files": {
           "/usr/share/com.ticklab.biopass/download_models.sh": "scripts/download_models.sh",
           "/lib/security/libbiopass_pam.so": "../../auth/build/pam/libbiopass_pam.so",
@@ -54,7 +53,6 @@
       "rpm": {
         "depends": ["fprintd", "yaml-cpp-devel"],
         "postInstallScript": "scripts/rpm/postinst",
-        "preRemoveScript": "scripts/rpm/prerm",
         "postRemoveScript": "scripts/rpm/postrm",
         "files": {
           "/usr/share/com.ticklab.biopass/download_models.sh": "scripts/download_models.sh",

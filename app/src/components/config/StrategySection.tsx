@@ -30,18 +30,13 @@ import type { StrategyConfig } from "@/types/config";
 
 interface Props {
   strategy: StrategyConfig;
-  pamIntegrationSupported: boolean;
   onChange: (strategy: StrategyConfig) => void;
 }
 
 const PAM_MANUAL_SETUP_GUIDE_URL =
   "https://github.com/TickLabVN/biopass/blob/main/docs/PAM.md";
 
-export function StrategySection({
-  strategy,
-  pamIntegrationSupported,
-  onChange,
-}: Props) {
+export function StrategySection({ strategy, onChange }: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -70,51 +65,22 @@ export function StrategySection({
       </h2>
 
       <div className="grid gap-6">
-        {/* PAM Enablement */}
-        {pamIntegrationSupported ? (
-          <div className="flex items-center justify-between p-4 rounded-lg bg-primary/5 border border-primary/10 transition-all">
-            <div className="grid gap-0.5">
-              <Label
-                htmlFor="pam-enabled"
-                className="text-sm font-semibold flex items-center gap-2"
-              >
-                System Sign-in Integration
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-bold uppercase tracking-wider">
-                  Recommended
-                </span>
-              </Label>
-              <p className="text-xs text-muted-foreground max-w-100">
-                Use Biopass to unlock your computer and authorize system
-                actions.
-              </p>
-            </div>
-            <Switch
-              id="pam-enabled"
-              checked={strategy.pam_enabled}
-              onCheckedChange={(checked) =>
-                onChange({ ...strategy, pam_enabled: checked })
-              }
-            />
-          </div>
-        ) : (
-          <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-500/5">
-            <Label className="text-sm font-semibold">
-              System Sign-in Integration
-            </Label>
-            <p className="text-xs text-muted-foreground mt-1 max-w-120">
-              This feature is currently supported only on Ubuntu and Pop!_OS.
-              For other distributions, configure PAM manually using the guide:
-            </p>
-            <a
-              href={PAM_MANUAL_SETUP_GUIDE_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-block mt-2 text-xs text-primary hover:underline break-all"
-            >
-              {PAM_MANUAL_SETUP_GUIDE_URL}
-            </a>
-          </div>
-        )}
+        <div className="p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5">
+          <Label className="text-sm font-semibold">System Sign-in Setup</Label>
+          <p className="text-xs text-muted-foreground mt-1 max-w-140">
+            Biopass does not edit PAM configurations automatically. To use it
+            for login, unlock, or sudo, configure your PAM stack manually using
+            this guide:
+          </p>
+          <a
+            href={PAM_MANUAL_SETUP_GUIDE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block mt-2 text-xs text-primary hover:underline break-all"
+          >
+            {PAM_MANUAL_SETUP_GUIDE_URL}
+          </a>
+        </div>
 
         {/* Debug Logging Toggle */}
         <div className="flex items-center justify-between p-3 rounded-lg border border-border transition-all">

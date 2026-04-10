@@ -10,10 +10,10 @@ Biopass consists of a backend C++ authentication module and a frontend Tauri des
 
 **For the C++ Backend:**
 
-You need to install CMake, Make, PAM headers, and CLI11.
+You need to install CMake, Make, PAM headers, CLI11 and nasm
 ```bash
 sudo apt update
-sudo apt install cmake make g++ libpam0g-dev libcli11-dev
+sudo apt install cmake make g++ libpam0g-dev libcli11-dev nasm
 ```
 
 **For the Tauri Application:**
@@ -27,7 +27,7 @@ curl -fsSL https://bun.sh/install | bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Install Tauri prerequisites (Ubuntu/Debian)
-sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev nasm
+sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 ```
 
 ### Building the Project

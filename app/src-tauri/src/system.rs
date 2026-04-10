@@ -36,34 +36,3 @@ pub fn list_video_devices() -> Result<Vec<String>, String> {
 
     Ok(devices)
 }
-
-#[tauri::command]
-pub fn supports_system_signin_integration() -> bool {
-    #[cfg(target_os = "linux")]
-    {
-        let os_release = match fs::read_to_string("/etc/os-release") {
-            Ok(content) => content,
-            Err(_) => return false,
-        };
-
-        let distro_id = os_release
-            .lines()
-            .find(|line| line.starts_with("ID="))
-            .map(|line| {
-                line.trim_start_matches("ID=")
-                    .trim()
-                    .trim_matches('"')
-                    .to_lowercase()
-            });
-
-        matches!(
-            distro_id.as_deref(),
-            Some("ubuntu") | Some("pop") | Some("pop_os")
-        )
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        false
-    }
-}

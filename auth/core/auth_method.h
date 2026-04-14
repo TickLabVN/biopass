@@ -9,30 +9,30 @@ enum AuthResult { Success, Failure, Retry, Unavailable };
 
 struct AuthConfig {
   bool debug = false;
-  bool anti_spoof = false;
+  bool antispoof = false;
 };
 
 struct IAuthMethod {
   virtual ~IAuthMethod() = default;
   virtual std::string name() const = 0;
-  virtual bool is_available() const = 0;
-  virtual int get_retries() const = 0;
-  virtual int get_retry_delay_ms() const = 0;
+  virtual bool isAvailable() const = 0;
+  virtual int getRetries() const = 0;
+  virtual int getRetryDelayMs() const = 0;
   virtual AuthResult authenticate(const std::string& username, const AuthConfig& config,
-                                  std::atomic<bool>* cancel_signal = nullptr) = 0;
+                                  std::atomic<bool>* cancelSignal = nullptr) = 0;
 };
 
 struct RetryStrategy {
-  RetryStrategy(int max_retries) : max_retries_(max_retries) {}
+  RetryStrategy(int maxRetries) : maxRetries_(maxRetries) {}
 
-  bool should_retry(AuthResult result, int attempts) const {
+  bool shouldRetry(AuthResult result, int attempts) const {
     if (result != AuthResult::Retry) {
       return false;
     }
-    return attempts < max_retries_;
+    return attempts < maxRetries_;
   }
 
  private:
-  int max_retries_;
+  int maxRetries_;
 };
 }  // namespace biopass

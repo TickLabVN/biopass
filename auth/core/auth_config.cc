@@ -10,7 +10,7 @@
 
 namespace biopass {
 
-std::string get_config_path(const std::string& username) {
+std::string getConfigPath(const std::string& username) {
   struct passwd* pw = getpwnam(username.c_str());
   if (pw == nullptr) {
     const char* home = getenv("HOME");
@@ -22,8 +22,8 @@ std::string get_config_path(const std::string& username) {
   return std::string(pw->pw_dir) + "/.config/com.ticklab.biopass/config.yaml";
 }
 
-bool config_exists(const std::string& username) {
-  std::ifstream f(get_config_path(username));
+bool configExists(const std::string& username) {
+  std::ifstream f(getConfigPath(username));
   return f.good();
 }
 
@@ -44,10 +44,10 @@ static ExecutionMode parse_mode(const std::string& mode_str) {
   return ExecutionMode::Parallel;
 }
 
-BiopassConfig load_config(const std::string& username) {
+BiopassConfig readConfig(const std::string& username) {
   BiopassConfig config;
 
-  std::string config_path = get_config_path(username);
+  std::string config_path = getConfigPath(username);
 
   try {
     YAML::Node yaml = YAML::LoadFile(config_path);
@@ -79,7 +79,7 @@ BiopassConfig load_config(const std::string& username) {
         if (f["retries"])
           config.methods_config.face.retries = f["retries"].as<int>();
         if (f["retry_delay"])
-          config.methods_config.face.retry_delay_ms = f["retry_delay"].as<int>();
+          config.methods_config.face.retryDelayMs = f["retry_delay"].as<int>();
         if (f["detection"]) {
           if (f["detection"]["model"])
             config.methods_config.face.detection.model = f["detection"]["model"].as<std::string>();
@@ -98,7 +98,7 @@ BiopassConfig load_config(const std::string& username) {
         if (f["anti_spoofing"]) {
           const auto& anti_spoofing = f["anti_spoofing"];
           if (anti_spoofing["enable"]) {
-            config.methods_config.face.anti_spoofing.enable =
+            config.methods_config.face.antiSpoofing.enable =
                 anti_spoofing["enable"].as<bool>();
           }
 
@@ -106,33 +106,33 @@ BiopassConfig load_config(const std::string& username) {
             const auto& model = anti_spoofing["model"];
             if (model.IsMap()) {
               if (model["path"])
-                config.methods_config.face.anti_spoofing.model.path = model["path"].as<std::string>();
+                config.methods_config.face.antiSpoofing.model.path = model["path"].as<std::string>();
               if (model["threshold"])
-                config.methods_config.face.anti_spoofing.model.threshold =
+                config.methods_config.face.antiSpoofing.model.threshold =
                     model["threshold"].as<float>();
             } else if (model.IsScalar()) {
               // Backward compatibility with old schema:
               // anti_spoofing.model: "<path>"
-              config.methods_config.face.anti_spoofing.model.path = model.as<std::string>();
+              config.methods_config.face.antiSpoofing.model.path = model.as<std::string>();
             }
           }
 
           // Backward compatibility with old schema:
           // anti_spoofing.threshold: <float>
           if (anti_spoofing["threshold"]) {
-            config.methods_config.face.anti_spoofing.model.threshold =
+            config.methods_config.face.antiSpoofing.model.threshold =
                 anti_spoofing["threshold"].as<float>();
           }
 
           if (anti_spoofing["ir_camera"] && !anti_spoofing["ir_camera"].IsNull()) {
-            config.methods_config.face.anti_spoofing.ir_camera =
+            config.methods_config.face.antiSpoofing.irCamera =
                 anti_spoofing["ir_camera"].as<std::string>();
           }
         }
 
         // Backward compatibility with old schema:
         // methods.face.ir_camera.enable + methods.face.ir_camera.device_id
-        if (f["ir_camera"] && config.methods_config.face.anti_spoofing.ir_camera.empty()) {
+        if (f["ir_camera"] && config.methods_config.face.antiSpoofing.irCamera.empty()) {
           bool ir_enable = false;
           int ir_device_id = 0;
           if (f["ir_camera"]["enable"])
@@ -140,13 +140,13 @@ BiopassConfig load_config(const std::string& username) {
           if (f["ir_camera"]["device_id"])
             ir_device_id = f["ir_camera"]["device_id"].as<int>();
           if (ir_enable) {
-            config.methods_config.face.anti_spoofing.ir_camera =
+            config.methods_config.face.antiSpoofing.irCamera =
                 "/dev/video" + std::to_string(ir_device_id);
           }
         }
 
-        config.auth.anti_spoof = config.methods_config.face.anti_spoofing.enable ||
-                                 !config.methods_config.face.anti_spoofing.ir_camera.empty();
+        config.auth.antispoof = config.methods_config.face.antiSpoofing.enable ||
+                                 !config.methods_config.face.antiSpoofing.irCamera.empty();
       }
 
       // Voice
@@ -157,7 +157,7 @@ BiopassConfig load_config(const std::string& username) {
         if (v["retries"])
           config.methods_config.voice.retries = v["retries"].as<int>();
         if (v["retry_delay"])
-          config.methods_config.voice.retry_delay_ms = v["retry_delay"].as<int>();
+          config.methods_config.voice.retryDelayMs = v["retry_delay"].as<int>();
         if (v["model"])
           config.methods_config.voice.model = v["model"].as<std::string>();
         if (v["threshold"])
@@ -198,8 +198,8 @@ BiopassConfig load_config(const std::string& username) {
   return config;
 }
 
-bool migrate_config_schema(const std::string& username, std::string* error) {
-  const std::string config_path = get_config_path(username);
+bool migrateConfigSchema(const std::string& username, std::string* error) {
+  const std::string config_path = getConfigPath(username);
   try {
     YAML::Node yaml = YAML::LoadFile(config_path);
     if (!yaml["methods"] || !yaml["methods"]["face"]) {
@@ -333,7 +333,7 @@ static int mkdir_p(const std::string& path) {
   return 0;
 }
 
-std::vector<std::string> list_faces(const std::string& username) {
+std::vector<std::string> listFaces(const std::string& username) {
   std::vector<std::string> faces;
   std::string dir = user_data_dir(username) + "/faces";
   DIR* dp = opendir(dir.c_str());
@@ -361,9 +361,9 @@ std::vector<std::string> list_faces(const std::string& username) {
   return faces;
 }
 
-std::string debug_path(const std::string& username) { return user_data_dir(username) + "/debugs"; }
+std::string getDebugPath(const std::string& username) { return user_data_dir(username) + "/debugs"; }
 
-int setup_config(const std::string& username) {
+int setupConfig(const std::string& username) {
   const std::string dataDir = user_data_dir(username);
   if (mkdir_p(dataDir + "/faces") != 0)
     return 1;

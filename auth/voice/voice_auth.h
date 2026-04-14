@@ -16,9 +16,9 @@ class VoiceAuth : public IAuthMethod {
   ~VoiceAuth() override = default;
 
   std::string name() const override { return "Voice"; }
-  bool is_available() const override;
-  int get_retries() const override { return config_.retries; }
-  int get_retry_delay_ms() const override { return config_.retry_delay_ms; }
+  bool isAvailable() const override;
+  int getRetries() const override { return config_.retries; }
+  int getRetryDelayMs() const override { return config_.retryDelayMs; }
   AuthResult authenticate(const std::string &username, const AuthConfig &config,
                           std::atomic<bool> *cancel_signal = nullptr) override;
 

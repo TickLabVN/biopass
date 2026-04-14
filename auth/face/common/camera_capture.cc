@@ -23,10 +23,13 @@ namespace biopass {
 
 namespace {
 
-constexpr int kCapturePollIntervalMs = 100;
+constexpr int kDefaultWarmupFrames = 5;
+constexpr int kDefaultWarmupTimeoutMs = 20000;
+constexpr int kDefaultCaptureTimeoutMs = 10000;
+constexpr int kDefaultCapturePollIntervalMs = 10;
 
-void configure_capture_logging_once();
-std::optional<CapDeviceID> resolve_camera_device_index(
+void captureLog();
+std::optional<CapDeviceID> resolveCameraDeviceIdx(
     CapContext ctx, const std::optional<std::string>& linux_video_device_path);
 
 std::string device_label(const std::optional<std::string>& linux_video_device_path) {
@@ -95,10 +98,16 @@ std::optional<CapFormatInfo> find_camera_format_by_fourcc(CapContext ctx, CapDev
   return std::nullopt;
 }
 
-bool capture_frame_openpnp(CapContext ctx, CapStream stream, uint8_t* buffer, size_t buffer_size) {
-  while (true) {
+bool capture_frame_openpnp(CapContext ctx, CapStream stream, uint8_t* buffer, size_t buffer_size,
+                           int capture_timeout_ms, int poll_interval_ms) {
+  const auto capture_deadline = std::chrono::steady_clock::now() +
+                                std::chrono::milliseconds(std::max(0, capture_timeout_ms));
+  const bool has_timeout = capture_timeout_ms > 0;
+  const auto sleep_interval = std::chrono::milliseconds(std::max(1, poll_interval_ms));
+
+  while (!has_timeout || std::chrono::steady_clock::now() < capture_deadline) {
     if (!Cap_hasNewFrame(ctx, stream)) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(kCapturePollIntervalMs));
+      std::this_thread::sleep_for(sleep_interval);
       continue;
     }
 
@@ -108,19 +117,21 @@ bool capture_frame_openpnp(CapContext ctx, CapStream stream, uint8_t* buffer, si
 
     return true;
   }
+
+  return false;
 }
 
-ImageRGB capture_frame_v4l2_grey(const std::string& device_path, const CapFormatInfo& format,
-                                 int warmup_frames, int capture_timeout_ms,
-                                 int poll_interval_ms) {
+ImageRGB captureFrameV4L2Grey(const std::string& devicePath, const CapFormatInfo& format,
+                                 int warmupFrames, int captureTimeoutMs,
+                                 int pollIntervalMs) {
   if (format.fourcc != V4L2_PIX_FMT_GREY) {
     spdlog::error("FaceAuth: V4L2 GREY fallback called for non-GREY format");
     return {};
   }
 
-  const int fd = ::open(device_path.c_str(), O_RDWR | O_NONBLOCK);
+  const int fd = ::open(devicePath.c_str(), O_RDWR | O_NONBLOCK);
   if (fd == -1) {
-    spdlog::error("FaceAuth: Failed to open {} for V4L2 fallback: {}", device_path,
+    spdlog::error("FaceAuth: Failed to open {} for V4L2 fallback: {}", devicePath,
                   std::strerror(errno));
     return {};
   }
@@ -141,7 +152,7 @@ ImageRGB capture_frame_v4l2_grey(const std::string& device_path, const CapFormat
   v4l2_format_info.fmt.pix.pixelformat = format.fourcc;
   v4l2_format_info.fmt.pix.field = V4L2_FIELD_NONE;
   if (xioctl_retry(fd, VIDIOC_S_FMT, &v4l2_format_info) == -1) {
-    spdlog::error("FaceAuth: VIDIOC_S_FMT failed for {}: {}", device_path, std::strerror(errno));
+    spdlog::error("FaceAuth: VIDIOC_S_FMT failed for {}: {}", devicePath, std::strerror(errno));
     return {};
   }
 
@@ -158,7 +169,7 @@ ImageRGB capture_frame_v4l2_grey(const std::string& device_path, const CapFormat
   request_buffers.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   request_buffers.memory = V4L2_MEMORY_MMAP;
   if (xioctl_retry(fd, VIDIOC_REQBUFS, &request_buffers) == -1 || request_buffers.count == 0) {
-    spdlog::error("FaceAuth: VIDIOC_REQBUFS failed for {}: {}", device_path, std::strerror(errno));
+    spdlog::error("FaceAuth: VIDIOC_REQBUFS failed for {}: {}", devicePath, std::strerror(errno));
     return {};
   }
 
@@ -174,7 +185,7 @@ ImageRGB capture_frame_v4l2_grey(const std::string& device_path, const CapFormat
     buffer.memory = V4L2_MEMORY_MMAP;
     buffer.index = index;
     if (xioctl_retry(fd, VIDIOC_QUERYBUF, &buffer) == -1) {
-      spdlog::error("FaceAuth: VIDIOC_QUERYBUF failed for {}: {}", device_path, std::strerror(errno));
+      spdlog::error("FaceAuth: VIDIOC_QUERYBUF failed for {}: {}", devicePath, std::strerror(errno));
       return {};
     }
 
@@ -182,7 +193,7 @@ ImageRGB capture_frame_v4l2_grey(const std::string& device_path, const CapFormat
     buffers[index].start =
         ::mmap(nullptr, buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, buffer.m.offset);
     if (buffers[index].start == MAP_FAILED) {
-      spdlog::error("FaceAuth: mmap failed for {}: {}", device_path, std::strerror(errno));
+      spdlog::error("FaceAuth: mmap failed for {}: {}", devicePath, std::strerror(errno));
       return {};
     }
   }
@@ -204,14 +215,14 @@ ImageRGB capture_frame_v4l2_grey(const std::string& device_path, const CapFormat
     buffer.memory = V4L2_MEMORY_MMAP;
     buffer.index = index;
     if (xioctl_retry(fd, VIDIOC_QBUF, &buffer) == -1) {
-      spdlog::error("FaceAuth: VIDIOC_QBUF failed for {}: {}", device_path, std::strerror(errno));
+      spdlog::error("FaceAuth: VIDIOC_QBUF failed for {}: {}", devicePath, std::strerror(errno));
       return {};
     }
   }
 
   v4l2_buf_type buffer_type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   if (xioctl_retry(fd, VIDIOC_STREAMON, &buffer_type) == -1) {
-    spdlog::error("FaceAuth: VIDIOC_STREAMON failed for {}: {}", device_path, std::strerror(errno));
+    spdlog::error("FaceAuth: VIDIOC_STREAMON failed for {}: {}", devicePath, std::strerror(errno));
     return {};
   }
 
@@ -221,12 +232,12 @@ ImageRGB capture_frame_v4l2_grey(const std::string& device_path, const CapFormat
     ~StreamStopper() { xioctl_retry(fd, VIDIOC_STREAMOFF, &type); }
   } stream_stopper{fd, buffer_type};
 
-  const int total_frames_needed = std::max(0, warmup_frames) + 1;
+  const int total_frames_needed = std::max(0, warmupFrames) + 1;
   int captured_frames = 0;
-  const bool has_timeout = capture_timeout_ms > 0;
-  const int safe_poll_interval_ms = std::max(1, poll_interval_ms);
+  const bool has_timeout = captureTimeoutMs > 0;
+  const int safe_poll_interval_ms = std::max(1, pollIntervalMs);
   const auto capture_deadline = std::chrono::steady_clock::now() +
-                                std::chrono::milliseconds(std::max(0, capture_timeout_ms));
+                                std::chrono::milliseconds(std::max(0, captureTimeoutMs));
 
   while (captured_frames < total_frames_needed) {
     pollfd poll_info {};
@@ -237,7 +248,7 @@ ImageRGB capture_frame_v4l2_grey(const std::string& device_path, const CapFormat
     if (has_timeout) {
       const auto now = std::chrono::steady_clock::now();
       if (now >= capture_deadline) {
-        spdlog::error("FaceAuth: Timed out waiting for V4L2 GREY frame from {}", device_path);
+        spdlog::error("FaceAuth: Timed out waiting for V4L2 GREY frame from {}", devicePath);
         return {};
       }
 
@@ -252,7 +263,7 @@ ImageRGB capture_frame_v4l2_grey(const std::string& device_path, const CapFormat
       if (errno == EINTR) {
         continue;
       }
-      spdlog::error("FaceAuth: poll failed for {}: {}", device_path, std::strerror(errno));
+      spdlog::error("FaceAuth: poll failed for {}: {}", devicePath, std::strerror(errno));
       return {};
     }
     if (poll_rc == 0) {
@@ -266,7 +277,7 @@ ImageRGB capture_frame_v4l2_grey(const std::string& device_path, const CapFormat
       if (errno == EAGAIN) {
         continue;
       }
-      spdlog::error("FaceAuth: VIDIOC_DQBUF failed for {}: {}", device_path, std::strerror(errno));
+      spdlog::error("FaceAuth: VIDIOC_DQBUF failed for {}: {}", devicePath, std::strerror(errno));
       return {};
     }
 
@@ -289,14 +300,14 @@ ImageRGB capture_frame_v4l2_grey(const std::string& device_path, const CapFormat
       }
 
       if (xioctl_retry(fd, VIDIOC_QBUF, &buffer) == -1) {
-        spdlog::error("FaceAuth: VIDIOC_QBUF failed for {}: {}", device_path, std::strerror(errno));
+        spdlog::error("FaceAuth: VIDIOC_QBUF failed for {}: {}", devicePath, std::strerror(errno));
         return {};
       }
       return image;
     }
 
     if (xioctl_retry(fd, VIDIOC_QBUF, &buffer) == -1) {
-      spdlog::error("FaceAuth: VIDIOC_QBUF failed for {}: {}", device_path, std::strerror(errno));
+      spdlog::error("FaceAuth: VIDIOC_QBUF failed for {}: {}", devicePath, std::strerror(errno));
       return {};
     }
   }
@@ -304,16 +315,16 @@ ImageRGB capture_frame_v4l2_grey(const std::string& device_path, const CapFormat
   return {};
 }
 
-ImageRGB capture_v4l2_grey_by_path(const std::string& device_path, int warmup_frames,
+ImageRGB captureV4L2Grey(const std::string& device_path, int warmup_frames,
                                    int capture_timeout_ms, int poll_interval_ms) {
-  configure_capture_logging_once();
+  captureLog();
   CapContext ctx = Cap_createContext();
   if (!ctx) {
     spdlog::error("FaceAuth: Failed to create capture context for '{}'", device_path);
     return {};
   }
 
-  const auto device_index = resolve_camera_device_index(ctx, device_path);
+  const auto device_index = resolveCameraDeviceIdx(ctx, device_path);
   if (!device_index.has_value()) {
     Cap_releaseContext(ctx);
     return {};
@@ -328,11 +339,11 @@ ImageRGB capture_v4l2_grey_by_path(const std::string& device_path, int warmup_fr
   }
 
   Cap_releaseContext(ctx);
-  return capture_frame_v4l2_grey(device_path, *grey_format, warmup_frames, capture_timeout_ms,
+  return captureFrameV4L2Grey(device_path, *grey_format, warmup_frames, capture_timeout_ms,
                                  poll_interval_ms);
 }
 
-void capture_log_callback(uint32_t level, const char* message) {
+void captureLogCallback(uint32_t level, const char* message) {
   if (!message)
     return;
   if (std::strstr(message, "tjDecompressHeader2 failed: No error") != nullptr) {
@@ -353,12 +364,12 @@ void capture_log_callback(uint32_t level, const char* message) {
   }
 }
 
-void configure_capture_logging_once() {
+void captureLog() {
   static std::once_flag once;
-  std::call_once(once, []() { Cap_installCustomLogFunction(capture_log_callback); });
+  std::call_once(once, []() { Cap_installCustomLogFunction(captureLogCallback); });
 }
 
-std::optional<CapDeviceID> resolve_camera_device_index(
+std::optional<CapDeviceID> resolveCameraDeviceIdx(
     CapContext ctx, const std::optional<std::string>& linux_video_device_path) {
   const uint32_t count = Cap_getDeviceCount(ctx);
   if (count == 0) {
@@ -397,8 +408,8 @@ std::optional<CapDeviceID> resolve_camera_device_index(
 
 }  // namespace
 
-bool is_camera_available(const std::optional<std::string>& linux_video_device_path) {
-  configure_capture_logging_once();
+bool checkCameraAvailability(const std::optional<std::string>& linux_video_device_path) {
+  captureLog();
   CapContext ctx = Cap_createContext();
   if (!ctx) {
     spdlog::error("FaceAuth: Failed to create capture context for '{}'",
@@ -406,7 +417,7 @@ bool is_camera_available(const std::optional<std::string>& linux_video_device_pa
     return false;
   }
 
-  const auto device_index = resolve_camera_device_index(ctx, linux_video_device_path);
+  const auto device_index = resolveCameraDeviceIdx(ctx, linux_video_device_path);
   if (!device_index.has_value()) {
     Cap_releaseContext(ctx);
     return false;
@@ -424,9 +435,9 @@ bool is_camera_available(const std::optional<std::string>& linux_video_device_pa
   return available;
 }
 
-ImageRGB capture_by_camera(const std::optional<std::string>& linux_video_device_path,
+ImageRGB captureImage(const std::optional<std::string>& linux_video_device_path,
                            CameraCaptureFormat format) {
-  configure_capture_logging_once();
+  captureLog();
   CapContext ctx = Cap_createContext();
   if (!ctx) {
     spdlog::error("FaceAuth: Failed to create capture context for '{}'",
@@ -434,7 +445,7 @@ ImageRGB capture_by_camera(const std::optional<std::string>& linux_video_device_
     return {};
   }
 
-  const auto device_index = resolve_camera_device_index(ctx, linux_video_device_path);
+  const auto device_index = resolveCameraDeviceIdx(ctx, linux_video_device_path);
   if (!device_index.has_value()) {
     Cap_releaseContext(ctx);
     return {};
@@ -447,7 +458,8 @@ ImageRGB capture_by_camera(const std::optional<std::string>& linux_video_device_
       return {};
     }
     Cap_releaseContext(ctx);
-    return capture_v4l2_grey_by_path(*linux_video_device_path, 0, 0, 0);
+    return captureV4L2Grey(*linux_video_device_path, kDefaultWarmupFrames,
+                                     kDefaultCaptureTimeoutMs, kDefaultCapturePollIntervalMs);
   }
 
   CapFormatInfo fmt;
@@ -477,7 +489,8 @@ ImageRGB capture_by_camera(const std::optional<std::string>& linux_video_device_
         "FaceAuth: Device '{}' reports GREY format; using V4L2 GREY fallback on '{}'",
         device_label(linux_video_device_path), *linux_path);
     Cap_releaseContext(ctx);
-    return capture_frame_v4l2_grey(*linux_path, fmt, 0, 0, 0);
+    return captureFrameV4L2Grey(*linux_path, fmt, kDefaultWarmupFrames,
+                                   kDefaultCaptureTimeoutMs, kDefaultCapturePollIntervalMs);
   }
 
   CapStream stream = Cap_openStream(ctx, *device_index, 0);
@@ -491,7 +504,8 @@ ImageRGB capture_by_camera(const std::optional<std::string>& linux_video_device_
   uint32_t buf_size = fmt.width * fmt.height * 3;
   std::vector<uint8_t> buf(buf_size);
 
-  if (!capture_frame_openpnp(ctx, stream, buf.data(), buf_size)) {
+  if (!capture_frame_openpnp(ctx, stream, buf.data(), buf_size, kDefaultCaptureTimeoutMs,
+                             kDefaultCapturePollIntervalMs)) {
     spdlog::error("FaceAuth: Failed to capture frame from '{}'",
                   device_label(linux_video_device_path));
     Cap_closeStream(ctx, stream);
@@ -504,14 +518,14 @@ ImageRGB capture_by_camera(const std::optional<std::string>& linux_video_device_
   return ImageRGB(static_cast<int>(fmt.width), static_cast<int>(fmt.height), buf.data());
 }
 
-ImageRGB capture_ir_by_camera(const std::string& device_path, int warmup_frames,
+ImageRGB captureImageByIRCamera(const std::string& device_path, int warmup_frames,
                               int capture_timeout_ms, int poll_interval_ms) {
   if (device_path.empty()) {
     spdlog::error("FaceAuth: IR camera capture requires a /dev/video* path");
     return {};
   }
 
-  return capture_v4l2_grey_by_path(device_path, warmup_frames, capture_timeout_ms,
+  return captureV4L2Grey(device_path, warmup_frames, capture_timeout_ms,
                                    poll_interval_ms);
 }
 

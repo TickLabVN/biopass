@@ -9,15 +9,15 @@
 
 namespace biopass {
 
-void save_failed_face(const std::string& username, const ImageRGB& face, const std::string& reason) {
-  setup_config(username);
+void saveFailedFace(const std::string& username, const ImageRGB& face, const std::string& reason) {
+  setupConfig(username);
   auto now = std::chrono::system_clock::now().time_since_epoch();
   auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
   
 
   const std::string failed_face_path =
-      debug_path(username) + "/" + reason + "." + std::to_string(ms) + ".jpg";
-  if (!image_save(failed_face_path, face)) {
+      getDebugPath(username) + "/" + reason + "." + std::to_string(ms) + ".jpg";
+  if (!saveImage(failed_face_path, face)) {
     spdlog::error("FaceAuth: Could not save failed face to {}", failed_face_path);
   }
 }

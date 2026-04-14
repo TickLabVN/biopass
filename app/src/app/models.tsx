@@ -124,8 +124,6 @@ function ModelsRouteComponent() {
       const checks = modelList.map(async (model) => {
         try {
           const exists = await cmd.file.exists(model.path);
-          console.log(`Checked model path: ${model.path}, exists: ${exists}`);
-
           if (!exists) {
             newStatuses[model.path] = "missing";
           } else if (inUsePaths.has(model.path)) {

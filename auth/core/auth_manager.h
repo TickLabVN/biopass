@@ -28,14 +28,14 @@ class AuthManager {
   AuthManager(AuthManager &&) = default;
   AuthManager &operator=(AuthManager &&) = default;
 
-  void add_method(std::unique_ptr<IAuthMethod> method);
-  void set_mode(ExecutionMode mode);
-  void set_config(const AuthConfig &config);
+  void addMethod(std::unique_ptr<IAuthMethod> method);
+  void setMode(ExecutionMode mode);
+  void setConfig(const AuthConfig &config);
   int authenticate(const std::string &username);
 
  private:
-  int run_sequential(const std::string &username);
-  int run_parallel(const std::string &username);
+  int runSequential(const std::string &username);
+  int runParallel(const std::string &username);
 
   std::vector<std::unique_ptr<IAuthMethod>> methods_;
   ExecutionMode mode_ = ExecutionMode::Parallel;

@@ -20,7 +20,7 @@ constexpr int kIrCapturePollIntervalMs = 10;
 
 }  // namespace
 
-bool run_ir_camera_anti_spoof(const std::string& device_path,
+bool checkAntispoofByIRCamera(const std::string& device_path,
                               const std::string& detection_model_path, float detection_threshold,
                               const std::string& username, bool debug) {
   if (device_path.empty()) {
@@ -32,7 +32,7 @@ bool run_ir_camera_anti_spoof(const std::string& device_path,
     return false;
   }
 
-  ImageRGB frame = capture_ir_by_camera(device_path, kIrCaptureWarmupFrames, kIrCaptureTimeoutMs,
+  ImageRGB frame = captureImageByIRCamera(device_path, kIrCaptureWarmupFrames, kIrCaptureTimeoutMs,
                                         kIrCapturePollIntervalMs);
   if (frame.empty()) {
     spdlog::error("FaceAuth: IR camera failed to capture frame from {}", device_path);
@@ -44,7 +44,7 @@ bool run_ir_camera_anti_spoof(const std::string& device_path,
     if (detector.inference(frame).empty()) {
       spdlog::error("FaceAuth: IR camera check failed, no face detected in captured frame");
       if (debug) {
-        save_failed_face(username, frame, "ir_no_face");
+        saveFailedFace(username, frame, "ir_no_face");
       }
       return false;
     }

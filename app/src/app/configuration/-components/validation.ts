@@ -96,7 +96,13 @@ export async function validateConfig(config: BiopassConfig): Promise<boolean> {
         return false;
       }
     } catch (err) {
-      console.error("Status check failed:", err);
+      console.error(`Failed to check model file at ${path}:`, err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Unknown error occurred while validating models",
+      );
+      return false;
     }
   }
 

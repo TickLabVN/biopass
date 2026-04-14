@@ -4,7 +4,7 @@
 
 namespace biopass {
 
-bool VoiceAuth::is_available() const {
+bool VoiceAuth::isAvailable() const {
   // TODO: Check if microphone is available
   // For now, return false since voice auth is not implemented
   return false;

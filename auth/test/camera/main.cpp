@@ -657,7 +657,7 @@ int main(int argc, char **argv) {
       fs::create_directories(parent_dir);
     }
 
-    if (!image_save(absolute_output_path.string(), image)) {
+    if (!saveImage(absolute_output_path.string(), image)) {
       std::cerr << "Failed to save image to " << absolute_output_path << '\n';
       return 1;
     }

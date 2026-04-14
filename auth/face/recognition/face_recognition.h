@@ -25,7 +25,7 @@ class FaceRecognition {
  public:
   FaceRecognition(const std::string& ckpt, int imgsz = 112, const float threshold = 0.50);
 
-  void load_model(const std::string& ckpt);
+  void loadModel(const std::string& ckpt);
   std::vector<float> inference(const ImageRGB& image);
   std::vector<float> preprocess(const ImageRGB& image);
 

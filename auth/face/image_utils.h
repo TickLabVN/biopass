@@ -57,7 +57,7 @@ struct ImageRGB {
 /**
  * Bilinear resize.
  */
-inline ImageRGB image_resize(const ImageRGB &src, int tw, int th) {
+inline ImageRGB resizeImage(const ImageRGB &src, int tw, int th) {
   if (src.empty()) return {};
   ImageRGB dst(tw, th);
   float sx = (float)src.width / tw;
@@ -89,12 +89,12 @@ inline ImageRGB image_resize(const ImageRGB &src, int tw, int th) {
 /**
  * Letterbox resize: scale to fit target keeping aspect ratio, pad with pad_val.
  */
-inline ImageRGB image_letterbox(const ImageRGB &src, int tw, int th, uint8_t pad_val = 114) {
+inline ImageRGB imageLetterbox(const ImageRGB &src, int tw, int th, uint8_t pad_val = 114) {
   if (src.empty()) return {};
   float scale = std::min((float)tw / src.width, (float)th / src.height);
   int nw = (int)std::round(src.width * scale);
   int nh = (int)std::round(src.height * scale);
-  ImageRGB resized = image_resize(src, nw, nh);
+  ImageRGB resized = resizeImage(src, nw, nh);
 
   ImageRGB out(tw, th);
   std::memset(out.data.data(), pad_val, out.data.size());
@@ -109,14 +109,14 @@ inline ImageRGB image_letterbox(const ImageRGB &src, int tw, int th, uint8_t pad
 /**
  * Resize with aspect-ratio preserving and zero-padding (for recognition).
  */
-inline ImageRGB image_resize_pad(const ImageRGB &src, int tw, int th) {
-  return image_letterbox(src, tw, th, 0);
+inline ImageRGB imageResizePad(const ImageRGB &src, int tw, int th) {
+  return imageLetterbox(src, tw, th, 0);
 }
 
 /**
  * HWC RGB uint8 -> CHW float, normalized to [0,1].
  */
-inline std::vector<float> image_to_chw(const ImageRGB &img) {
+inline std::vector<float> imageToChw(const ImageRGB &img) {
   int h = img.height, w = img.width;
   std::vector<float> out(3 * h * w);
   for (int c = 0; c < 3; c++)
@@ -129,7 +129,7 @@ inline std::vector<float> image_to_chw(const ImageRGB &img) {
 /**
  * HWC RGB uint8 -> CHW float, with mean/std normalization.
  */
-inline std::vector<float> image_to_chw_normalized(const ImageRGB &img, const float mean[3],
+inline std::vector<float> imageToChwNormalized(const ImageRGB &img, const float mean[3],
                                                   const float std_val[3]) {
   int h = img.height, w = img.width;
   std::vector<float> out(3 * h * w);
@@ -141,7 +141,7 @@ inline std::vector<float> image_to_chw_normalized(const ImageRGB &img, const flo
 }
 
 namespace {
-inline std::string path_extension_lower(const std::string &path) {
+inline std::string lowercasePathExtension(const std::string &path) {
   size_t dot = path.rfind('.');
   if (dot == std::string::npos) return "";
   std::string ext = path.substr(dot);
@@ -154,7 +154,7 @@ inline std::string path_extension_lower(const std::string &path) {
  * Load image from any supported format (JPEG, PNG, BMP, GIF, TGA, PSD, HDR, PIC, PNM).
  * Automatically detects format from file contents via stb_image.
  */
-inline ImageRGB image_load(const std::string &path) {
+inline ImageRGB readImage(const std::string &path) {
   int w = 0, h = 0, channels = 0;
   uint8_t *pixels = stbi_load(path.c_str(), &w, &h, &channels, 3);
   if (!pixels) return {};
@@ -172,10 +172,10 @@ inline ImageRGB image_load(const std::string &path) {
  *   .tga          -> TGA
  * Returns false on unsupported extension or write failure.
  */
-inline bool image_save(const std::string &path, const ImageRGB &img) {
+inline bool saveImage(const std::string &path, const ImageRGB &img) {
   if (img.empty()) return false;
 
-  std::string ext = path_extension_lower(path);
+  std::string ext = lowercasePathExtension(path);
   int stride = img.width * 3;
 
   if (ext == ".jpg" || ext == ".jpeg") {
@@ -190,14 +190,6 @@ inline bool image_save(const std::string &path, const ImageRGB &img) {
 
   // Fallback: save as PNG
   return stbi_write_png(path.c_str(), img.width, img.height, 3, img.ptr(), stride) != 0;
-}
-
-/**
- * Backward-compatible aliases.
- */
-inline ImageRGB image_load_bmp(const std::string &path) { return image_load(path); }
-inline bool image_save_bmp(const std::string &path, const ImageRGB &img) {
-  return image_save(path, img);
 }
 
 #endif  // IMAGE_UTILS_H

@@ -16,9 +16,9 @@
 
 #include "detection/face_detection.h"
 
-int handle_crop_face(const std::string& inputPath, const std::string& outputPath,
+int cropFace(const std::string& inputPath, const std::string& outputPath,
                      const std::string& modelPath) {
-  ImageRGB image = image_load(inputPath);
+  ImageRGB image = readImage(inputPath);
   if (image.empty()) {
     spdlog::error("Could not read input image: {}", inputPath);
     return 1;
@@ -39,7 +39,7 @@ int handle_crop_face(const std::string& inputPath, const std::string& outputPath
   }
 
   ImageRGB faceCrop = detectedFaces[0].image;
-  if (!image_save(outputPath, faceCrop)) {
+  if (!saveImage(outputPath, faceCrop)) {
     spdlog::error("Could not save cropped image to: {}", outputPath);
     return 1;
   }
@@ -48,15 +48,15 @@ int handle_crop_face(const std::string& inputPath, const std::string& outputPath
   return 0;
 }
 
-int handle_authenticate(const std::string& username) {
+int authenticate(const std::string& username) {
   const char* pUsername = username.c_str();
 
   // Load configuration from file
-  if (!biopass::config_exists(pUsername)) {
+  if (!biopass::configExists(pUsername)) {
     // User has not configured biopass — skip this module transparently
     return 2;  // PAM_IGNORE
   }
-  biopass::BiopassConfig config = biopass::load_config(pUsername);
+  biopass::BiopassConfig config = biopass::readConfig(pUsername);
 
   if (config.debug) {
     spdlog::set_level(spdlog::level::debug);
@@ -66,27 +66,27 @@ int handle_authenticate(const std::string& username) {
 
   // Create and configure AuthManager
   biopass::AuthManager manager;
-  manager.set_mode(config.mode);
-  manager.set_config(config.auth);
+  manager.setMode(config.mode);
+  manager.setConfig(config.auth);
 
   // Add requested authentication methods
-  int methods_count = 0;
+  int numOfMethods = 0;
   for (const auto& method_name : config.methods) {
     if (method_name == "face") {
-      manager.add_method(std::make_unique<biopass::FaceAuth>(config.methods_config.face));
-      methods_count++;
+      manager.addMethod(std::make_unique<biopass::FaceAuth>(config.methods_config.face));
+      numOfMethods++;
     } else if (method_name == "voice") {
-      manager.add_method(std::make_unique<biopass::VoiceAuth>(config.methods_config.voice));
-      methods_count++;
+      manager.addMethod(std::make_unique<biopass::VoiceAuth>(config.methods_config.voice));
+      numOfMethods++;
     } else if (method_name == "fingerprint") {
-      manager.add_method(
+      manager.addMethod(
           std::make_unique<biopass::FingerprintAuth>(config.methods_config.fingerprint));
-      methods_count++;
+      numOfMethods++;
     }
   }
 
   // If no methods are enabled, ignore this module and let PAM jump to the next one
-  if (methods_count == 0) {
+  if (numOfMethods == 0) {
     return 2;  // PAM_IGNORE
   }
 
@@ -100,14 +100,14 @@ int handle_authenticate(const std::string& username) {
   }
 }
 
-int handle_migrate_config(const std::string& username) {
+int migrateConfig(const std::string& username) {
   if (getpwnam(username.c_str()) == nullptr) {
     spdlog::error("User '{}' not found", username);
     return 1;
   }
 
   std::string error;
-  if (!biopass::migrate_config_schema(username, &error)) {
+  if (!biopass::migrateConfigSchema(username, &error)) {
     spdlog::error("Failed to migrate config schema: {}", error);
     return 1;
   }
@@ -130,10 +130,10 @@ int main(int argc, char** argv) {
   auto auth_cmd = app.add_subcommand("auth", "Authenticate a user with Biopass");
   auth_cmd->add_option("--username,-u", username, "Username for authentication")->required();
 
-  std::string migrate_username;
+  std::string migrateUsername;
   auto migrate_cmd =
       app.add_subcommand("migrate", "Migration tool for applying schema changes (run once after updates)");
-  migrate_cmd->add_option("--username,-u", migrate_username, "Username to migrate")->required();
+  migrate_cmd->add_option("--username,-u", migrateUsername, "Username to migrate")->required();
   migrate_cmd->group("");
 
   try {
@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
   }
 
   if (app.got_subcommand(crop_cmd)) {
-    return handle_crop_face(inputPath, outputPath, modelPath);
+    return cropFace(inputPath, outputPath, modelPath);
   }
 
   if (app.got_subcommand(auth_cmd)) {
@@ -151,15 +151,15 @@ int main(int argc, char** argv) {
       spdlog::info("{}", app.help());
       return 2;  // PAM_IGNORE logic / error
     }
-    return handle_authenticate(username);
+    return authenticate(username);
   }
 
   if (app.got_subcommand(migrate_cmd)) {
-    if (migrate_username.empty()) {
+    if (migrateUsername.empty()) {
       spdlog::info("{}", app.help());
       return 1;
     }
-    return handle_migrate_config(migrate_username);
+    return migrateConfig(migrateUsername);
   }
 
   spdlog::error("No valid subcommand provided");

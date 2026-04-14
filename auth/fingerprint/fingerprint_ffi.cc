@@ -20,7 +20,7 @@ void fingerprint_auth_free(void* auth) {
 bool fingerprint_is_available(void* auth) {
   if (!auth)
     return false;
-  return static_cast<biopass::FingerprintAuth*>(auth)->is_available();
+  return static_cast<biopass::FingerprintAuth*>(auth)->isAvailable();
 }
 
 char** fingerprint_list_enrolled_fingers(void* auth, const char* username, int* count) {
@@ -31,7 +31,7 @@ char** fingerprint_list_enrolled_fingers(void* auth, const char* username, int* 
   }
 
   auto* fp_auth = static_cast<biopass::FingerprintAuth*>(auth);
-  std::vector<std::string> fingers = fp_auth->list_enrolled_fingers(username);
+  std::vector<std::string> fingers = fp_auth->listEnrolledFingers(username);
 
   if (fingers.empty()) {
     *count = 0;
@@ -73,7 +73,7 @@ bool fingerprint_enroll(void* auth, const char* username, const char* finger_nam
 bool fingerprint_remove_finger(void* auth, const char* username, const char* finger_name) {
   if (!auth || !username || !finger_name)
     return false;
-  return static_cast<biopass::FingerprintAuth*>(auth)->remove_finger(username, finger_name);
+  return static_cast<biopass::FingerprintAuth*>(auth)->removeFinger(username, finger_name);
 }
 
 }  // extern "C"

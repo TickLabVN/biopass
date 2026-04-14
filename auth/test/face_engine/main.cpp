@@ -21,7 +21,7 @@ std::string default_model_dir() {
 
 ImageRGB extract_largest_face(FaceDetection& detector, const std::string& image_path,
                               const std::string& image_label) {
-  ImageRGB input_image = image_load(image_path);
+  ImageRGB input_image = readImage(image_path);
   if (input_image.empty()) {
     throw std::runtime_error("Failed to load image: " + image_path);
   }
@@ -71,10 +71,10 @@ int main(int argc, char** argv) {
     ImageRGB face2 = extract_largest_face(detector, image_2_path, "Image2");
 
     if (save_crops) {
-      if (!image_save(crop_1_path, face1)) {
+      if (!saveImage(crop_1_path, face1)) {
         throw std::runtime_error("Failed to save cropped image to: " + crop_1_path);
       }
-      if (!image_save(crop_2_path, face2)) {
+      if (!saveImage(crop_2_path, face2)) {
         throw std::runtime_error("Failed to save cropped image to: " + crop_2_path);
       }
       std::cout << "Saved crops: " << crop_1_path << ", " << crop_2_path << std::endl;

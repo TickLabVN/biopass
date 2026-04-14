@@ -88,7 +88,7 @@ gboolean on_verify_timeout(gpointer user_data) {
 
 }  // namespace
 
-bool FingerprintAuth::is_available() const {
+bool FingerprintAuth::isAvailable() const {
   GError* error = nullptr;
   GDBusProxy* manager = g_dbus_proxy_new_for_bus_sync(G_BUS_TYPE_SYSTEM, G_DBUS_PROXY_FLAGS_NONE,
                                                       nullptr, FPRINT_SERVICE, FPRINT_MANAGER_PATH,
@@ -321,7 +321,7 @@ AuthResult FingerprintAuth::authenticate(const std::string& username, const Auth
   return ctx.result;
 }
 
-std::vector<std::string> FingerprintAuth::list_enrolled_fingers(const std::string& username) {
+std::vector<std::string> FingerprintAuth::listEnrolledFingers(const std::string& username) {
   std::vector<std::string> enrolled_fingers;
   GError* error = nullptr;
   GDBusConnection* connection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, nullptr, &error);
@@ -575,7 +575,7 @@ bool FingerprintAuth::enroll(const std::string& username, const std::string& fin
   return ctx.success;
 }
 
-bool FingerprintAuth::remove_finger(const std::string& username, const std::string& finger_name) {
+bool FingerprintAuth::removeFinger(const std::string& username, const std::string& finger_name) {
   GError* error = nullptr;
   GDBusConnection* connection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, nullptr, &error);
   if (!connection) {

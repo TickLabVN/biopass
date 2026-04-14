@@ -13,10 +13,10 @@ FaceDetection::FaceDetection(const std::string &ckpt, int imgsz,
   this->iou = iou;
   this->classes = classes;
 
-  this->load_model(ckpt);
+  this->loadModel(ckpt);
 }
 
-void FaceDetection::load_model(const std::string &ckpt) {
+void FaceDetection::loadModel(const std::string &ckpt) {
   this->ckpt = ckpt;
 
   Ort::SessionOptions opts;
@@ -46,7 +46,7 @@ void FaceDetection::load_model(const std::string &ckpt) {
 
 std::vector<Detection> FaceDetection::inference(const ImageRGB &image) {
   // Preprocess
-  ImageRGB input_image = image_letterbox(image, this->imgsz, this->imgsz);
+  ImageRGB input_image = imageLetterbox(image, this->imgsz, this->imgsz);
   std::vector<float> image_data = this->preprocess(input_image);
 
   // Inference
@@ -93,5 +93,5 @@ std::vector<Detection> FaceDetection::inference(const ImageRGB &image) {
 }
 
 std::vector<float> FaceDetection::preprocess(const ImageRGB &input_image) {
-  return image_to_chw(input_image);
+  return imageToChw(input_image);
 }

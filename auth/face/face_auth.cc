@@ -16,16 +16,16 @@
 
 namespace biopass {
 
-bool FaceAuth::is_available() const { return is_camera_available(std::nullopt); }
+bool FaceAuth::isAvailable() const { return checkCameraAvailability(std::nullopt); }
 
 AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig& config,
                                   std::atomic<bool>* cancel_signal) {
-  if (!this->is_available()) {
+  if (!this->isAvailable()) {
     spdlog::error("FaceAuth: Could not open camera");
     return AuthResult::Unavailable;
   }
 
-  std::vector<std::string> enrolledFaces = biopass::list_faces(username);
+  std::vector<std::string> enrolledFaces = biopass::listFaces(username);
   if (enrolledFaces.empty()) {
     spdlog::error("FaceAuth: No face enrolled for user {}, skipping", username);
     return AuthResult::Unavailable;
@@ -66,7 +66,7 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
     return AuthResult::Failure;
   }
 
-  ImageRGB loginFace = capture_by_camera(std::nullopt);
+  ImageRGB loginFace = captureImage(std::nullopt);
   if (loginFace.empty()) {
     spdlog::error("FaceAuth: Could not read frame");
     return AuthResult::Retry;
@@ -80,14 +80,14 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
 
   ImageRGB face = detectedImages[0].image;
 
-  if (!run_anti_spoof_checks(face_config_, username, face, config)) {
+  if (!checkAntiSpoof(face_config_, username, face, config)) {
     spdlog::warn("FaceAuth: Anti-spoofing failed");
     return AuthResult::Retry;
   }
 
   // Match against all enrolled faces — succeed if any match.
   for (const auto& facePath : enrolledFaces) {
-    ImageRGB preparedFace = image_load(facePath);
+    ImageRGB preparedFace = readImage(facePath);
     if (preparedFace.empty())
       continue;
 
@@ -98,7 +98,7 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
   }
 
   if (config.debug) {
-    save_failed_face(username, face, "not_similar");
+    saveFailedFace(username, face, "not_similar");
   }
 
   return AuthResult::Retry;

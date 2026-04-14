@@ -16,10 +16,10 @@ FaceAntiSpoofing::FaceAntiSpoofing(const std::string& ckpt, int imgsz, const flo
   this->ckpt = ckpt;
   this->imgsz = imgsz;
   this->threshold = threshold;
-  this->load_model(ckpt);
+  this->loadModel(ckpt);
 }
 
-void FaceAntiSpoofing::load_model(const std::string& ckpt) {
+void FaceAntiSpoofing::loadModel(const std::string& ckpt) {
   this->ckpt = ckpt;
 
   Ort::SessionOptions opts;
@@ -50,9 +50,9 @@ void FaceAntiSpoofing::load_model(const std::string& ckpt) {
 std::vector<float> FaceAntiSpoofing::preprocess(const ImageRGB& input_image) {
   const float mean[3] = {0.5931f, 0.4690f, 0.4229f};
   const float std[3] = {0.2471f, 0.2214f, 0.2157f};
-  ImageRGB resize_img = image_resize(input_image, this->imgsz, this->imgsz);
+  ImageRGB resize_img = resizeImage(input_image, this->imgsz, this->imgsz);
 
-  return image_to_chw_normalized(resize_img, mean, std);
+  return imageToChwNormalized(resize_img, mean, std);
 }
 
 SpoofResult FaceAntiSpoofing::inference(const ImageRGB& image) {

@@ -8,7 +8,7 @@
 
 namespace biopass {
 
-bool run_anti_spoof_checks(const FaceMethodConfig& face_config, const std::string& username,
+bool checkAntiSpoof(const FaceMethodConfig& face_config, const std::string& username,
                            const ImageRGB& face, const AuthConfig& config);
 
 }  // namespace biopass

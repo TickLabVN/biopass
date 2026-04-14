@@ -58,6 +58,8 @@ System sign-in setup is manual on all Linux distributions: [docs/PAM.md](docs/PA
 
 Feel free to request new features or report bugs by opening an issue. For contributing, please read [CONTRIBUTING.md](docs/contributing.md).
 
+> We are opening a vote for next feature in https://github.com/TickLabVN/biopass/discussions/62
+
 ## Star History
 
 <picture>

@@ -18,7 +18,7 @@
 
 <h2 align="center">Biopass</h2>
 <p align="center"><b>Modern multi-modal biometric login for Linux</b></p>
-<p align="center">A fast, secure, and privacy-focused biometric recognition module for Linux desktops supporting face, fingerprint, and voice.</p>
+<p align="center">A fast, secure, and privacy-focused biometric recognition module for Linux desktops supporting face and fingerprint.</p>
 
 ---
 
@@ -32,10 +32,10 @@ Biopass was developed by [@phucvinh57](https://github.com/phucvinh57) and [@thai
 
 | Feature | [**Biopass**](https://github.com/TickLabVN/biopass) | [**Howdy**](https://github.com/boltgolt/howdy) |
 | :--- | :--- | :--- |
-| **Modalities** | Face + Fingerprint | Face ID only |
+| **Modalities** | Face + Fingerprint | Face only |
 | **User Interface** | Modern GUI for management | Command-line interface only |
 | **Configuration** | GUI | Manual |
-| **Face Anti-spoofing** | Built-in liveness detection | Limited (Requires IR camera for security) |
+| **Face Anti-spoofing** | IR camera + Embedded AI model | IR camera only |
 
 ## Installation
 
@@ -49,9 +49,9 @@ System sign-in setup is manual on all Linux distributions: [docs/PAM.md](docs/PA
 - [x] Authentication: User can register multiple biometrics for authentication. Authentication methods can be executed in parallel or sequentially.
     - [x] Face:
       - [x] Recognition
-      - [ ] Anti-spoofing
+      - [x] Anti-spoofing
         - [x] By AI model
-        - [ ] By IR camera
+        - [x] By IR camera (please read [IR camera guide](docs/IR%20camera.md))
     - [x] Fingerprint
     - [ ] Voice: recognition + anti-spoofing
 - [ ] Local AI model management: User can download, update, and delete AI models for face and voice authentication methods.

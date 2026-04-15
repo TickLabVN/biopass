@@ -2,6 +2,7 @@
 
 #include <security/_pam_types.h>
 
+#include <atomic>
 #include <string>
 
 namespace biopass {
@@ -18,6 +19,8 @@ struct IAuthMethod {
   virtual bool isAvailable() const = 0;
   virtual int getRetries() const = 0;
   virtual int getRetryDelayMs() const = 0;
+  virtual void beginAuthenticationSession() {}
+  virtual void endAuthenticationSession() {}
   virtual AuthResult authenticate(const std::string& username, const AuthConfig& config,
                                   std::atomic<bool>* cancelSignal = nullptr) = 0;
 };

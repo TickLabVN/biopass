@@ -16,13 +16,44 @@
 
 namespace biopass {
 
+namespace {
+
+constexpr int kIrCaptureWarmupFrames = 5;
+constexpr int kIrCaptureTimeoutMs = 3000;
+constexpr int kIrCapturePollIntervalMs = 10;
+
+}  // namespace
+
 bool FaceAuth::isAvailable() const { return checkCameraAvailability(std::nullopt); }
+
+void FaceAuth::beginAuthenticationSession() {
+  if (!camera_session_) {
+    camera_session_ = openCameraSession(std::nullopt);
+  }
+
+  if (!face_config_.antiSpoofing.irCamera.empty() && !ir_camera_session_) {
+    ir_camera_session_ =
+        openCameraSession(face_config_.antiSpoofing.irCamera, CameraCaptureFormat::V4L2Grey,
+                          kIrCaptureWarmupFrames, kIrCaptureTimeoutMs, kIrCapturePollIntervalMs);
+  }
+}
+
+void FaceAuth::endAuthenticationSession() {
+  ir_camera_session_.reset();
+  camera_session_.reset();
+}
 
 AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig& config,
                                   std::atomic<bool>* cancel_signal) {
-  if (!this->isAvailable()) {
+  if (!camera_session_) {
+    camera_session_ = openCameraSession(std::nullopt);
+  }
+  if (!camera_session_ || !camera_session_->isOpen()) {
     spdlog::error("FaceAuth: Could not open camera");
-    return AuthResult::Unavailable;
+    if (!checkCameraAvailability(std::nullopt)) {
+      return AuthResult::Unavailable;
+    }
+    return AuthResult::Retry;
   }
 
   std::vector<std::string> enrolledFaces = biopass::listFaces(username);
@@ -66,9 +97,10 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
     return AuthResult::Failure;
   }
 
-  ImageRGB loginFace = captureImage(std::nullopt);
+  ImageRGB loginFace = camera_session_->capture();
   if (loginFace.empty()) {
     spdlog::error("FaceAuth: Could not read frame");
+    camera_session_.reset();
     return AuthResult::Retry;
   }
 
@@ -80,8 +112,18 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
 
   ImageRGB face = detectedImages[0].image;
 
-  if (!checkAntiSpoof(face_config_, username, face, config)) {
+  if (!face_config_.antiSpoofing.irCamera.empty() &&
+      (!ir_camera_session_ || !ir_camera_session_->isOpen())) {
+    ir_camera_session_ =
+        openCameraSession(face_config_.antiSpoofing.irCamera, CameraCaptureFormat::V4L2Grey,
+                          kIrCaptureWarmupFrames, kIrCaptureTimeoutMs, kIrCapturePollIntervalMs);
+  }
+
+  if (!checkAntiSpoof(face_config_, username, face, config, ir_camera_session_.get())) {
     spdlog::warn("FaceAuth: Anti-spoofing failed");
+    if (ir_camera_session_ && !ir_camera_session_->isOpen()) {
+      ir_camera_session_.reset();
+    }
     return AuthResult::Retry;
   }
 

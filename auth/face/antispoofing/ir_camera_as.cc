@@ -22,7 +22,8 @@ constexpr int kIrCapturePollIntervalMs = 10;
 
 bool checkAntispoofByIRCamera(const std::string& device_path,
                               const std::string& detection_model_path, float detection_threshold,
-                              const std::string& username, bool debug) {
+                              const std::string& username, bool debug,
+                              ICameraCaptureSession* session) {
   if (device_path.empty()) {
     return false;
   }
@@ -32,8 +33,13 @@ bool checkAntispoofByIRCamera(const std::string& device_path,
     return false;
   }
 
-  ImageRGB frame = captureImageByIRCamera(device_path, kIrCaptureWarmupFrames, kIrCaptureTimeoutMs,
-                                        kIrCapturePollIntervalMs);
+  ImageRGB frame;
+  if (session && session->isOpen()) {
+    frame = session->capture();
+  } else {
+    frame = captureImageByIRCamera(device_path, kIrCaptureWarmupFrames, kIrCaptureTimeoutMs,
+                                   kIrCapturePollIntervalMs);
+  }
   if (frame.empty()) {
     spdlog::error("FaceAuth: IR camera failed to capture frame from {}", device_path);
     return false;

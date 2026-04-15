@@ -7,6 +7,22 @@
 
 namespace biopass {
 
+namespace {
+
+class MethodSessionGuard {
+ public:
+  explicit MethodSessionGuard(IAuthMethod& method) : method_(method) {}
+  ~MethodSessionGuard() { method_.endAuthenticationSession(); }
+
+  MethodSessionGuard(const MethodSessionGuard&) = delete;
+  MethodSessionGuard& operator=(const MethodSessionGuard&) = delete;
+
+ private:
+  IAuthMethod& method_;
+};
+
+}  // namespace
+
 void AuthManager::addMethod(std::unique_ptr<IAuthMethod> method) {
   this->methods_.push_back(std::move(method));
 }
@@ -45,6 +61,9 @@ int AuthManager::runSequential(const std::string& username) {
       spdlog::debug("AuthManager: {} is not available, skipping", method->name());
       continue;
     }
+
+    method->beginAuthenticationSession();
+    MethodSessionGuard session_guard(*method);
 
     RetryStrategy rs(method->getRetries());
     int attempts = 0;
@@ -108,6 +127,9 @@ int AuthManager::runParallel(const std::string& username) {
 
     futures.push_back(std::async(
         std::launch::async, [&method, &username, &config = this->config_, &success_found]() {
+          method->beginAuthenticationSession();
+          MethodSessionGuard session_guard(*method);
+
           RetryStrategy retry_strategy(method->getRetries());
           int attempts = 0;
           AuthResult result;

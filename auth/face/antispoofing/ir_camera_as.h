@@ -4,8 +4,10 @@
 
 namespace biopass {
 
+class ICameraCaptureSession;
+
 bool checkAntispoofByIRCamera(const std::string& ir_camera_path, const std::string& detection_model_path,
                               float detection_threshold, const std::string& username,
-                              bool debug);
+                              bool debug, ICameraCaptureSession* session = nullptr);
 
 }  // namespace biopass

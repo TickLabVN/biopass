@@ -32,7 +32,7 @@ Biopass was developed by [@phucvinh57](https://github.com/phucvinh57) and [@thai
 
 | Feature | [**Biopass**](https://github.com/TickLabVN/biopass) | [**Howdy**](https://github.com/boltgolt/howdy) |
 | :--- | :--- | :--- |
-| **Modalities** | Face + Fingerprint | Face only |
+| **Authentication methods** | Face + Fingerprint | Face only |
 | **User Interface** | Modern GUI for management | Command-line interface only |
 | **Configuration** | GUI | Manual |
 | **Face Anti-spoofing** | IR camera + Embedded AI model | IR camera only |
@@ -42,7 +42,8 @@ Biopass was developed by [@phucvinh57](https://github.com/phucvinh57) and [@thai
 - Debian and RPM package: https://github.com/TickLabVN/biopass/releases
 - AUR package: https://aur.archlinux.org/packages/biopass-bin
 
-System sign-in setup is manual on all Linux distributions: [docs/PAM.md](docs/PAM.md)
+**System sign-in setup is manual on all Linux distributions: [docs/PAM.md](docs/PAM.md)**
+**IR camera setup: [IR camera guide](docs/IR%20camera.md)**
 
 ## Features
 
@@ -50,8 +51,8 @@ System sign-in setup is manual on all Linux distributions: [docs/PAM.md](docs/PA
     - [x] Face:
       - [x] Recognition
       - [x] Anti-spoofing
-        - [x] By AI model
-        - [x] By IR camera (please read [IR camera guide](docs/IR%20camera.md))
+        - [x] With AI model
+        - [x] With IR camera (please read [IR camera guide](docs/IR%20camera.md))
     - [x] Fingerprint
     - [ ] Voice: recognition + anti-spoofing (we are discussing about it in https://github.com/TickLabVN/biopass/discussions/62)
 - [ ] Local AI model management: User can download, update, and delete AI models for face and voice authentication methods.

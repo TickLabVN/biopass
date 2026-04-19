@@ -40,12 +40,27 @@ If you only want IR-based anti-spoofing, selecting the `IR Camera` device is eno
 
 ## 3. If The IR Emitter Stays Off On Linux
 
-On some Linux systems, the IR camera is detected but the IR light emitter does not turn on automatically. In that case, use `linux-enable-ir-emitter`:
+On some Linux systems, the IR camera is detected but the IR light emitter does not turn on automatically. In that case, use [`linux-enable-ir-emitter`](https://github.com/EmixamPP/linux-enable-ir-emitter).
 
-- Repository: https://github.com/EmixamPP/linux-enable-ir-emitter
+To install it:
 
-That project is designed to enable the emitter for infrared cameras that are recognized by Linux but not activated correctly out of the box.
+```bash
+VERSION=6.1.2
+DIST=linux-enable-ir-emitter-$VERSION-release.systemd.x86-64.tar.gz
+wget https://github.com/EmixamPP/linux-enable-ir-emitter/releases/download/$VERSION/$DIST
+sudo tar -C / --no-same-owner -m -h -vxzf $DIST
+```
 
-Please follow that project's README for setup and configuration. In particular, run its configuration flow first so you can confirm that the IR emitter actually activates on your hardware.
+Then, configure your IR emitter: 
+
+```bash
+sudo linux-enable-ir-emitter configure
+```
+
+Follow instructions printed when it is configuring your camera. After successfully triggering your IR emitter, please run this command:
+
+```bash
+sudo systemctl enable --now linux-enable-ir-emitter
+```
 
 Thanks @notherealmarco for help me on this https://github.com/TickLabVN/biopass/discussions/60#discussioncomment-16521628.

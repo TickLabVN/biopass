@@ -61,7 +61,7 @@ int authenticate(const std::string& username) {
   if (config.debug) {
     spdlog::set_level(spdlog::level::debug);
   } else {
-    spdlog::set_level(spdlog::level::info);
+    spdlog::set_level(spdlog::level::off);
   }
 
   // Create and configure AuthManager

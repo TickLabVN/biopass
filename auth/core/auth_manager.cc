@@ -40,7 +40,7 @@ int AuthManager::authenticate(const std::string& username) {
   if (this->config_.debug) {
     spdlog::set_level(spdlog::level::debug);
   } else {
-    spdlog::set_level(spdlog::level::err);
+    spdlog::set_level(spdlog::level::off);
   }
 
   switch (this->mode_) {

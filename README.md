@@ -41,9 +41,8 @@ Biopass was developed by [@phucvinh57](https://github.com/phucvinh57) and [@thai
 
 - Debian and RPM package: https://github.com/TickLabVN/biopass/releases
 - AUR package: https://aur.archlinux.org/packages/biopass-bin
-
 - System sign-in setup is manual on all Linux distributions: [docs/PAM.md](docs/PAM.md)
-- IR camera setup: [IR camera guide](docs/IR%20camera.md)
+- [IR camera setup guide](docs/IR%20camera.md)
 
 ## Features
 
@@ -52,7 +51,7 @@ Biopass was developed by [@phucvinh57](https://github.com/phucvinh57) and [@thai
       - [x] Recognition
       - [x] Anti-spoofing
         - [x] With AI model
-        - [x] With IR camera (please read [IR camera guide](docs/IR%20camera.md))
+        - [x] With IR camera
     - [x] Fingerprint
     - [ ] Voice: recognition + anti-spoofing (we are discussing about it in https://github.com/TickLabVN/biopass/discussions/62)
 - [ ] Local AI model management: User can download, update, and delete AI models for face and voice authentication methods.

@@ -2,7 +2,6 @@
 #include <security/pam_modules.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -17,12 +16,8 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
   const char *service = nullptr;
   retval = pam_get_item(pamh, PAM_SERVICE, (const void **)&service);
-  if (retval == PAM_SUCCESS && service != nullptr) {
-    // Polkit/pkexec require explicit password prompts in most DEs.
-    // We bypass Biopass for these services to prevent auth hangs.
-    if (strcmp(service, "polkit-1") == 0 || strcmp(service, "pkexec") == 0) {
-      return PAM_IGNORE;
-    }
+  if (retval != PAM_SUCCESS) {
+    service = nullptr;
   }
 
   const char *pUsername;
@@ -35,8 +30,13 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
   if (pid < 0) {
     return PAM_AUTH_ERR;
   } else if (pid == 0) {
-    // Run "biopass-helper auth --username <username>"
-    execl("/usr/bin/biopass-helper", "biopass-helper", "auth", "--username", pUsername, NULL);
+    // Run "biopass-helper auth --username <username> [--service <name>]"
+    if (service != nullptr && service[0] != '\0') {
+      execl("/usr/bin/biopass-helper", "biopass-helper", "auth", "--username", pUsername,
+            "--service", service, NULL);
+    } else {
+      execl("/usr/bin/biopass-helper", "biopass-helper", "auth", "--username", pUsername, NULL);
+    }
 
     // If execl returns, it failed
     perror("execl failed");

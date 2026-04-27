@@ -28,14 +28,14 @@ AntiSpoofTask make_task(const std::string& name, std::future<bool> future) {
 
 bool checkAntiSpoofByAIModel(const FaceMethodConfig& faceCfg, const std::string& username,
                              const ImageRGB& face, const AuthConfig& authCfg) {
-  const std::string modelPath = faceCfg.antiSpoofing.model.path;
+  const std::string modelPath = faceCfg.anti_spoofing.model.path;
   if (modelPath.empty() || !std::ifstream(modelPath).good()) {
     spdlog::error("FaceAuth: Anti-spoofing model file not found: {}", modelPath);
     return false;
   }
 
   try {
-    FaceAntiSpoofing face_as(modelPath, 128, faceCfg.antiSpoofing.model.threshold);
+    FaceAntiSpoofing face_as(modelPath, 128, faceCfg.anti_spoofing.model.threshold);
     const SpoofResult result = face_as.inference(face);
     if (result.spoof) {
       spdlog::warn("FaceAuth: AI anti-spoofing detected spoof, score: {}", result.score);
@@ -58,8 +58,9 @@ bool checkAntiSpoofByAIModel(const FaceMethodConfig& faceCfg, const std::string&
 bool checkAntiSpoof(const FaceMethodConfig& face_config, const std::string& username,
                     const ImageRGB& face, const AuthConfig& config,
                     ICameraCaptureSession* ir_camera_session) {
-  const bool ai_enabled = face_config.antiSpoofing.enable;
-  const bool ir_enabled = !face_config.antiSpoofing.irCamera.empty();
+  const bool ai_enabled = face_config.anti_spoofing.enable;
+  const bool ir_enabled = face_config.anti_spoofing.ir_camera.has_value() &&
+                          !face_config.anti_spoofing.ir_camera->empty();
 
   if (!ai_enabled && !ir_enabled) {
     spdlog::debug("FaceAuth: Anti-spoofing methods are disabled, skipping checks");
@@ -67,7 +68,8 @@ bool checkAntiSpoof(const FaceMethodConfig& face_config, const std::string& user
   }
 
   spdlog::debug("FaceAuth: Anti-spoofing started (ai_enabled={}, ir_enabled={}, ir_camera='{}')",
-                ai_enabled, ir_enabled, face_config.antiSpoofing.irCamera);
+                ai_enabled, ir_enabled,
+                face_config.anti_spoofing.ir_camera.value_or(""));
 
   std::vector<AntiSpoofTask> tasks;
 
@@ -85,7 +87,7 @@ bool checkAntiSpoof(const FaceMethodConfig& face_config, const std::string& user
   }
 
   if (ir_enabled) {
-    const auto ir_camera_path = face_config.antiSpoofing.irCamera;
+    const auto ir_camera_path = *face_config.anti_spoofing.ir_camera;
     const auto detection_model = face_config.detection.model;
     const auto detection_threshold = face_config.detection.threshold;
     const auto username_copy = username;

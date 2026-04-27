@@ -31,9 +31,10 @@ void FaceAuth::beginAuthenticationSession() {
     camera_session_ = openCameraSession(std::nullopt);
   }
 
-  if (!face_config_.antiSpoofing.irCamera.empty() && !ir_camera_session_) {
+  if (face_config_.anti_spoofing.ir_camera.has_value() &&
+      !face_config_.anti_spoofing.ir_camera->empty() && !ir_camera_session_) {
     ir_camera_session_ =
-        openCameraSession(face_config_.antiSpoofing.irCamera, CameraCaptureFormat::V4L2Grey,
+        openCameraSession(*face_config_.anti_spoofing.ir_camera, CameraCaptureFormat::V4L2Grey,
                           kIrCaptureWarmupFrames, kIrCaptureTimeoutMs, kIrCapturePollIntervalMs);
   }
 }
@@ -112,10 +113,11 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
 
   ImageRGB face = detectedImages[0].image;
 
-  if (!face_config_.antiSpoofing.irCamera.empty() &&
+  if (face_config_.anti_spoofing.ir_camera.has_value() &&
+      !face_config_.anti_spoofing.ir_camera->empty() &&
       (!ir_camera_session_ || !ir_camera_session_->isOpen())) {
     ir_camera_session_ =
-        openCameraSession(face_config_.antiSpoofing.irCamera, CameraCaptureFormat::V4L2Grey,
+        openCameraSession(*face_config_.anti_spoofing.ir_camera, CameraCaptureFormat::V4L2Grey,
                           kIrCaptureWarmupFrames, kIrCaptureTimeoutMs, kIrCapturePollIntervalMs);
   }
 

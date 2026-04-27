@@ -19,8 +19,8 @@ class FaceAuth : public IAuthMethod {
 
   std::string name() const override { return "Face"; }
   bool isAvailable() const override;
-  int getRetries() const override { return face_config_.retries; }
-  int getRetryDelayMs() const override { return face_config_.retryDelayMs; }
+  uint32_t getRetries() const override { return face_config_.retries; }
+  uint32_t getRetryDelayMs() const override { return face_config_.retry_delay; }
   void beginAuthenticationSession() override;
   void endAuthenticationSession() override;
   AuthResult authenticate(const std::string &username, const AuthConfig &config,

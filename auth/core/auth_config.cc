@@ -38,12 +38,6 @@ std::string user_data_dir(const std::string& username) {
   return "";
 }
 
-static ExecutionMode parse_mode(const std::string& mode_str) {
-  if (mode_str == "sequential")
-    return ExecutionMode::Sequential;
-  return ExecutionMode::Parallel;
-}
-
 BiopassConfig readConfig(const std::string& username) {
   BiopassConfig config;
 
@@ -51,21 +45,56 @@ BiopassConfig readConfig(const std::string& username) {
 
   try {
     YAML::Node yaml = YAML::LoadFile(config_path);
+    static const std::vector<std::string> supported_methods = {"face", "fingerprint"};
 
     // 1. Strategy
     if (yaml["strategy"]) {
       const auto& s = yaml["strategy"];
-      if (s["debug"]) {
-        config.debug = s["debug"].as<bool>();
-        config.auth.debug = config.debug;
-      }
+      if (s["debug"])
+        config.strategy.debug = s["debug"].as<bool>();
       if (s["execution_mode"])
-        config.mode = parse_mode(s["execution_mode"].as<std::string>());
+        config.strategy.execution_mode = s["execution_mode"].as<std::string>();
       if (s["order"] && s["order"].IsSequence()) {
-        config.methods.clear();
-        for (const auto& m : s["order"]) config.methods.push_back(m.as<std::string>());
+        config.strategy.order.clear();
+        for (const auto& m : s["order"]) config.strategy.order.push_back(m.as<std::string>());
+      }
+      if (s["ignore_services"]) {
+        config.strategy.ignore_services.clear();
+        if (s["ignore_services"].IsSequence()) {
+          for (const auto& item : s["ignore_services"]) {
+            if (item.IsScalar()) {
+              const auto service = item.as<std::string>();
+              if (service.empty()) {
+                continue;
+              }
+              if (std::find(config.strategy.ignore_services.begin(),
+                            config.strategy.ignore_services.end(),
+                            service) == config.strategy.ignore_services.end()) {
+                config.strategy.ignore_services.push_back(service);
+              }
+            }
+          }
+        }
       }
     }
+    std::vector<std::string> normalized_order;
+    for (const auto& method : config.strategy.order) {
+      if (std::find(supported_methods.begin(), supported_methods.end(), method) ==
+          supported_methods.end()) {
+        continue;
+      }
+      if (std::find(normalized_order.begin(), normalized_order.end(), method) ==
+          normalized_order.end()) {
+        normalized_order.push_back(method);
+      }
+    }
+    for (const auto& method : supported_methods) {
+      if (std::find(normalized_order.begin(), normalized_order.end(), method) ==
+          normalized_order.end()) {
+        normalized_order.push_back(method);
+      }
+    }
+    config.strategy.order = std::move(normalized_order);
 
     // 2. Methods — enable flags + model paths
     if (yaml["methods"]) {
@@ -75,64 +104,60 @@ BiopassConfig readConfig(const std::string& username) {
       if (m["face"]) {
         const auto& f = m["face"];
         if (f["enable"])
-          config.methods_config.face.enable = f["enable"].as<bool>();
+          config.methods.face.enable = f["enable"].as<bool>();
         if (f["retries"])
-          config.methods_config.face.retries = f["retries"].as<int>();
+          config.methods.face.retries = f["retries"].as<uint32_t>();
         if (f["retry_delay"])
-          config.methods_config.face.retryDelayMs = f["retry_delay"].as<int>();
+          config.methods.face.retry_delay = f["retry_delay"].as<uint32_t>();
         if (f["detection"]) {
           if (f["detection"]["model"])
-            config.methods_config.face.detection.model = f["detection"]["model"].as<std::string>();
+            config.methods.face.detection.model = f["detection"]["model"].as<std::string>();
           if (f["detection"]["threshold"])
-            config.methods_config.face.detection.threshold =
-                f["detection"]["threshold"].as<float>();
+            config.methods.face.detection.threshold = f["detection"]["threshold"].as<float>();
         }
         if (f["recognition"]) {
           if (f["recognition"]["model"])
-            config.methods_config.face.recognition.model =
-                f["recognition"]["model"].as<std::string>();
+            config.methods.face.recognition.model = f["recognition"]["model"].as<std::string>();
           if (f["recognition"]["threshold"])
-            config.methods_config.face.recognition.threshold =
-                f["recognition"]["threshold"].as<float>();
+            config.methods.face.recognition.threshold = f["recognition"]["threshold"].as<float>();
         }
         if (f["anti_spoofing"]) {
           const auto& anti_spoofing = f["anti_spoofing"];
           if (anti_spoofing["enable"]) {
-            config.methods_config.face.antiSpoofing.enable =
-                anti_spoofing["enable"].as<bool>();
+            config.methods.face.anti_spoofing.enable = anti_spoofing["enable"].as<bool>();
           }
 
           if (anti_spoofing["model"]) {
             const auto& model = anti_spoofing["model"];
             if (model.IsMap()) {
               if (model["path"])
-                config.methods_config.face.antiSpoofing.model.path = model["path"].as<std::string>();
+                config.methods.face.anti_spoofing.model.path = model["path"].as<std::string>();
               if (model["threshold"])
-                config.methods_config.face.antiSpoofing.model.threshold =
-                    model["threshold"].as<float>();
+                config.methods.face.anti_spoofing.model.threshold = model["threshold"].as<float>();
             } else if (model.IsScalar()) {
               // Backward compatibility with old schema:
               // anti_spoofing.model: "<path>"
-              config.methods_config.face.antiSpoofing.model.path = model.as<std::string>();
+              config.methods.face.anti_spoofing.model.path = model.as<std::string>();
             }
           }
 
           // Backward compatibility with old schema:
           // anti_spoofing.threshold: <float>
           if (anti_spoofing["threshold"]) {
-            config.methods_config.face.antiSpoofing.model.threshold =
+            config.methods.face.anti_spoofing.model.threshold =
                 anti_spoofing["threshold"].as<float>();
           }
 
           if (anti_spoofing["ir_camera"] && !anti_spoofing["ir_camera"].IsNull()) {
-            config.methods_config.face.antiSpoofing.irCamera =
-                anti_spoofing["ir_camera"].as<std::string>();
+            config.methods.face.anti_spoofing.ir_camera = anti_spoofing["ir_camera"].as<std::string>();
           }
         }
 
         // Backward compatibility with old schema:
         // methods.face.ir_camera.enable + methods.face.ir_camera.device_id
-        if (f["ir_camera"] && config.methods_config.face.antiSpoofing.irCamera.empty()) {
+        const bool ir_camera_missing = !config.methods.face.anti_spoofing.ir_camera.has_value() ||
+                                       config.methods.face.anti_spoofing.ir_camera->empty();
+        if (f["ir_camera"] && ir_camera_missing) {
           bool ir_enable = false;
           int ir_device_id = 0;
           if (f["ir_camera"]["enable"])
@@ -140,37 +165,65 @@ BiopassConfig readConfig(const std::string& username) {
           if (f["ir_camera"]["device_id"])
             ir_device_id = f["ir_camera"]["device_id"].as<int>();
           if (ir_enable) {
-            config.methods_config.face.antiSpoofing.irCamera =
+            config.methods.face.anti_spoofing.ir_camera =
                 "/dev/video" + std::to_string(ir_device_id);
           }
         }
-
-        config.auth.antispoof = config.methods_config.face.antiSpoofing.enable ||
-                                 !config.methods_config.face.antiSpoofing.irCamera.empty();
       }
 
       // Fingerprint
       if (m["fingerprint"]) {
         const auto& fp = m["fingerprint"];
         if (fp["enable"])
-          config.methods_config.fingerprint.enable = fp["enable"].as<bool>();
+          config.methods.fingerprint.enable = fp["enable"].as<bool>();
         if (fp["retries"])
-          config.methods_config.fingerprint.retries = fp["retries"].as<int>();
+          config.methods.fingerprint.retries = fp["retries"].as<uint32_t>();
         if (fp["timeout"])
-          config.methods_config.fingerprint.timeout_ms = fp["timeout"].as<int>();
+          config.methods.fingerprint.timeout = fp["timeout"].as<uint32_t>();
         else if (fp["retry_delay"])
-          config.methods_config.fingerprint.timeout_ms = fp["retry_delay"].as<int>();
-      }
+          config.methods.fingerprint.timeout = fp["retry_delay"].as<uint32_t>();
 
-      // Filter method list to only enabled methods
-      std::vector<std::string> enabled;
-      for (const auto& name : config.methods) {
-        if (name == "face" && config.methods_config.face.enable)
-          enabled.push_back(name);
-        else if (name == "fingerprint" && config.methods_config.fingerprint.enable)
-          enabled.push_back(name);
+        if (fp["fingers"] && fp["fingers"].IsSequence()) {
+          config.methods.fingerprint.fingers.clear();
+          for (const auto& finger : fp["fingers"]) {
+            if (!finger.IsMap()) {
+              continue;
+            }
+            FingerConfig parsed_finger;
+            if (finger["name"] && finger["name"].IsScalar()) {
+              parsed_finger.name = finger["name"].as<std::string>();
+            }
+            if (finger["created_at"] && finger["created_at"].IsScalar()) {
+              parsed_finger.created_at = finger["created_at"].as<uint64_t>();
+            }
+            config.methods.fingerprint.fingers.push_back(parsed_finger);
+          }
+        }
       }
-      config.methods = enabled;
+    }
+
+    if (yaml["models"] && yaml["models"].IsSequence()) {
+      config.models.clear();
+      for (const auto& model : yaml["models"]) {
+        if (!model.IsMap()) {
+          continue;
+        }
+        ModelConfig parsed_model;
+        if (model["path"] && model["path"].IsScalar()) {
+          parsed_model.path = model["path"].as<std::string>();
+        }
+        if (model["type"] && model["type"].IsScalar()) {
+          parsed_model.model_type = model["type"].as<std::string>();
+        }
+        if (parsed_model.model_type == "voice") {
+          continue;
+        }
+        config.models.push_back(parsed_model);
+      }
+    }
+
+    if (yaml["appearance"] && yaml["appearance"].IsScalar()) {
+      config.appearance = yaml["appearance"].as<std::string>();
     }
   } catch (const YAML::BadFile& e) {
     spdlog::warn("Biopass: Config file not found at {}, using defaults", config_path);

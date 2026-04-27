@@ -299,7 +299,7 @@ AuthResult FingerprintAuth::authenticate(const std::string& username, const Auth
   ctx.loop = g_main_loop_new(nullptr, FALSE);
   ctx.debug = config.debug;
   ctx.cancel_signal = cancel_signal;
-  ctx.verify_timeout_ms = config_.timeout_ms;
+  ctx.verify_timeout_ms = config_.timeout;
 
   verify_status_subscription_id = g_dbus_connection_signal_subscribe(
       connection, FPRINT_SERVICE, FPRINT_DEVICE_INTERFACE, "VerifyStatus", dev_path_str.c_str(),
@@ -308,9 +308,9 @@ AuthResult FingerprintAuth::authenticate(const std::string& username, const Auth
   // Poll cancel token every 50ms (prevent hanging forever)
   cancel_poll_source_id = g_timeout_add(50, on_cancel_timeout, &ctx);
 
-  if (config_.timeout_ms > 0) {
-    verify_timeout_source_id = g_timeout_add(config_.timeout_ms, on_verify_timeout, &ctx);
-    spdlog::debug("Waiting for fingerprint (timeout {} ms)...", config_.timeout_ms);
+  if (config_.timeout > 0) {
+    verify_timeout_source_id = g_timeout_add(config_.timeout, on_verify_timeout, &ctx);
+    spdlog::debug("Waiting for fingerprint (timeout {} ms)...", config_.timeout);
   } else {
     spdlog::debug("Waiting for fingerprint...");
   }

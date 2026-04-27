@@ -5,7 +5,9 @@
 #include <sys/types.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <cerrno>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -17,9 +19,16 @@ namespace biopass {
 // Per-method config structs (mirrors Tauri config.rs)
 // ---------------------------------------------------------------------------
 
+struct StrategyConfig {
+  bool debug = false;
+  std::string execution_mode = "parallel";
+  std::vector<std::string> order = {"face", "fingerprint"};
+  std::vector<std::string> ignore_services = {"polkit-1", "pkexec"};
+};
+
 struct DetectionConfig {
   std::string model = "models/yolov8n-face.onnx";
-  float threshold = 0.5f;
+  float threshold = 0.8f;
 };
 
 struct RecognitionConfig {
@@ -27,34 +36,47 @@ struct RecognitionConfig {
   float threshold = 0.8f;
 };
 
+struct AntiSpoofingModelConfig {
+  std::string path = "models/mobilenetv3_antispoof.onnx";
+  float threshold = 0.8f;
+};
+
 struct AntiSpoofingConfig {
   bool enable = false;
-  struct ModelConfig {
-    std::string path = "models/mobilenetv3_antispoof.onnx";
-    float threshold = 0.8f;
-  } model;
-  // Linux device path, e.g. "/dev/video2". Empty means disabled.
-  std::string irCamera;
+  AntiSpoofingModelConfig model;
+  // Linux device path, e.g. "/dev/video2". nullopt means disabled.
+  std::optional<std::string> ir_camera = std::nullopt;
 };
 
 struct FaceMethodConfig {
   bool enable = true;
-  int retries = 5;
-  int retryDelayMs = 200;
+  uint32_t retries = 5;
+  uint32_t retry_delay = 200;
   DetectionConfig detection;
   RecognitionConfig recognition;
-  AntiSpoofingConfig antiSpoofing;
+  AntiSpoofingConfig anti_spoofing;
+};
+
+struct FingerConfig {
+  std::string name;
+  uint64_t created_at = 0;
 };
 
 struct FingerprintMethodConfig {
   bool enable = false;
-  int retries = 3;
-  int timeout_ms = 1000;
+  uint32_t retries = 1;
+  uint32_t timeout = 5000;
+  std::vector<FingerConfig> fingers;
 };
 
 struct MethodsConfig {
   FaceMethodConfig face;
   FingerprintMethodConfig fingerprint;
+};
+
+struct ModelConfig {
+  std::string path;
+  std::string model_type;
 };
 
 // ---------------------------------------------------------------------------
@@ -66,11 +88,10 @@ struct MethodsConfig {
  * Loaded from ~/.config/com.ticklab.biopass/config.yaml
  */
 struct BiopassConfig {
-  bool debug = false;
-  ExecutionMode mode = ExecutionMode::Parallel;
-  std::vector<std::string> methods = {"face"};
-  AuthConfig auth = {};
-  MethodsConfig methods_config = {};
+  StrategyConfig strategy = {};
+  MethodsConfig methods = {};
+  std::vector<ModelConfig> models = {};
+  std::string appearance = "system";
 };
 std::string getConfigPath(const std::string &username);
 BiopassConfig readConfig(const std::string &username);

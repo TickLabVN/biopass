@@ -9,6 +9,7 @@ export interface StrategyConfig {
   debug: boolean;
   execution_mode: "sequential" | "parallel";
   order: string[];
+  ignore_services: string[];
 }
 
 export interface MethodsConfig {

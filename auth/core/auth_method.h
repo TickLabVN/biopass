@@ -3,6 +3,7 @@
 #include <security/_pam_types.h>
 
 #include <atomic>
+#include <cstdint>
 #include <string>
 
 namespace biopass {
@@ -17,8 +18,8 @@ struct IAuthMethod {
   virtual ~IAuthMethod() = default;
   virtual std::string name() const = 0;
   virtual bool isAvailable() const = 0;
-  virtual int getRetries() const = 0;
-  virtual int getRetryDelayMs() const = 0;
+  virtual uint32_t getRetries() const = 0;
+  virtual uint32_t getRetryDelayMs() const = 0;
   virtual void beginAuthenticationSession() {}
   virtual void endAuthenticationSession() {}
   virtual AuthResult authenticate(const std::string& username, const AuthConfig& config,
@@ -26,9 +27,9 @@ struct IAuthMethod {
 };
 
 struct RetryStrategy {
-  RetryStrategy(int maxRetries) : maxRetries_(maxRetries) {}
+  RetryStrategy(uint32_t maxRetries) : maxRetries_(maxRetries) {}
 
-  bool shouldRetry(AuthResult result, int attempts) const {
+  bool shouldRetry(AuthResult result, uint32_t attempts) const {
     if (result != AuthResult::Retry) {
       return false;
     }
@@ -36,6 +37,6 @@ struct RetryStrategy {
   }
 
  private:
-  int maxRetries_;
+  uint32_t maxRetries_;
 };
 }  // namespace biopass

@@ -20,6 +20,8 @@ pub struct StrategyConfig {
     pub debug: bool,
     pub execution_mode: String,
     pub order: Vec<String>,
+    #[serde(default = "default_ignored_services")]
+    pub ignore_services: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -237,31 +239,8 @@ fn default_fingerprint_timeout() -> u32 {
     5000
 }
 
-const SUPPORTED_METHODS: [&str; 2] = ["face", "fingerprint"];
-
-fn normalize_method_order(order: Vec<String>) -> Vec<String> {
-    let mut normalized: Vec<String> = order
-        .into_iter()
-        .filter(|method| SUPPORTED_METHODS.contains(&method.as_str()))
-        .fold(Vec::new(), |mut acc, method| {
-            if !acc.contains(&method) {
-                acc.push(method);
-            }
-            acc
-        });
-
-    for method in SUPPORTED_METHODS {
-        if !normalized.iter().any(|current| current == method) {
-            normalized.push(method.to_string());
-        }
-    }
-
-    normalized
-}
-
-fn normalize_config(config: &mut BiopassConfig) {
-    config.strategy.order = normalize_method_order(std::mem::take(&mut config.strategy.order));
-    config.models.retain(|model| model.model_type != "voice");
+fn default_ignored_services() -> Vec<String> {
+    vec!["polkit-1".to_string(), "pkexec".to_string()]
 }
 
 fn get_default_config(app: &AppHandle) -> BiopassConfig {
@@ -276,6 +255,7 @@ fn get_default_config(app: &AppHandle) -> BiopassConfig {
             debug: false,
             execution_mode: "parallel".to_string(),
             order: vec!["face".to_string(), "fingerprint".to_string()],
+            ignore_services: default_ignored_services(),
         },
         methods: MethodsConfig {
             face: FaceMethodConfig {
@@ -329,25 +309,19 @@ pub fn load_config(app: AppHandle) -> Result<BiopassConfig, String> {
     let config_path = get_config_path(&app)?;
 
     if !config_path.exists() {
-        let mut default_config = get_default_config(&app);
-        normalize_config(&mut default_config);
-        return Ok(default_config);
+        return Ok(get_default_config(&app));
     }
 
     let content = fs::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config file: {}", e))?;
 
-    let mut parsed: BiopassConfig = serde_yaml::from_str(&content)
-        .map_err(|e| format!("Failed to parse config file: {}", e))?;
-    normalize_config(&mut parsed);
-    Ok(parsed)
+    serde_yaml::from_str(&content).map_err(|e| format!("Failed to parse config file: {}", e))
 }
 
 #[tauri::command]
-pub fn save_config(app: AppHandle, mut config: BiopassConfig) -> Result<(), String> {
+pub fn save_config(app: AppHandle, config: BiopassConfig) -> Result<(), String> {
     let config_dir = get_config_dir(&app)?;
     let config_path = get_config_path(&app)?;
-    normalize_config(&mut config);
 
     let yaml_content =
         serde_yaml::to_string(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;

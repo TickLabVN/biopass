@@ -5,6 +5,7 @@
 #include <pwd.h>
 
 #include <CLI/CLI.hpp>
+#include <algorithm>
 #include <memory>
 
 #include "auth_config.h"
@@ -47,7 +48,7 @@ int cropFace(const std::string& inputPath, const std::string& outputPath,
   return 0;
 }
 
-int authenticate(const std::string& username) {
+int authenticate(const std::string& username, const std::string& service) {
   const char* pUsername = username.c_str();
 
   // Load configuration from file
@@ -57,26 +58,40 @@ int authenticate(const std::string& username) {
   }
   biopass::BiopassConfig config = biopass::readConfig(pUsername);
 
-  if (config.debug) {
+  if (!service.empty() &&
+      std::find(config.strategy.ignore_services.begin(), config.strategy.ignore_services.end(),
+                service) != config.strategy.ignore_services.end()) {
+    return 2;  // PAM_IGNORE
+  }
+
+  if (config.strategy.debug) {
     spdlog::set_level(spdlog::level::debug);
   } else {
     spdlog::set_level(spdlog::level::off);
   }
 
+  biopass::AuthConfig runtime_config;
+  runtime_config.debug = config.strategy.debug;
+  runtime_config.antispoof =
+      config.methods.face.anti_spoofing.enable ||
+      (config.methods.face.anti_spoofing.ir_camera.has_value() &&
+       !config.methods.face.anti_spoofing.ir_camera->empty());
+
   // Create and configure AuthManager
   biopass::AuthManager manager;
-  manager.setMode(config.mode);
-  manager.setConfig(config.auth);
+  manager.setMode(config.strategy.execution_mode == "sequential"
+                      ? biopass::ExecutionMode::Sequential
+                      : biopass::ExecutionMode::Parallel);
+  manager.setConfig(runtime_config);
 
   // Add requested authentication methods
   int numOfMethods = 0;
-  for (const auto& method_name : config.methods) {
-    if (method_name == "face") {
-      manager.addMethod(std::make_unique<biopass::FaceAuth>(config.methods_config.face));
+  for (const auto& method_name : config.strategy.order) {
+    if (method_name == "face" && config.methods.face.enable) {
+      manager.addMethod(std::make_unique<biopass::FaceAuth>(config.methods.face));
       numOfMethods++;
-    } else if (method_name == "fingerprint") {
-      manager.addMethod(
-          std::make_unique<biopass::FingerprintAuth>(config.methods_config.fingerprint));
+    } else if (method_name == "fingerprint" && config.methods.fingerprint.enable) {
+      manager.addMethod(std::make_unique<biopass::FingerprintAuth>(config.methods.fingerprint));
       numOfMethods++;
     }
   }
@@ -123,8 +138,10 @@ int main(int argc, char** argv) {
   crop_cmd->add_option("--model,-m", modelPath, "Detection model path")->required();
 
   std::string username;
+  std::string pamService;
   auto auth_cmd = app.add_subcommand("auth", "Authenticate a user with Biopass");
   auth_cmd->add_option("--username,-u", username, "Username for authentication")->required();
+  auth_cmd->add_option("--service,-s", pamService, "PAM service name");
 
   std::string migrateUsername;
   auto migrate_cmd =
@@ -147,7 +164,7 @@ int main(int argc, char** argv) {
       spdlog::info("{}", app.help());
       return 2;  // PAM_IGNORE logic / error
     }
-    return authenticate(username);
+    return authenticate(username, pamService);
   }
 
   if (app.got_subcommand(migrate_cmd)) {

@@ -66,7 +66,7 @@ int AuthManager::runSequential(const std::string& username) {
     MethodSessionGuard session_guard(*method);
 
     RetryStrategy rs(method->getRetries());
-    int attempts = 0;
+    uint32_t attempts = 0;
     AuthResult result;
 
     do {
@@ -131,7 +131,7 @@ int AuthManager::runParallel(const std::string& username) {
           MethodSessionGuard session_guard(*method);
 
           RetryStrategy retry_strategy(method->getRetries());
-          int attempts = 0;
+          uint32_t attempts = 0;
           AuthResult result;
 
           do {

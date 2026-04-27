@@ -16,7 +16,9 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
 
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -31,15 +33,31 @@ import { useConfigurationStore } from "../-stores/configuration-store";
 const PAM_MANUAL_SETUP_GUIDE_URL =
   "https://github.com/TickLabVN/biopass/blob/main/docs/PAM.md";
 
+function parseIgnoredServicesInput(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((service) => service.trim())
+    .filter((service, index, services) => {
+      if (!service) return false;
+      return services.indexOf(service) === index;
+    });
+}
+
 export function StrategyConfig() {
   const strategy = useConfigurationStore((state) => state.config?.strategy);
   const setStrategy = useConfigurationStore((state) => state.setStrategy);
+  const [ignoredServicesInput, setIgnoredServicesInput] = useState("");
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
   );
+
+  useEffect(() => {
+    if (!strategy) return;
+    setIgnoredServicesInput(strategy.ignore_services.join(", "));
+  }, [strategy]);
 
   if (!strategy) return null;
   const strategyConfig = strategy;
@@ -169,6 +187,32 @@ export function StrategyConfig() {
             </DndContext>
           </div>
         )}
+
+        {/* Ignored PAM Services */}
+        <div className="grid gap-2.5">
+          <Label
+            htmlFor="ignored-services"
+            className="text-sm font-medium text-muted-foreground"
+          >
+            Ignored PAM Services (optional)
+          </Label>
+          <Input
+            id="ignored-services"
+            value={ignoredServicesInput}
+            onChange={(event) => {
+              const value = event.target.value;
+              setIgnoredServicesInput(value);
+              setStrategy({
+                ...strategyConfig,
+                ignore_services: parseIgnoredServicesInput(value),
+              });
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Comma-separated PAM service names to bypass Biopass. Example:{" "}
+            <code>polkit-1</code>, <code>pkexec</code> or <code>sudo</code>.
+          </p>
+        </div>
       </div>
     </div>
   );

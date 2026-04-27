@@ -1,0 +1,6 @@
+Name: Biopass - face and fingerprint authentication
+Default: no
+Priority: 260
+Auth-Type: Primary
+Auth:
+        [success=2 default=ignore]      libbiopass_pam.so

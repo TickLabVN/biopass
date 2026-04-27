@@ -47,7 +47,8 @@
           "/usr/lib/biopass/libbiopass_as.so": "../../auth/build/face/antispoofing/libbiopass_as.so",
           "/usr/lib/biopass/libonnxruntime.so.1": "../../auth/build/_deps/onnxruntime-src/lib/libonnxruntime.so.1.19.2",
           "/usr/lib/biopass/libopenpnp-capture.so.0": "../../auth/build/_deps/openpnp-capture-build/libopenpnp-capture.so.0.0.28",
-          "/etc/ld.so.conf.d/biopass.conf": "scripts/biopass-ldconf"
+          "/etc/ld.so.conf.d/biopass.conf": "scripts/biopass-ldconf",
+          "/usr/share/pam-configs/biopass": "assets/pam-configs/biopass"
         }
       },
       "rpm": {
@@ -63,7 +64,8 @@
           "/usr/lib/biopass/libbiopass_as.so": "../../auth/build/face/antispoofing/libbiopass_as.so",
           "/usr/lib/biopass/libonnxruntime.so.1": "../../auth/build/_deps/onnxruntime-src/lib/libonnxruntime.so.1.19.2",
           "/usr/lib/biopass/libopenpnp-capture.so.0": "../../auth/build/_deps/openpnp-capture-build/libopenpnp-capture.so.0.0.28",
-          "/etc/ld.so.conf.d/biopass.conf": "scripts/biopass-ldconf"
+          "/etc/ld.so.conf.d/biopass.conf": "scripts/biopass-ldconf",
+          "/usr/share/pam-configs/biopass": "assets/pam-configs/biopass"
         }
       }
     }

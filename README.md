@@ -57,6 +57,11 @@ Biopass was developed by [@phucvinh57](https://github.com/phucvinh57) and [@thai
 
 Feel free to request new features or report bugs by opening an issue. For contributing, please read [CONTRIBUTING.md](docs/contributing.md).
 
+## References
+Models used in this project:
+- Face Recognition: **[EdgeFace](https://github.com/otroshi/edgeface)**
+- Face Detection: **[YOLO-Face](https://github.com/akanametov/yolo-face)**
+
 ## Star History
 
 <picture>

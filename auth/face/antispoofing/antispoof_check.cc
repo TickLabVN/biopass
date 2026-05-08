@@ -103,7 +103,7 @@ bool checkAntiSpoof(const FaceMethodConfig& face_config, const std::string& user
         })));
   }
 
-  bool any_success = false;
+  bool all_passed = true;
   for (auto& task : tasks) {
     bool ok = false;
     try {
@@ -114,16 +114,16 @@ bool checkAntiSpoof(const FaceMethodConfig& face_config, const std::string& user
     }
     if (ok) {
       spdlog::debug("FaceAuth: {} anti-spoofing method passed", task.name);
-      any_success = true;
     } else {
       spdlog::debug("FaceAuth: {} anti-spoofing method failed", task.name);
+      all_passed = false;
     }
   }
 
-  if (!any_success) {
-    spdlog::error("FaceAuth: Anti-spoofing failed (all enabled methods failed)");
+  if (!all_passed) {
+    spdlog::error("FaceAuth: Anti-spoofing failed (one or more enabled methods failed)");
   }
-  return any_success;
+  return all_passed;
 }
 
 }  // namespace biopass

@@ -1,4 +1,5 @@
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/ansicolor_sink.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,6 +65,8 @@ int authenticate(const std::string& username, const std::string& service) {
     return 2;  // PAM_IGNORE
   }
 
+  auto stderr_sink = std::make_shared<spdlog::sinks::ansicolor_stderr_sink_mt>();
+  spdlog::set_default_logger(std::make_shared<spdlog::logger>("biopass", stderr_sink));
   if (config.strategy.debug) {
     spdlog::set_level(spdlog::level::debug);
   } else {

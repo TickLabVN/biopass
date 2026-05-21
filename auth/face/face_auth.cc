@@ -24,11 +24,11 @@ constexpr int kIrCapturePollIntervalMs = 10;
 
 }  // namespace
 
-bool FaceAuth::isAvailable() const { return checkCameraAvailability(std::nullopt); }
+bool FaceAuth::isAvailable() const { return checkCameraAvailability(face_config_.camera); }
 
 void FaceAuth::beginAuthenticationSession() {
   if (!camera_session_) {
-    camera_session_ = openCameraSession(std::nullopt);
+    camera_session_ = openCameraSession(face_config_.camera);
   }
 
   if (face_config_.anti_spoofing.ir_camera.has_value() &&
@@ -47,11 +47,11 @@ void FaceAuth::endAuthenticationSession() {
 AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig& config,
                                   std::atomic<bool>* cancel_signal) {
   if (!camera_session_) {
-    camera_session_ = openCameraSession(std::nullopt);
+    camera_session_ = openCameraSession(face_config_.camera);
   }
   if (!camera_session_ || !camera_session_->isOpen()) {
     spdlog::error("FaceAuth: Could not open camera");
-    if (!checkCameraAvailability(std::nullopt)) {
+    if (!checkCameraAvailability(face_config_.camera)) {
       return AuthResult::Unavailable;
     }
     return AuthResult::Retry;

@@ -1,42 +1,19 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { Camera, Circle, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cmd } from "@/commands";
 import { Button } from "@/components/ui/button";
-
-function stopMediaStream(stream: MediaStream | null) {
-  if (!stream) return;
-
-  for (const track of stream.getTracks()) {
-    track.stop();
-  }
-}
-
-async function openCamera(deviceId?: string) {
-  const video = deviceId
-    ? {
-        width: 640,
-        height: 480,
-        deviceId: { exact: deviceId },
-      }
-    : {
-        width: 640,
-        height: 480,
-      };
-
-  return navigator.mediaDevices.getUserMedia({ video });
-}
+import { useConfigurationStore } from "../../-stores/configuration-store";
 
 export function FaceCapture() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const previewRef = useRef<HTMLImageElement>(null);
   const [capturing, setCapturing] = useState(false);
   const [faceImages, setFaceImages] = useState<string[]>([]);
-  const [activeBrowserCameraLabel, setActiveBrowserCameraLabel] = useState<
-    string | null
-  >(null);
+  const camera = useConfigurationStore(
+    (state) => state.config?.methods.face.camera ?? null,
+  );
 
   const loadFaceImages = useCallback(async () => {
     try {
@@ -51,75 +28,87 @@ export function FaceCapture() {
     loadFaceImages();
   }, [loadFaceImages]);
 
+  // Subscribe to native preview frames whenever the session is active.
+  useEffect(() => {
+    if (!capturing) return;
+
+    let unlisten: UnlistenFn | undefined;
+    let cancelled = false;
+
+    listen<string>("face-preview-frame", (event) => {
+      if (previewRef.current) {
+        previewRef.current.src = `data:image/jpeg;base64,${event.payload}`;
+      }
+    }).then((u) => {
+      if (cancelled) {
+        u();
+      } else {
+        unlisten = u;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [capturing]);
+
+  // Make sure the helper process is torn down on unmount.
   useEffect(() => {
     return () => {
-      stopMediaStream(stream);
+      cmd.face.stopPreview().catch(() => {});
     };
-  }, [stream]);
+  }, []);
 
-  // Attach stream to video element when stream changes
+  // Restart session when camera selection changes while preview is running.
   useEffect(() => {
-    if (!videoRef.current) {
-      return;
-    }
-
-    if (!stream) {
-      videoRef.current.srcObject = null;
-      return;
-    }
-
-    videoRef.current.srcObject = stream;
-    videoRef.current.play().catch(console.error);
-  }, [stream]);
+    if (!capturing) return;
+    let alive = true;
+    (async () => {
+      try {
+        await cmd.face.stopPreview();
+        await cmd.face.startPreview(camera);
+      } catch (err) {
+        if (alive) {
+          toast.error(`Failed to switch camera: ${err}`);
+          setCapturing(false);
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [camera, capturing]);
 
   async function startCamera() {
-    let mediaStream: MediaStream | null = null;
-
     try {
-      mediaStream = await openCamera();
-
-      const activeTrackLabel = mediaStream.getVideoTracks()[0]?.label?.trim();
-
-      stopMediaStream(stream);
-      setStream(mediaStream);
-      setActiveBrowserCameraLabel(activeTrackLabel || null);
+      await cmd.face.startPreview(camera);
       setCapturing(true);
     } catch (err) {
-      stopMediaStream(mediaStream);
-      setActiveBrowserCameraLabel(null);
-      toast.error("Failed to access camera");
+      toast.error(`Failed to start camera: ${err}`);
       console.error(err);
     }
   }
 
-  function stopCamera() {
-    stopMediaStream(stream);
-    setStream(null);
-    setActiveBrowserCameraLabel(null);
+  async function stopCamera() {
+    try {
+      await cmd.face.stopPreview();
+    } catch (err) {
+      console.error("stopPreview failed:", err);
+    }
     setCapturing(false);
+    if (previewRef.current) {
+      previewRef.current.removeAttribute("src");
+    }
   }
 
   async function capturePhoto() {
-    if (!videoRef.current || !canvasRef.current) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-    const base64Data = dataUrl.split(",")[1];
-
     try {
-      await cmd.face.saveImage(base64Data);
+      await cmd.face.captureInSession();
       toast.success("Face image saved!");
       await loadFaceImages();
     } catch (err) {
-      toast.error(`Failed to save face image: ${err}`);
+      toast.error(`${err}`);
     }
   }
 
@@ -143,11 +132,9 @@ export function FaceCapture() {
       <div className="grid gap-4">
         {/* Camera Preview */}
         <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
+          <img
+            ref={previewRef}
+            alt="Camera preview"
             className={`w-full h-full object-cover ${capturing ? "" : "hidden"}`}
           />
           {!capturing && (
@@ -155,7 +142,6 @@ export function FaceCapture() {
               <Camera className="w-12 h-12 opacity-50" />
             </div>
           )}
-          <canvas ref={canvasRef} className="hidden" />
         </div>
 
         {/* Controls */}
@@ -181,9 +167,7 @@ export function FaceCapture() {
 
         {capturing && (
           <p className="text-[10px] text-muted-foreground">
-            {activeBrowserCameraLabel
-              ? `Browser preview camera: ${activeBrowserCameraLabel}`
-              : "Browser preview camera: active, but WebKit did not expose a device label."}
+            Native preview via openpnp-capture (works cross-distro).
           </p>
         )}
 

@@ -27,6 +27,7 @@ export interface FaceMethodConfig {
   enable: boolean;
   retries: number;
   retry_delay: number;
+  camera: string | null;
   detection: {
     model: string;
     threshold: number;

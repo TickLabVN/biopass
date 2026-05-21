@@ -33,6 +33,12 @@ export function FaceSetting() {
     fetchDevices();
   }, []);
 
+  const selectedCamera = useMemo(() => {
+    if (!config) return null;
+    if (!config.camera) return null;
+    return videoDevices.find((device) => device.path === config.camera) ?? null;
+  }, [config, videoDevices]);
+
   const selectedIrCamera = useMemo(() => {
     if (!config) return null;
     const irCameraPath = config.anti_spoofing.ir_camera;
@@ -52,6 +58,10 @@ export function FaceSetting() {
   const selectedAiModelExists = antiSpoofModels.some(
     (model) => model.path === config.anti_spoofing.model.path,
   );
+  const unavailableCameraDeviceOption = "__unavailable_camera_device__";
+  const cameraValue = config.camera
+    ? (selectedCamera?.path ?? unavailableCameraDeviceOption)
+    : disabledOption;
   const irCameraValue = config.anti_spoofing.ir_camera
     ? (selectedIrCamera?.path ?? unavailableIrDeviceOption)
     : disabledOption;
@@ -108,6 +118,52 @@ export function FaceSetting() {
             }
             className="h-10"
           />
+        </div>
+      </div>
+
+      <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
+        <div className="grid gap-2">
+          <Label
+            htmlFor="camera-device"
+            className="text-sm font-medium text-muted-foreground"
+          >
+            Camera Device
+          </Label>
+          <Select
+            value={cameraValue}
+            onValueChange={(value) => {
+              if (value === disabledOption) {
+                setFaceConfig({ ...config, camera: null });
+                return;
+              }
+              setFaceConfig({ ...config, camera: value });
+            }}
+          >
+            <SelectTrigger id="camera-device" className="h-10 w-full">
+              <SelectValue placeholder="Auto-select (first device)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={disabledOption}>
+                Auto-select (first device)
+              </SelectItem>
+              {cameraValue === unavailableCameraDeviceOption && (
+                <SelectItem value={unavailableCameraDeviceOption} disabled>
+                  Selected camera unavailable
+                </SelectItem>
+              )}
+              {videoDevices.length > 0 ? (
+                videoDevices.map((device) => (
+                  <SelectItem key={device.path} value={device.path}>
+                    {device.display_name}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="__no_devices__" disabled>
+                  No video devices found
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

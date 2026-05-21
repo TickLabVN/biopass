@@ -5,8 +5,8 @@
 #include <sys/types.h>
 
 #include <algorithm>
-#include <cstdint>
 #include <cerrno>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -52,6 +52,9 @@ struct FaceMethodConfig {
   bool enable = true;
   uint32_t retries = 5;
   uint32_t retry_delay = 200;
+  // Linux device path for the primary (visual) camera, e.g. "/dev/video0". nullopt means
+  // auto-select.
+  std::optional<std::string> camera = std::nullopt;
   DetectionConfig detection;
   RecognitionConfig recognition;
   AntiSpoofingConfig anti_spoofing;
@@ -93,13 +96,13 @@ struct BiopassConfig {
   std::vector<ModelConfig> models = {};
   std::string appearance = "system";
 };
-std::string getConfigPath(const std::string &username);
-BiopassConfig readConfig(const std::string &username);
-bool configExists(const std::string &username);
-bool migrateConfigSchema(const std::string &username, std::string *error = nullptr);
+std::string getConfigPath(const std::string& username);
+BiopassConfig readConfig(const std::string& username);
+bool configExists(const std::string& username);
+bool migrateConfigSchema(const std::string& username, std::string* error = nullptr);
 
-std::vector<std::string> listFaces(const std::string &username);
-std::string getDebugPath(const std::string &username);
-int setupConfig(const std::string &username);
+std::vector<std::string> listFaces(const std::string& username);
+std::string getDebugPath(const std::string& username);
+int setupConfig(const std::string& username);
 
 }  // namespace biopass

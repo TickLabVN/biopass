@@ -16,26 +16,46 @@
 
 namespace biopass {
 
-namespace {
+const IRCaptureParams& FaceAuth::irParams() const {
+  return face_config_.advanced.ir_capture;
+}
 
-constexpr int kIrCaptureWarmupFrames = 5;
-constexpr int kIrCaptureTimeoutMs = 3000;
-constexpr int kIrCapturePollIntervalMs = 10;
+bool FaceAuth::isAvailable() const {
+  return checkCameraAvailability(face_config_.camera_device);
+}
 
-}  // namespace
-
-bool FaceAuth::isAvailable() const { return checkCameraAvailability(std::nullopt); }
+uint32_t FaceAuth::getMaxAuthTimeMs() const {
+  if (face_config_.advanced.auth.max_time_ms > 0) {
+    return static_cast<uint32_t>(face_config_.advanced.auth.max_time_ms);
+  }
+  // Default: retries * retry_delay with some margin for capture time
+  return face_config_.retries * face_config_.retry_delay + 5000;
+}
 
 void FaceAuth::beginAuthenticationSession() {
   if (!camera_session_) {
-    camera_session_ = openCameraSession(std::nullopt);
+    camera_session_ = openCameraSession(face_config_.camera_device);
   }
 
   if (face_config_.anti_spoofing.ir_camera.has_value() &&
       !face_config_.anti_spoofing.ir_camera->empty() && !ir_camera_session_) {
-    ir_camera_session_ =
-        openCameraSession(*face_config_.anti_spoofing.ir_camera, CameraCaptureFormat::V4L2Grey,
-                          kIrCaptureWarmupFrames, kIrCaptureTimeoutMs, kIrCapturePollIntervalMs);
+    // If camera_device and ir_camera point to the same device, reuse the primary session
+    if (face_config_.camera_device.has_value() &&
+        *face_config_.camera_device == *face_config_.anti_spoofing.ir_camera) {
+      spdlog::debug("FaceAuth: IR camera same as primary device, reusing session");
+      ir_camera_session_ = nullptr;
+    } else {
+      const auto& ir = irParams();
+      ir_camera_session_ =
+          openCameraSession(*face_config_.anti_spoofing.ir_camera, CameraCaptureFormat::V4L2NV12,
+                            ir.warmup_frames, ir.capture_timeout_ms, ir.poll_interval_ms);
+      if (!ir_camera_session_) {
+        spdlog::warn("FaceAuth: NV12 IR capture unavailable; falling back to GREY");
+        ir_camera_session_ =
+            openCameraSession(*face_config_.anti_spoofing.ir_camera, CameraCaptureFormat::V4L2Grey,
+                              ir.warmup_frames, ir.capture_timeout_ms, ir.poll_interval_ms);
+      }
+    }
   }
 }
 
@@ -47,11 +67,11 @@ void FaceAuth::endAuthenticationSession() {
 AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig& config,
                                   std::atomic<bool>* cancel_signal) {
   if (!camera_session_) {
-    camera_session_ = openCameraSession(std::nullopt);
+    camera_session_ = openCameraSession(face_config_.camera_device);
   }
   if (!camera_session_ || !camera_session_->isOpen()) {
     spdlog::error("FaceAuth: Could not open camera");
-    if (!checkCameraAvailability(std::nullopt)) {
+    if (!checkCameraAvailability(face_config_.camera_device)) {
       return AuthResult::Unavailable;
     }
     return AuthResult::Retry;
@@ -113,15 +133,37 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
 
   ImageRGB face = detectedImages[0].image;
 
+  // Check if IR anti-spoofing is needed
   if (face_config_.anti_spoofing.ir_camera.has_value() &&
       !face_config_.anti_spoofing.ir_camera->empty() &&
       (!ir_camera_session_ || !ir_camera_session_->isOpen())) {
-    ir_camera_session_ =
-        openCameraSession(*face_config_.anti_spoofing.ir_camera, CameraCaptureFormat::V4L2Grey,
-                          kIrCaptureWarmupFrames, kIrCaptureTimeoutMs, kIrCapturePollIntervalMs);
+    // Reuse primary session if same device, otherwise open new session
+    if (face_config_.camera_device.has_value() &&
+        *face_config_.camera_device == *face_config_.anti_spoofing.ir_camera) {
+      spdlog::debug("FaceAuth: Reusing primary camera session for IR anti-spoofing");
+      ir_camera_session_ = nullptr;
+    } else {
+      const auto& ir = irParams();
+      ir_camera_session_ =
+          openCameraSession(*face_config_.anti_spoofing.ir_camera, CameraCaptureFormat::V4L2NV12,
+                            ir.warmup_frames, ir.capture_timeout_ms, ir.poll_interval_ms);
+      if (!ir_camera_session_) {
+        ir_camera_session_ =
+            openCameraSession(*face_config_.anti_spoofing.ir_camera, CameraCaptureFormat::V4L2Grey,
+                              ir.warmup_frames, ir.capture_timeout_ms, ir.poll_interval_ms);
+      }
+    }
   }
 
-  if (!checkAntiSpoof(face_config_, username, face, config, ir_camera_session_.get())) {
+  auto* ir_session = ir_camera_session_.get();
+  FaceMethodConfig as_config = face_config_;
+  if (!ir_session && face_config_.camera_device.has_value() &&
+      *face_config_.camera_device == *face_config_.anti_spoofing.ir_camera) {
+    spdlog::debug("FaceAuth: Same device for camera and IR, reusing session and disabling AI anti-spoofing");
+    ir_session = camera_session_.get();
+    as_config.anti_spoofing.enable = false;
+  }
+  if (!checkAntiSpoof(as_config, username, face, config, ir_session)) {
     spdlog::warn("FaceAuth: Anti-spoofing failed");
     if (ir_camera_session_ && !ir_camera_session_->isOpen()) {
       ir_camera_session_.reset();

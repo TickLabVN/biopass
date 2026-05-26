@@ -38,6 +38,68 @@ std::string user_data_dir(const std::string& username) {
   return "";
 }
 
+static void parseAdvancedConfig(const YAML::Node& adv, AdvancedConfig& out) {
+  if (!adv || !adv.IsMap()) return;
+
+  // Unsharp mask
+  if (adv["unsharp_mask"]) {
+    const auto& us = adv["unsharp_mask"];
+    if (us["enable"])           out.unsharp_mask.enable = us["enable"].as<bool>();
+    if (us["amount"])           out.unsharp_mask.amount = us["amount"].as<float>();
+  }
+
+  // IR capture
+  if (adv["ir_capture"]) {
+    const auto& ir = adv["ir_capture"];
+    if (ir["warmup_frames"])    out.ir_capture.warmup_frames = ir["warmup_frames"].as<int>();
+    if (ir["capture_timeout_ms"])  out.ir_capture.capture_timeout_ms = ir["capture_timeout_ms"].as<int>();
+    if (ir["poll_interval_ms"]) out.ir_capture.poll_interval_ms = ir["poll_interval_ms"].as<int>();
+    if (ir["max_attempts"])     out.ir_capture.max_attempts = ir["max_attempts"].as<int>();
+    if (ir["agc_sleep_ms"])     out.ir_capture.agc_sleep_ms = ir["agc_sleep_ms"].as<int>();
+    if (ir["camera_warmup_ms"]) out.ir_capture.camera_warmup_ms = ir["camera_warmup_ms"].as<int>();
+  }
+
+  // Capture
+  if (adv["capture"]) {
+    const auto& cap = adv["capture"];
+    if (cap["width"])           out.capture.width = cap["width"].as<int>();
+    if (cap["height"])          out.capture.height = cap["height"].as<int>();
+  }
+
+  // Detection
+  if (adv["detection"]) {
+    const auto& det = adv["detection"];
+    if (det["input_size"])      out.detection.input_size = det["input_size"].as<int>();
+    if (det["nms_iou_threshold"])  out.detection.nms_iou_threshold = det["nms_iou_threshold"].as<float>();
+  }
+
+  // Anti-spoofing
+  if (adv["anti_spoofing"]) {
+    const auto& as_ = adv["anti_spoofing"];
+    if (as_["spoof_class"])     out.anti_spoofing.spoof_class = as_["spoof_class"].as<int>();
+    if (as_["combinational_mode"])  out.anti_spoofing.combinational_mode = as_["combinational_mode"].as<std::string>();
+    if (as_["debug_save_path"]) out.anti_spoofing.debug_save_path = as_["debug_save_path"].as<std::string>();
+  }
+
+  // Enrollment
+  if (adv["enrollment"]) {
+    const auto& enr = adv["enrollment"];
+    if (enr["capture_count"])   out.enrollment.capture_count = enr["capture_count"].as<int>();
+  }
+
+  // Recognition
+  if (adv["recognition"]) {
+    const auto& rec = adv["recognition"];
+    if (rec["gallery_path"])    out.recognition.gallery_path = rec["gallery_path"].as<std::string>();
+  }
+
+  // Auth
+  if (adv["auth"]) {
+    const auto& a = adv["auth"];
+    if (a["max_time_ms"])       out.auth.max_time_ms = a["max_time_ms"].as<int>();
+  }
+}
+
 BiopassConfig readConfig(const std::string& username) {
   BiopassConfig config;
 
@@ -121,6 +183,10 @@ BiopassConfig readConfig(const std::string& username) {
           if (f["recognition"]["threshold"])
             config.methods.face.recognition.threshold = f["recognition"]["threshold"].as<float>();
         }
+        if (f["camera_device"] && !f["camera_device"].IsNull()) {
+          config.methods.face.camera_device = f["camera_device"].as<std::string>();
+        }
+
         if (f["anti_spoofing"]) {
           const auto& anti_spoofing = f["anti_spoofing"];
           if (anti_spoofing["enable"]) {
@@ -152,6 +218,8 @@ BiopassConfig readConfig(const std::string& username) {
             config.methods.face.anti_spoofing.ir_camera = anti_spoofing["ir_camera"].as<std::string>();
           }
         }
+
+        parseAdvancedConfig(f["advanced"], config.methods.face.advanced);
 
         // Backward compatibility with old schema:
         // methods.face.ir_camera.enable + methods.face.ir_camera.device_id

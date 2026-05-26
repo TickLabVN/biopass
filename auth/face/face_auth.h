@@ -5,6 +5,7 @@
 #include "auth_config.h"
 #include "auth_method.h"
 #include "camera_capture.h"
+#include "ir_camera_as.h"
 
 namespace biopass {
 
@@ -21,10 +22,13 @@ class FaceAuth : public IAuthMethod {
   bool isAvailable() const override;
   uint32_t getRetries() const override { return face_config_.retries; }
   uint32_t getRetryDelayMs() const override { return face_config_.retry_delay; }
+  uint32_t getMaxAuthTimeMs() const override;
   void beginAuthenticationSession() override;
   void endAuthenticationSession() override;
   AuthResult authenticate(const std::string &username, const AuthConfig &config,
                           std::atomic<bool> *cancel_signal = nullptr) override;
+
+  const IRCaptureParams& irParams() const;
 
  private:
   FaceMethodConfig face_config_;

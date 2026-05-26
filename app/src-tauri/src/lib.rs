@@ -1,4 +1,4 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+pub mod camera;
 pub mod config;
 pub mod face;
 pub mod fingerprint;
@@ -6,6 +6,7 @@ pub mod fingerprint_ffi;
 pub mod paths;
 pub mod system;
 
+use camera::CameraState;
 use config::{load_config, save_config};
 use face::{capture_face, delete_face, list_faces};
 use fingerprint::{
@@ -21,20 +22,47 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
+        .manage(CameraState {
+            preview: std::sync::Mutex::new(None),
+        })
         .setup(|app| {
             #[cfg(target_os = "linux")]
             {
-                use webkit2gtk::{PermissionRequestExt, WebViewExt};
+                use webkit2gtk::{PermissionRequestExt, SettingsExt, WebViewExt};
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.with_webview(|webview| {
-                        webview.inner().connect_permission_request(
+                        let inner = webview.inner();
+                        inner.connect_permission_request(
                             |_view, request: &webkit2gtk::PermissionRequest| {
                                 request.allow();
                                 true
                             },
                         );
+
+                        if let Some(settings) = inner.settings() {
+                            settings.set_enable_media_stream(true);
+                            settings.set_enable_webrtc(true);
+                            settings.set_enable_media(true);
+                        }
                     });
                 }
+            }
+
+            // Stop camera preview explicitly when window closes,
+            // ensuring background thread is joined before managed state drops.
+            if let Some(window) = app.get_webview_window("main") {
+                let app_handle = app.handle().clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Destroyed = event {
+                        if let Some(state) = app_handle.try_state::<CameraState>() {
+                            if let Ok(mut preview) = state.preview.lock() {
+                                if let Some(mut p) = preview.take() {
+                                    p.stop();
+                                }
+                            }
+                        }
+                    }
+                });
             }
 
             Ok(())
@@ -53,7 +81,11 @@ pub fn run() {
             remove_fingerprint,
             fingerprint_is_available,
             list_enrolled_fingerprints,
-            list_fingerprint_devices
+            list_fingerprint_devices,
+            camera::start_camera_preview,
+            camera::get_preview_frame,
+            camera::stop_camera_preview,
+            camera::capture_camera_frame,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

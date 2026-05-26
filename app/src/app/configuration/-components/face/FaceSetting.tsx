@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { VideoDeviceInfo } from "@/types/config";
+import type { AdvancedConfig, FaceMethodConfig, VideoDeviceInfo } from "@/types/config";
 import { useConfigurationStore } from "../../-stores/configuration-store";
 import { ModelSelect } from "../methods/shared/ModelSelect";
 import { Threshold } from "../methods/shared/Threshold";
@@ -33,6 +33,13 @@ export function FaceSetting() {
     fetchDevices();
   }, []);
 
+  const selectedCameraDevice = useMemo(() => {
+    if (!config) return null;
+    const cameraDevice = config.camera_device;
+    if (!cameraDevice) return null;
+    return videoDevices.find((device) => device.path === cameraDevice) ?? null;
+  }, [config, videoDevices]);
+
   const selectedIrCamera = useMemo(() => {
     if (!config) return null;
     const irCameraPath = config.anti_spoofing.ir_camera;
@@ -45,6 +52,12 @@ export function FaceSetting() {
   );
 
   if (!config) return null;
+
+  const faceConfig: FaceMethodConfig = config;
+
+  function setAdvancedField<K extends keyof AdvancedConfig>(key: K, value: AdvancedConfig[K]) {
+    setFaceConfig({ ...faceConfig, advanced: { ...faceConfig.advanced, [key]: value } } as FaceMethodConfig);
+  }
 
   const disabledOption = "__disabled__";
   const unavailableAiModelOption = "__unavailable_ai_model__";
@@ -111,7 +124,43 @@ export function FaceSetting() {
         </div>
       </div>
 
-      <FaceCapture />
+      <div className="grid gap-2">
+        <Label htmlFor="camera-device" className="text-xs text-muted-foreground">
+          Camera Device
+        </Label>
+        <Select
+          value={config.camera_device ?? "__default__"}
+          onValueChange={(value) => {
+            setFaceConfig({
+              ...config,
+              camera_device: value === "__default__" ? null : value,
+            });
+          }}
+        >
+          <SelectTrigger id="camera-device" className="h-10 w-full">
+            <SelectValue placeholder="Select Camera Device" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__default__">Default (auto)</SelectItem>
+            {videoDevices.map((device) => (
+              <SelectItem key={device.path} value={device.path}>
+                {device.display_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <FaceCapture
+        selectedDevicePath={selectedCameraDevice?.path}
+        previewFps={config.advanced.capture.preview_fps}
+        onPreviewFpsChange={(fps) =>
+          setAdvancedField("capture", {
+            ...config.advanced.capture,
+            preview_fps: fps,
+          })
+        }
+      />
 
       <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
         <h4 className="font-medium mb-3 text-sm">Detection</h4>
@@ -293,6 +342,7 @@ export function FaceSetting() {
           </Select>
         </div>
       </div>
+
     </div>
   );
 }

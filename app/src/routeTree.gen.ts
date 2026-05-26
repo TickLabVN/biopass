@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './app/__root'
 import { Route as ModelsRouteImport } from './app/models'
+import { Route as AdvancedRouteImport } from './app/advanced'
 import { Route as PageRouteImport } from './app/page'
 import { Route as ConfigurationPageRouteImport } from './app/configuration/page'
 
 const ModelsRoute = ModelsRouteImport.update({
   id: '/models',
   path: '/models',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdvancedRoute = AdvancedRouteImport.update({
+  id: '/advanced',
+  path: '/advanced',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PageRoute = PageRouteImport.update({
@@ -31,30 +37,34 @@ const ConfigurationPageRoute = ConfigurationPageRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof PageRoute
+  '/advanced': typeof AdvancedRoute
   '/models': typeof ModelsRoute
   '/configuration/': typeof ConfigurationPageRoute
 }
 export interface FileRoutesByTo {
   '/': typeof PageRoute
+  '/advanced': typeof AdvancedRoute
   '/models': typeof ModelsRoute
   '/configuration': typeof ConfigurationPageRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof PageRoute
+  '/advanced': typeof AdvancedRoute
   '/models': typeof ModelsRoute
   '/configuration/': typeof ConfigurationPageRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/models' | '/configuration/'
+  fullPaths: '/' | '/advanced' | '/models' | '/configuration/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/models' | '/configuration'
-  id: '__root__' | '/' | '/models' | '/configuration/'
+  to: '/' | '/advanced' | '/models' | '/configuration'
+  id: '__root__' | '/' | '/advanced' | '/models' | '/configuration/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   PageRoute: typeof PageRoute
+  AdvancedRoute: typeof AdvancedRoute
   ModelsRoute: typeof ModelsRoute
   ConfigurationPageRoute: typeof ConfigurationPageRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/models'
       fullPath: '/models'
       preLoaderRoute: typeof ModelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/advanced': {
+      id: '/advanced'
+      path: '/advanced'
+      fullPath: '/advanced'
+      preLoaderRoute: typeof AdvancedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   PageRoute: PageRoute,
+  AdvancedRoute: AdvancedRoute,
   ModelsRoute: ModelsRoute,
   ConfigurationPageRoute: ConfigurationPageRoute,
 }

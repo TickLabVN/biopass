@@ -132,6 +132,58 @@ inline ImageRGB imageResizePad(const ImageRGB &src, int tw, int th) {
 }
 
 /**
+ * Unsharp mask sharpening.  Applies a 3-tap separable blur (kernel [1,2,1])
+ * then computes: result = input + amount * (input - blurred).
+ * Clamped to [0,255].  amount ≈ 3.0 matches x4 PIL sharpness.
+ */
+inline ImageRGB sharpenImage(const ImageRGB &src, float amount = 3.0f) {
+  if (src.empty()) return {};
+  int h = src.height, w = src.width;
+  ImageRGB tmp(w, h);
+  // Horizontal pass: blur rows
+  for (int y = 0; y < h; y++) {
+    for (int x = 1; x < w - 1; x++) {
+      for (int c = 0; c < 3; c++) {
+        int v = (int)src.at(y, x - 1, c) + 2 * (int)src.at(y, x, c) + (int)src.at(y, x + 1, c);
+        tmp.at(y, x, c) = (uint8_t)((v + 2) >> 2);  // round division by 4
+      }
+    }
+    // Left/right edges: copy from src (unblurred)
+    for (int c = 0; c < 3; c++) {
+      tmp.at(y, 0, c) = src.at(y, 0, c);
+      tmp.at(y, w - 1, c) = src.at(y, w - 1, c);
+    }
+  }
+  ImageRGB blurred(w, h);
+  // Vertical pass: blur columns
+  for (int x = 0; x < w; x++) {
+    for (int y = 1; y < h - 1; y++) {
+      for (int c = 0; c < 3; c++) {
+        int v = (int)tmp.at(y - 1, x, c) + 2 * (int)tmp.at(y, x, c) + (int)tmp.at(y + 1, x, c);
+        blurred.at(y, x, c) = (uint8_t)((v + 2) >> 2);
+      }
+    }
+    for (int c = 0; c < 3; c++) {
+      blurred.at(0, x, c) = tmp.at(0, x, c);
+      blurred.at(h - 1, x, c) = tmp.at(h - 1, x, c);
+    }
+  }
+  // Unsharp mask: out = src + amount * (src - blurred)
+  ImageRGB out(w, h);
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) {
+      for (int c = 0; c < 3; c++) {
+        int s = (int)src.at(y, x, c);
+        int b = (int)blurred.at(y, x, c);
+        int v = (int)(s + amount * (s - b) + 0.5f);
+        out.at(y, x, c) = (uint8_t)(v < 0 ? 0 : v > 255 ? 255 : v);
+      }
+    }
+  }
+  return out;
+}
+
+/**
  * HWC RGB uint8 -> CHW float, normalized to [0,1].
  */
 inline std::vector<float> imageToChw(const ImageRGB &img) {

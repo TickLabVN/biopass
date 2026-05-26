@@ -30,6 +30,115 @@ pub struct MethodsConfig {
     pub fingerprint: FingerprintMethodConfig,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct UnsharpMaskConfig {
+    pub enable: bool,
+    pub amount: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct IRCaptureConfig {
+    pub warmup_frames: i32,
+    pub capture_timeout_ms: i32,
+    pub poll_interval_ms: i32,
+    pub max_attempts: i32,
+    pub agc_sleep_ms: i32,
+    pub camera_warmup_ms: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct CaptureAdvancedConfig {
+    pub width: i32,
+    pub height: i32,
+    pub preview_fps: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct DetectionAdvancedConfig {
+    pub input_size: i32,
+    pub nms_iou_threshold: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct AntiSpoofingAdvancedConfig {
+    pub spoof_class: i32,
+    pub combinational_mode: String,
+    pub debug_save_path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct EnrollmentAdvancedConfig {
+    pub capture_count: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct RecognitionAdvancedConfig {
+    pub gallery_path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct AuthAdvancedConfig {
+    pub max_time_ms: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct AdvancedConfig {
+    pub unsharp_mask: UnsharpMaskConfig,
+    pub ir_capture: IRCaptureConfig,
+    pub capture: CaptureAdvancedConfig,
+    pub detection: DetectionAdvancedConfig,
+    pub anti_spoofing: AntiSpoofingAdvancedConfig,
+    pub enrollment: EnrollmentAdvancedConfig,
+    pub recognition: RecognitionAdvancedConfig,
+    pub auth: AuthAdvancedConfig,
+}
+
+impl Default for UnsharpMaskConfig {
+    fn default() -> Self { Self { enable: true, amount: 5.0 } }
+}
+impl Default for IRCaptureConfig {
+    fn default() -> Self { Self { warmup_frames: 3, capture_timeout_ms: 5000, poll_interval_ms: 33, max_attempts: 2, agc_sleep_ms: 500, camera_warmup_ms: 0 } }
+}
+impl Default for CaptureAdvancedConfig {
+    fn default() -> Self { Self { width: 640, height: 480, preview_fps: 3 } }
+}
+impl Default for DetectionAdvancedConfig {
+    fn default() -> Self { Self { input_size: 640, nms_iou_threshold: 0.50 } }
+}
+impl Default for AntiSpoofingAdvancedConfig {
+    fn default() -> Self { Self { spoof_class: 1, combinational_mode: "all".to_string(), debug_save_path: "".to_string() } }
+}
+impl Default for EnrollmentAdvancedConfig {
+    fn default() -> Self { Self { capture_count: 1 } }
+}
+impl Default for RecognitionAdvancedConfig {
+    fn default() -> Self { Self { gallery_path: "".to_string() } }
+}
+impl Default for AuthAdvancedConfig {
+    fn default() -> Self { Self { max_time_ms: 0 } }
+}
+impl Default for AdvancedConfig {
+    fn default() -> Self { Self {
+        unsharp_mask: Default::default(),
+        ir_capture: Default::default(),
+        capture: Default::default(),
+        detection: Default::default(),
+        anti_spoofing: Default::default(),
+        enrollment: Default::default(),
+        recognition: Default::default(),
+        auth: Default::default(),
+    }}
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct FaceMethodConfig {
     pub enable: bool,
@@ -38,6 +147,10 @@ pub struct FaceMethodConfig {
     pub detection: DetectionConfig,
     pub recognition: RecognitionConfig,
     pub anti_spoofing: AntiSpoofingConfig,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub camera_device: Option<String>,
+    #[serde(default)]
+    pub advanced: AdvancedConfig,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -75,7 +188,11 @@ struct FaceMethodConfigRaw {
     #[serde(default)]
     pub anti_spoofing: AntiSpoofingConfigRaw,
     #[serde(default)]
+    pub camera_device: Option<String>,
+    #[serde(default)]
     pub ir_camera: Option<LegacyIRCameraConfig>,
+    #[serde(default)]
+    pub advanced: AdvancedConfig,
 }
 
 impl<'de> Deserialize<'de> for FaceMethodConfig {
@@ -102,6 +219,8 @@ impl<'de> Deserialize<'de> for FaceMethodConfig {
             detection: raw.detection,
             recognition: raw.recognition,
             anti_spoofing,
+            camera_device: raw.camera_device,
+            advanced: raw.advanced,
         })
     }
 }
@@ -278,6 +397,8 @@ fn get_default_config(app: &AppHandle) -> BiopassConfig {
                     },
                     ir_camera: None,
                 },
+                camera_device: None,
+                advanced: AdvancedConfig::default(),
             },
             fingerprint: FingerprintMethodConfig {
                 enable: false,

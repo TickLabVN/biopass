@@ -11,6 +11,7 @@ namespace biopass {
 enum class CameraCaptureFormat {
   Default,
   V4L2Grey,
+  V4L2NV12,
 };
 
 class ICameraCaptureSession {

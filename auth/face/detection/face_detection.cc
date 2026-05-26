@@ -1,8 +1,13 @@
 #include "face_detection.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "utils.h"
+
+static float sigmoid(float x) {
+  return 1.0f / (1.0f + std::exp(-x));
+}
 
 FaceDetection::FaceDetection(const std::string &ckpt, int imgsz,
                              const std::vector<std::string> &classes, const float conf,
@@ -59,28 +64,83 @@ std::vector<Detection> FaceDetection::inference(const ImageRGB &image) {
       this->session->Run(Ort::RunOptions{nullptr}, this->input_names_cstr.data(), &input_tensor, 1,
                          this->output_names_cstr.data(), this->output_names_cstr.size());
 
-  auto &out = output_tensors[0];
-  auto shape = out.GetTensorTypeAndShapeInfo().GetShape();
-  int pred_dim = static_cast<int>(shape[1]);
-  int num_preds = static_cast<int>(shape[2]);
-  const float *output_data = out.GetTensorData<float>();
+  // Decode all YOLOv8 output heads
+  const int strides[3] = {8, 16, 32};
+  std::vector<RawDet> candidates;
+  for (size_t ti = 0; ti < output_tensors.size() && ti < 3; ++ti) {
+    auto &t = output_tensors[ti];
+    auto ts = t.GetTensorTypeAndShapeInfo().GetShape();
+    if (ts.size() < 3) continue;
+    int pred_dim = static_cast<int>(ts[1]);
+    int H = static_cast<int>(ts[2]);
+    int W = static_cast<int>(ts.size() > 3 ? ts[3] : 1);
+    int num = H * W;
+    const float *tdata = t.GetTensorData<float>();
+    int stride = strides[ti];
 
-  // NMS
-  auto raw_dets = non_max_suppression(output_data, num_preds, pred_dim, this->conf, this->iou);
-  scale_boxes({input_image.height, input_image.width}, raw_dets, {image.height, image.width});
+    if (pred_dim < 65 || H == 0 || W == 0) continue;
+
+    // ONNX tensor is NCHW layout: tdata[ch * H * W + h * W + w]
+    // We access by iterating spatial positions (h, w)
+    for (int row = 0; row < H; ++row) {
+      for (int col = 0; col < W; ++col) {
+        int sp = row * W + col;  // spatial offset within a channel
+
+        // YOLOv8-pose: class score at channel 64
+        float score = sigmoid(tdata[64 * num + sp]);
+        if (score < this->conf) continue;
+
+        // DFL decode: softmax over 16 bins per coordinate
+        auto dfl = [&](int ch_base) -> float {
+          float mx = tdata[ch_base * num + sp];
+          for (int j = 1; j < 16; ++j) {
+            float v = tdata[(ch_base + j) * num + sp];
+            if (v > mx) mx = v;
+          }
+          float sum = 0.0f, result = 0.0f;
+          for (int j = 0; j < 16; ++j) {
+            float e = std::exp(tdata[(ch_base + j) * num + sp] - mx);
+            sum += e;
+            result += j * e;
+          }
+          return result / sum;
+        };
+
+        float lt = dfl(0);   // left distance from cell center
+        float tp = dfl(16);  // top distance from cell center
+        float rb = dfl(32);  // right distance from cell center
+        float bt = dfl(48);  // bottom distance from cell center
+
+        // Cell center at (col+0.5, row+0.5) in grid units
+        float cx_cell = (col + 0.5f) * stride;
+        float cy_cell = (row + 0.5f) * stride;
+
+        RawDet d;
+        d.x1 = cx_cell - lt * stride;
+        d.y1 = cy_cell - tp * stride;
+        d.x2 = cx_cell + rb * stride;
+        d.y2 = cy_cell + bt * stride;
+        d.conf = score;
+        d.cls = 0;
+        candidates.push_back(d);
+      }
+    }
+  }
+
+  // NMS on decoded boxes
+  auto keep_indices = nms_boxes(candidates, iou);
+  scale_boxes({input_image.height, input_image.width}, candidates, {image.height, image.width});
 
   // Get detection results
   std::vector<Detection> results;
-  for (auto &d : raw_dets) {
+  for (int idx : keep_indices) {
+    auto &d = candidates[idx];
     int x1 = std::max(0, (int)d.x1);
     int y1 = std::max(0, (int)d.y1);
     int x2 = std::min(image.width, (int)d.x2);
     int y2 = std::min(image.height, (int)d.y2);
 
-    // Ensure the box has positive area after clipping
-    if (x2 - x1 <= 0 || y2 - y1 <= 0) {
-      continue;
-    }
+    if (x2 - x1 <= 0 || y2 - y1 <= 0) continue;
 
     Box xyxy_box(x1, y1, x2, y2);
     ImageRGB crop_face = image.crop(x1, y1, x2, y2);

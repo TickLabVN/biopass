@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Cpu, Laptop, Moon, Settings, Sun, User } from "lucide-react";
+import { Cpu, Laptop, Moon, Settings, Sun, User, Wrench } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
 import logo from "@/assets/logo.png";
@@ -137,6 +137,17 @@ function App() {
                 >
                   <Cpu className="w-4 h-4" />
                   <span className="text-sm font-medium">AI Models</span>
+                </Link>
+                <Link
+                  to="/advanced"
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+                    pathname === "/advanced"
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  <Wrench className="w-4 h-4" />
+                  <span className="text-sm font-medium">Advanced</span>
                 </Link>
               </div>
             </div>

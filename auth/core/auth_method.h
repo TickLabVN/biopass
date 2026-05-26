@@ -20,6 +20,7 @@ struct IAuthMethod {
   virtual bool isAvailable() const = 0;
   virtual uint32_t getRetries() const = 0;
   virtual uint32_t getRetryDelayMs() const = 0;
+  virtual uint32_t getMaxAuthTimeMs() const { return 0; }
   virtual void beginAuthenticationSession() {}
   virtual void endAuthenticationSession() {}
   virtual AuthResult authenticate(const std::string& username, const AuthConfig& config,

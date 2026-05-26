@@ -177,6 +177,215 @@ class OpenPnpCameraSession : public ICameraCaptureSession {
   std::vector<uint8_t> buffer_;
 };
 
+class V4L2NV12CameraSession : public ICameraCaptureSession {
+ public:
+  V4L2NV12CameraSession(std::string device_path, const CapFormatInfo& format, int warmup_frames,
+                        int capture_timeout_ms, int poll_interval_ms)
+      : device_path_(std::move(device_path)),
+        warmup_frames_(std::max(0, warmup_frames)),
+        capture_timeout_ms_(capture_timeout_ms),
+        poll_interval_ms_(std::max(1, poll_interval_ms)) {
+    fd_ = ::open(device_path_.c_str(), O_RDWR | O_NONBLOCK);
+    if (fd_ == -1) {
+      spdlog::error("FaceAuth: Failed to open {} for V4L2 NV12 capture: {}", device_path_,
+                    std::strerror(errno));
+      return;
+    }
+
+    v4l2_format v4l2_format_info {};
+    v4l2_format_info.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    v4l2_format_info.fmt.pix.width = format.width;
+    v4l2_format_info.fmt.pix.height = format.height;
+    v4l2_format_info.fmt.pix.pixelformat = V4L2_PIX_FMT_NV12;
+    v4l2_format_info.fmt.pix.field = V4L2_FIELD_NONE;
+    if (xioctl_retry(fd_, VIDIOC_S_FMT, &v4l2_format_info) == -1) {
+      spdlog::error("FaceAuth: VIDIOC_S_FMT (NV12) failed for {}: {}", device_path_, std::strerror(errno));
+      close();
+      return;
+    }
+
+    if (format.fps > 0) {
+      v4l2_streamparm stream_params {};
+      stream_params.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+      stream_params.parm.capture.timeperframe.numerator = 1;
+      stream_params.parm.capture.timeperframe.denominator = format.fps;
+      xioctl_retry(fd_, VIDIOC_S_PARM, &stream_params);
+    }
+
+    width_ = v4l2_format_info.fmt.pix.width;
+    height_ = v4l2_format_info.fmt.pix.height;
+
+    v4l2_requestbuffers request_buffers {};
+    request_buffers.count = 4;
+    request_buffers.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    request_buffers.memory = V4L2_MEMORY_MMAP;
+    if (xioctl_retry(fd_, VIDIOC_REQBUFS, &request_buffers) == -1 || request_buffers.count == 0) {
+      spdlog::error("FaceAuth: VIDIOC_REQBUFS (NV12) failed for {}: {}", device_path_, std::strerror(errno));
+      close();
+      return;
+    }
+
+    buffers_.resize(request_buffers.count);
+    for (uint32_t index = 0; index < request_buffers.count; ++index) {
+      v4l2_buffer buffer {};
+      buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+      buffer.memory = V4L2_MEMORY_MMAP;
+      buffer.index = index;
+      if (xioctl_retry(fd_, VIDIOC_QUERYBUF, &buffer) == -1) {
+        spdlog::error("FaceAuth: VIDIOC_QUERYBUF (NV12) failed for {}: {}", device_path_, std::strerror(errno));
+        close();
+        return;
+      }
+
+      buffers_[index].length = buffer.length;
+      buffers_[index].start = ::mmap(nullptr, buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED,
+                                     fd_, buffer.m.offset);
+      if (buffers_[index].start == MAP_FAILED) {
+        spdlog::error("FaceAuth: mmap (NV12) failed for {}: {}", device_path_, std::strerror(errno));
+        close();
+        return;
+      }
+    }
+
+    for (uint32_t index = 0; index < buffers_.size(); ++index) {
+      v4l2_buffer buffer {};
+      buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+      buffer.memory = V4L2_MEMORY_MMAP;
+      buffer.index = index;
+      if (xioctl_retry(fd_, VIDIOC_QBUF, &buffer) == -1) {
+        spdlog::error("FaceAuth: VIDIOC_QBUF (NV12) failed for {}: {}", device_path_, std::strerror(errno));
+        close();
+        return;
+      }
+    }
+
+    if (xioctl_retry(fd_, VIDIOC_STREAMON, &buffer_type_) == -1) {
+      spdlog::error("FaceAuth: VIDIOC_STREAMON (NV12) failed for {}: {}", device_path_, std::strerror(errno));
+      close();
+      return;
+    }
+
+    stream_started_ = true;
+  }
+
+  ~V4L2NV12CameraSession() override { close(); }
+
+  bool isOpen() const override { return fd_ >= 0 && stream_started_; }
+
+  ImageRGB capture() override {
+    if (!isOpen()) return {};
+
+    const int total_frames_needed = warmup_frames_ + 1;
+    int captured_frames = 0;
+    const bool has_timeout = capture_timeout_ms_ > 0;
+    const auto capture_deadline = std::chrono::steady_clock::now() +
+                                  std::chrono::milliseconds(std::max(0, capture_timeout_ms_));
+
+    while (captured_frames < total_frames_needed) {
+      pollfd poll_info {};
+      poll_info.fd = fd_;
+      poll_info.events = POLLIN;
+
+      int poll_timeout_ms = -1;
+      if (has_timeout) {
+        const auto now = std::chrono::steady_clock::now();
+        if (now >= capture_deadline) {
+          spdlog::error("FaceAuth: Timed out waiting for NV12 frame from {}", device_path_);
+          close();
+          return {};
+        }
+        const auto remaining_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(capture_deadline - now).count();
+        poll_timeout_ms = std::max(1, std::min(poll_interval_ms_, static_cast<int>(remaining_ms)));
+      }
+
+      const int poll_rc = ::poll(&poll_info, 1, poll_timeout_ms);
+      if (poll_rc == -1) {
+        if (errno == EINTR) continue;
+        spdlog::error("FaceAuth: poll failed for {}: {}", device_path_, std::strerror(errno));
+        close();
+        return {};
+      }
+      if (poll_rc == 0) continue;
+
+      v4l2_buffer buffer {};
+      buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+      buffer.memory = V4L2_MEMORY_MMAP;
+      if (xioctl_retry(fd_, VIDIOC_DQBUF, &buffer) == -1) {
+        if (errno == EAGAIN) continue;
+        spdlog::error("FaceAuth: VIDIOC_DQBUF (NV12) failed for {}: {}", device_path_, std::strerror(errno));
+        close();
+        return {};
+      }
+
+      const uint8_t* frame_data = static_cast<const uint8_t*>(buffers_.at(buffer.index).start);
+      ++captured_frames;
+
+      ImageRGB image;
+      if (captured_frames >= total_frames_needed) {
+        // Extract Y (luma) plane from NV12 frame as greyscale
+        image = ImageRGB(static_cast<int>(width_), static_cast<int>(height_));
+        for (uint32_t y = 0; y < height_; ++y) {
+          const uint8_t* src_row = frame_data + y * width_;
+          uint8_t* dst_row = image.ptr() + y * width_ * 3;
+          for (uint32_t x = 0; x < width_; ++x) {
+            const uint8_t value = src_row[x];
+            dst_row[x * 3 + 0] = value;
+            dst_row[x * 3 + 1] = value;
+            dst_row[x * 3 + 2] = value;
+          }
+        }
+      }
+
+      if (xioctl_retry(fd_, VIDIOC_QBUF, &buffer) == -1) {
+        spdlog::error("FaceAuth: VIDIOC_QBUF (NV12) failed for {}: {}", device_path_, std::strerror(errno));
+        close();
+        return {};
+      }
+
+      if (!image.empty()) return image;
+    }
+
+    return {};
+  }
+
+ private:
+  struct MappedBuffer {
+    void* start = MAP_FAILED;
+    size_t length = 0;
+  };
+
+  void close() {
+    if (fd_ >= 0 && stream_started_) {
+      xioctl_retry(fd_, VIDIOC_STREAMOFF, &buffer_type_);
+      stream_started_ = false;
+    }
+    for (auto& buffer : buffers_) {
+      if (buffer.start != MAP_FAILED) {
+        ::munmap(buffer.start, buffer.length);
+        buffer.start = MAP_FAILED;
+        buffer.length = 0;
+      }
+    }
+    buffers_.clear();
+    if (fd_ >= 0) {
+      ::close(fd_);
+      fd_ = -1;
+    }
+  }
+
+  std::string device_path_;
+  int fd_ = -1;
+  uint32_t width_ = 0;
+  uint32_t height_ = 0;
+  int warmup_frames_ = 0;
+  int capture_timeout_ms_ = 0;
+  int poll_interval_ms_ = 0;
+  std::vector<MappedBuffer> buffers_;
+  v4l2_buf_type buffer_type_ = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  bool stream_started_ = false;
+};
+
 class V4L2GreyCameraSession : public ICameraCaptureSession {
  public:
   V4L2GreyCameraSession(std::string device_path, const CapFormatInfo& format, int warmup_frames,
@@ -498,6 +707,28 @@ std::unique_ptr<ICameraCaptureSession> openCameraSession(
     return nullptr;
   }
 
+  if (format == CameraCaptureFormat::V4L2NV12) {
+    if (!linux_video_device_path.has_value()) {
+      spdlog::error("FaceAuth: Direct V4L2 NV12 capture requires a /dev/video* path");
+      Cap_releaseContext(ctx);
+      return nullptr;
+    }
+
+    const auto nv12_format = find_camera_format_by_fourcc(ctx, *device_index, V4L2_PIX_FMT_NV12);
+    if (!nv12_format.has_value()) {
+      spdlog::error("FaceAuth: Camera '{}' does not expose NV12 format", *linux_video_device_path);
+      Cap_releaseContext(ctx);
+      return nullptr;
+    }
+
+    Cap_releaseContext(ctx);
+    auto session = std::make_unique<V4L2NV12CameraSession>(*linux_video_device_path, *nv12_format,
+                                                           warmup_frames, capture_timeout_ms,
+                                                           poll_interval_ms);
+    if (!session->isOpen()) return nullptr;
+    return session;
+  }
+
   if (format == CameraCaptureFormat::V4L2Grey) {
     if (!linux_video_device_path.has_value()) {
       spdlog::error("FaceAuth: Direct V4L2 GREY capture requires a /dev/video* path");
@@ -593,8 +824,15 @@ ImageRGB captureImageByIRCamera(const std::string& device_path, int warmup_frame
     return {};
   }
 
-  auto session = openCameraSession(device_path, CameraCaptureFormat::V4L2Grey, warmup_frames,
+  // Try NV12 first (preferred), fall back to GREY
+  auto session = openCameraSession(device_path, CameraCaptureFormat::V4L2NV12, warmup_frames,
                                    capture_timeout_ms, poll_interval_ms);
+  if (!session) {
+    spdlog::warn("FaceAuth: NV12 capture unavailable for '{}'; falling back to GREY", device_path);
+    session = openCameraSession(device_path, CameraCaptureFormat::V4L2Grey, warmup_frames,
+                                capture_timeout_ms, poll_interval_ms);
+  }
+
   if (!session) {
     return {};
   }

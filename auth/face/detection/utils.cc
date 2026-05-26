@@ -4,7 +4,7 @@
 #include <cmath>
 #include <numeric>
 
-static std::vector<int> nms(const std::vector<RawDet>& dets, float iou_threshold) {
+std::vector<int> nms_boxes(const std::vector<RawDet>& dets, float iou_threshold) {
   if (dets.empty())
     return {};
 
@@ -83,7 +83,7 @@ std::vector<RawDet> non_max_suppression(const float* output, int num_preds, int 
     candidates.push_back(d);
   }
 
-  auto keep_indices = nms(candidates, iou_thres);
+  auto keep_indices = nms_boxes(candidates, iou_thres);
   std::vector<RawDet> result;
   for (int i = 0; i < std::min(static_cast<int>(keep_indices.size()), max_det); i++) {
     result.push_back(candidates[keep_indices[i]]);

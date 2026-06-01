@@ -151,6 +151,11 @@ BiopassConfig readConfig(const std::string& username) {
           if (anti_spoofing["ir_camera"] && !anti_spoofing["ir_camera"].IsNull()) {
             config.methods.face.anti_spoofing.ir_camera = anti_spoofing["ir_camera"].as<std::string>();
           }
+
+          if (anti_spoofing["ir_warmup_delay_ms"]) {
+            config.methods.face.anti_spoofing.ir_warmup_delay_ms =
+                anti_spoofing["ir_warmup_delay_ms"].as<int>();
+          }
         }
 
         // Backward compatibility with old schema:

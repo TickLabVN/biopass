@@ -73,7 +73,11 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
   std::unique_ptr<FaceRecognition> faceReg;
   std::unique_ptr<FaceDetection> detector;
   try {
-    detector = std::make_unique<FaceDetection>(detectModelPath);
+    detector = std::make_unique<FaceDetection>(
+        detectModelPath, 640, std::vector<std::string>{"face"},
+        face_config_.detection.threshold);
+    spdlog::debug("FaceAuth: Detection model loaded | threshold={:.3f}",
+                  face_config_.detection.threshold);
   } catch (const std::exception& e) {
     std::string msg = e.what();
     size_t first_line = msg.find('\n');
@@ -84,7 +88,10 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
   }
 
   try {
-    faceReg = std::make_unique<FaceRecognition>(recogModelPath);
+    faceReg = std::make_unique<FaceRecognition>(
+        recogModelPath, 112, face_config_.recognition.threshold);
+    spdlog::debug("FaceAuth: Recognition model loaded | threshold={:.3f}",
+                  face_config_.recognition.threshold);
   } catch (const std::exception& e) {
     std::string msg = e.what();
     size_t first_line = msg.find('\n');
@@ -122,21 +129,29 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
   }
 
   if (!checkAntiSpoof(face_config_, username, face, config, ir_camera_session_.get())) {
-    spdlog::warn("FaceAuth: Anti-spoofing failed");
-    if (ir_camera_session_ && !ir_camera_session_->isOpen()) {
-      ir_camera_session_.reset();
-    }
-    return AuthResult::Retry;
+    spdlog::warn("FaceAuth: Anti-spoofing failed — returning Failure (no retry allowed)");
+    // Always tear down the IR session so a subsequent call cannot reuse a
+    // partially-warmed camera to bypass the check.
+    ir_camera_session_.reset();
+    return AuthResult::Failure;
   }
 
   // Match against all enrolled faces — succeed if any match.
+  spdlog::debug("FaceAuth: Recognition | threshold={:.3f} enrolled_count={}",
+                face_config_.recognition.threshold, enrolledFaces.size());
   for (const auto& facePath : enrolledFaces) {
     ImageRGB preparedFace = readImage(facePath);
-    if (preparedFace.empty())
+    if (preparedFace.empty()) {
+      spdlog::warn("FaceAuth: Recognition | could not load enrolled image: {}", facePath);
       continue;
+    }
 
     MatchResult match = faceReg->match(preparedFace, face);
+    spdlog::debug("FaceAuth: Recognition | face='{}' score={:.4f} threshold={:.3f} similar={}",
+                  facePath, match.dist, face_config_.recognition.threshold, match.similar);
     if (match.similar) {
+      spdlog::debug("FaceAuth: Recognition PASSED | matched face='{}' score={:.4f}",
+                    facePath, match.dist);
       return AuthResult::Success;
     }
   }

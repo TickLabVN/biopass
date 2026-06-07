@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useFormContext, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { cmd } from "@/commands";
 import { Button } from "@/components/ui/button";
@@ -12,15 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useConfigurationStore } from "../-stores/configuration-store";
+import type { BiopassConfig } from "@/types/config";
 
 export function FingerprintSetting() {
-  const config = useConfigurationStore(
-    (state) => state.config?.methods.fingerprint,
-  );
-  const setFingerprintConfig = useConfigurationStore(
-    (state) => state.setFingerprintConfig,
-  );
+  const { getValues, setValue } = useFormContext<BiopassConfig>();
+  const config = useWatch<BiopassConfig, "methods.fingerprint">({
+    name: "methods.fingerprint",
+  });
   const [selectedFinger, setSelectedFinger] = useState<string>("");
   const [isAdding, setIsAdding] = useState(false);
   const [username, setUsername] = useState<string>("");
@@ -39,9 +38,7 @@ export function FingerprintSetting() {
         const enrolledFingers = await cmd.fingerprint.listEnrolled(user);
         if (canceled) return;
 
-        const currentConfig =
-          useConfigurationStore.getState().config?.methods.fingerprint;
-        if (!currentConfig) return;
+        const currentConfig = getValues("methods.fingerprint");
 
         // Update local config if there's a mismatch (best effort)
         const currentFingerNames = currentConfig.fingers.map((f) => f.name);
@@ -56,7 +53,10 @@ export function FingerprintSetting() {
               existing || { name, created_at: Math.floor(Date.now() / 1000) }
             );
           });
-          setFingerprintConfig({ ...currentConfig, fingers: syncedFingers });
+          setValue("methods.fingerprint.fingers", syncedFingers, {
+            shouldDirty: true,
+            shouldValidate: true,
+          });
         }
       } catch (err) {
         console.error("Failed to sync fingerprints:", err);
@@ -68,7 +68,7 @@ export function FingerprintSetting() {
     return () => {
       canceled = true;
     };
-  }, [setFingerprintConfig]);
+  }, [getValues, setValue]);
 
   const fingerOptions = [
     "left-thumb",
@@ -84,9 +84,7 @@ export function FingerprintSetting() {
   ];
 
   const handleAdd = async () => {
-    const currentConfig =
-      useConfigurationStore.getState().config?.methods.fingerprint;
-    if (!currentConfig) return;
+    const currentConfig = getValues("methods.fingerprint");
 
     setIsAdding(true);
     const toastId = toast.loading(
@@ -118,13 +116,17 @@ export function FingerprintSetting() {
       });
 
       // The backend saves to config, but we update UI immediately
-      setFingerprintConfig({
-        ...currentConfig,
-        fingers: [
+      setValue(
+        "methods.fingerprint.fingers",
+        [
           ...currentConfig.fingers,
           { name: selectedFinger, created_at: Math.floor(Date.now() / 1000) },
         ],
-      });
+        {
+          shouldDirty: true,
+          shouldValidate: true,
+        },
+      );
       setSelectedFinger("");
     } catch (err) {
       toast.error(`Enrollment failed: ${err}`, { id: toastId });
@@ -135,9 +137,7 @@ export function FingerprintSetting() {
   };
 
   const handleDelete = async (fingerName: string) => {
-    const currentConfig =
-      useConfigurationStore.getState().config?.methods.fingerprint;
-    if (!currentConfig) return;
+    const currentConfig = getValues("methods.fingerprint");
 
     try {
       await cmd.fingerprint.remove(username, fingerName);
@@ -146,16 +146,18 @@ export function FingerprintSetting() {
         formattedName.charAt(0).toUpperCase() + formattedName.slice(1);
       toast.success(`${capitalizedName} deleted`);
 
-      setFingerprintConfig({
-        ...currentConfig,
-        fingers: currentConfig.fingers.filter((f) => f.name !== fingerName),
-      });
+      setValue(
+        "methods.fingerprint.fingers",
+        currentConfig.fingers.filter((f) => f.name !== fingerName),
+        {
+          shouldDirty: true,
+          shouldValidate: true,
+        },
+      );
     } catch (err) {
       toast.error(`Delete failed: ${err}`);
     }
   };
-
-  if (!config) return null;
 
   return (
     <div className="grid gap-4">
@@ -223,6 +225,7 @@ export function FingerprintSetting() {
           </div>
 
           <Button
+            type="button"
             onClick={handleAdd}
             disabled={isAdding || !selectedFinger}
             className="w-full h-9 mt-1"

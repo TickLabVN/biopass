@@ -38,8 +38,37 @@ export default defineConfig(async () => ({
             if (id.includes("@dnd-kit")) {
               return "vendor-dnd";
             }
-            // Put all other node_modules (including React) into a single vendor chunk
-            // to avoid circular dependency cycles between libraries.
+            if (
+              id.includes("/react/") ||
+              id.includes("/react-dom/") ||
+              id.includes("/scheduler/")
+            ) {
+              return "vendor-react";
+            }
+            if (id.includes("@tanstack")) {
+              return "vendor-router";
+            }
+            if (id.includes("lucide-react")) {
+              return "vendor-icons";
+            }
+            if (
+              id.includes("@radix-ui") ||
+              id.includes("class-variance-authority") ||
+              id.includes("clsx") ||
+              id.includes("tailwind-merge") ||
+              id.includes("next-themes") ||
+              id.includes("sonner")
+            ) {
+              return "vendor-ui";
+            }
+            if (
+              id.includes("react-hook-form") ||
+              id.includes("@hookform") ||
+              id.includes("zod")
+            ) {
+              return "vendor-forms";
+            }
+            // Keep any remaining third-party dependencies in a fallback vendor chunk.
             return "vendor";
           }
           // Group configuration UI components for better organization

@@ -147,17 +147,17 @@ export function FaceCapture() {
         {/* Controls */}
         <div className="flex gap-2">
           {!capturing ? (
-            <Button onClick={startCamera} className="flex-1">
+            <Button type="button" onClick={startCamera} className="flex-1">
               <Camera className="w-4 h-4 mr-2" />
               Start Camera
             </Button>
           ) : (
             <>
-              <Button onClick={capturePhoto} className="flex-1">
+              <Button type="button" onClick={capturePhoto} className="flex-1">
                 <Circle className="w-4 h-4 mr-2" />
                 Capture
               </Button>
-              <Button variant="outline" onClick={stopCamera}>
+              <Button type="button" variant="outline" onClick={stopCamera}>
                 <Square className="w-4 h-4 mr-2" />
                 Stop
               </Button>

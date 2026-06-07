@@ -17,6 +17,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useFormContext, useWatch } from "react-hook-form";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { useConfigurationStore } from "../-stores/configuration-store";
+import type { BiopassConfig } from "@/types/config";
 
 const PAM_MANUAL_SETUP_GUIDE_URL =
   "https://github.com/TickLabVN/biopass/blob/main/docs/PAM.md";
@@ -43,9 +44,17 @@ function parseIgnoredServicesInput(raw: string): string[] {
     });
 }
 
+function areServicesEqual(left: string[], right: string[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((service, index) => service === right[index])
+  );
+}
+
 export function StrategyConfig() {
-  const strategy = useConfigurationStore((state) => state.config?.strategy);
-  const setStrategy = useConfigurationStore((state) => state.setStrategy);
+  const { setValue } = useFormContext<BiopassConfig>();
+  const strategy = useWatch<BiopassConfig, "strategy">({ name: "strategy" });
+  const ignoreServices = strategy.ignore_services;
   const [ignoredServicesInput, setIgnoredServicesInput] = useState("");
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -55,11 +64,10 @@ export function StrategyConfig() {
   );
 
   useEffect(() => {
-    if (!strategy) return;
-    setIgnoredServicesInput(strategy.ignore_services.join(", "));
-  }, [strategy]);
+    if (!ignoreServices) return;
+    setIgnoredServicesInput(ignoreServices.join(", "));
+  }, [ignoreServices]);
 
-  if (!strategy) return null;
   const strategyConfig = strategy;
 
   function handleDragEnd(event: DragEndEvent) {
@@ -69,7 +77,10 @@ export function StrategyConfig() {
       const oldIndex = strategyConfig.order.indexOf(active.id as string);
       const newIndex = strategyConfig.order.indexOf(over.id as string);
       const newOrder = arrayMove(strategyConfig.order, oldIndex, newIndex);
-      setStrategy({ ...strategyConfig, order: newOrder });
+      setValue("strategy.order", newOrder, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
     }
   }
 
@@ -118,7 +129,10 @@ export function StrategyConfig() {
             id="debug-enabled"
             checked={strategyConfig.debug}
             onCheckedChange={(checked) =>
-              setStrategy({ ...strategyConfig, debug: checked })
+              setValue("strategy.debug", checked, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
             }
           />
         </div>
@@ -131,10 +145,14 @@ export function StrategyConfig() {
           <Select
             value={strategyConfig.execution_mode}
             onValueChange={(value) =>
-              setStrategy({
-                ...strategyConfig,
-                execution_mode: value as "sequential" | "parallel",
-              })
+              setValue(
+                "strategy.execution_mode",
+                value as "sequential" | "parallel",
+                {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                },
+              )
             }
           >
             <SelectTrigger className="w-full h-10 transition-all">
@@ -201,10 +219,18 @@ export function StrategyConfig() {
             value={ignoredServicesInput}
             onChange={(event) => {
               const value = event.target.value;
+              const ignoreServices = parseIgnoredServicesInput(value);
+
               setIgnoredServicesInput(value);
-              setStrategy({
-                ...strategyConfig,
-                ignore_services: parseIgnoredServicesInput(value),
+              if (
+                areServicesEqual(ignoreServices, strategyConfig.ignore_services)
+              ) {
+                return;
+              }
+
+              setValue("strategy.ignore_services", ignoreServices, {
+                shouldDirty: true,
+                shouldValidate: true,
               });
             }}
           />

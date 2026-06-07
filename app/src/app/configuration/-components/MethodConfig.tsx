@@ -1,26 +1,26 @@
 import { Fingerprint, ScanFace, ShieldCheck } from "lucide-react";
 import { useState } from "react";
+import { Controller, useFormContext, useWatch } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useConfigurationStore } from "../-stores/configuration-store";
+import type { BiopassConfig } from "@/types/config";
 import { FingerprintSetting } from "./FingerprintSetting";
 import { FaceSetting } from "./face/FaceSetting";
 import { MethodCard } from "./MethodCard";
 
-export function MethodConfig() {
-  const faceConfig = useConfigurationStore(
-    (state) => state.config?.methods.face,
-  );
-  const fingerprintConfig = useConfigurationStore(
-    (state) => state.config?.methods.fingerprint,
-  );
-  const setFaceConfig = useConfigurationStore((state) => state.setFaceConfig);
-  const setFingerprintConfig = useConfigurationStore(
-    (state) => state.setFingerprintConfig,
-  );
-  const [expandedMethod, setExpandedMethod] = useState<string | null>("face");
+function parseNumberInput(value: string): number {
+  return value === "" ? Number.NaN : Number(value);
+}
 
-  if (!faceConfig || !fingerprintConfig) return null;
+export function MethodConfig() {
+  const { control, setValue } = useFormContext<BiopassConfig>();
+  const faceConfig = useWatch<BiopassConfig, "methods.face">({
+    name: "methods.face",
+  });
+  const fingerprintConfig = useWatch<BiopassConfig, "methods.fingerprint">({
+    name: "methods.fingerprint",
+  });
+  const [expandedMethod, setExpandedMethod] = useState<string | null>("face");
 
   const methodIcons: Record<string, React.ReactNode> = {
     face: <ScanFace className="w-5 h-5 text-white" />,
@@ -48,7 +48,12 @@ export function MethodConfig() {
           icon={methodIcons.face}
           color={methodColors.face}
           enabled={faceConfig.enable}
-          onToggle={(enable) => setFaceConfig({ ...faceConfig, enable })}
+          onToggle={(enable) =>
+            setValue("methods.face.enable", enable, {
+              shouldDirty: true,
+              shouldValidate: true,
+            })
+          }
           expanded={expandedMethod === "face"}
           onExpand={() =>
             setExpandedMethod(expandedMethod === "face" ? null : "face")
@@ -64,7 +69,10 @@ export function MethodConfig() {
           color={methodColors.fingerprint}
           enabled={fingerprintConfig.enable}
           onToggle={(enable) =>
-            setFingerprintConfig({ ...fingerprintConfig, enable })
+            setValue("methods.fingerprint.enable", enable, {
+              shouldDirty: true,
+              shouldValidate: true,
+            })
           }
           expanded={expandedMethod === "fingerprint"}
           onExpand={() =>
@@ -83,19 +91,30 @@ export function MethodConfig() {
                 >
                   Max Retries
                 </Label>
-                <Input
-                  id="fingerprint-max-retries"
-                  type="number"
-                  min="0"
-                  max="10"
-                  value={fingerprintConfig.retries}
-                  onChange={(e) =>
-                    setFingerprintConfig({
-                      ...fingerprintConfig,
-                      retries: parseInt(e.target.value, 10) || 0,
-                    })
-                  }
-                  className="h-10"
+                <Controller
+                  control={control}
+                  name="methods.fingerprint.retries"
+                  render={({ field, fieldState }) => (
+                    <>
+                      <Input
+                        id="fingerprint-max-retries"
+                        type="number"
+                        min="0"
+                        max="10"
+                        value={Number.isNaN(field.value) ? "" : field.value}
+                        onChange={(e) =>
+                          field.onChange(parseNumberInput(e.target.value))
+                        }
+                        aria-invalid={fieldState.invalid}
+                        className="h-10"
+                      />
+                      {fieldState.error && (
+                        <p className="text-xs text-destructive">
+                          {fieldState.error.message}
+                        </p>
+                      )}
+                    </>
+                  )}
                 />
               </div>
               <div className="grid gap-2">
@@ -105,24 +124,34 @@ export function MethodConfig() {
                 >
                   Timeout (ms)
                 </Label>
-                <Input
-                  id="fingerprint-timeout"
-                  type="number"
-                  min="0"
-                  max="5000"
-                  step="100"
-                  value={fingerprintConfig.timeout}
-                  onChange={(e) =>
-                    setFingerprintConfig({
-                      ...fingerprintConfig,
-                      timeout: parseInt(e.target.value, 10) || 0,
-                    })
-                  }
-                  className="h-10"
+                <Controller
+                  control={control}
+                  name="methods.fingerprint.timeout"
+                  render={({ field, fieldState }) => (
+                    <>
+                      <Input
+                        id="fingerprint-timeout"
+                        type="number"
+                        min="0"
+                        max="5000"
+                        step="100"
+                        value={Number.isNaN(field.value) ? "" : field.value}
+                        onChange={(e) =>
+                          field.onChange(parseNumberInput(e.target.value))
+                        }
+                        aria-invalid={fieldState.invalid}
+                        className="h-10"
+                      />
+                      {fieldState.error && (
+                        <p className="text-xs text-destructive">
+                          {fieldState.error.message}
+                        </p>
+                      )}
+                    </>
+                  )}
                 />
               </div>
             </div>
-
             <div className="overflow-hidden">
               <FingerprintSetting />
             </div>

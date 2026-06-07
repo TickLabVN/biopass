@@ -1,5 +1,6 @@
 #include <spdlog/spdlog.h>
-#include <spdlog/sinks/ansicolor_sink.h>
+#include <spdlog/sinks/daily_file_sink.h>
+#include <spdlog/sinks/null_sink.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,6 +8,8 @@
 
 #include <CLI/CLI.hpp>
 #include <algorithm>
+#include <cctype>
+#include <filesystem>
 #include <memory>
 
 #include "auth_config.h"
@@ -16,6 +19,49 @@
 #include "image_utils.h"
 
 #include "detection/face_detection.h"
+
+namespace {
+
+std::string sanitizeLogShard(const std::string& username) {
+  if (username.empty()) {
+    return "system";
+  }
+
+  std::string shard;
+  shard.reserve(username.size());
+  for (unsigned char c : username) {
+    if (std::isalnum(c) || c == '.' || c == '_' || c == '-') {
+      shard.push_back(static_cast<char>(c));
+    } else {
+      shard.push_back('_');
+    }
+  }
+  return shard;
+}
+
+std::string getBiopassLogPath(const std::string& username) {
+  return "/var/log/biopass/" + sanitizeLogShard(username);
+}
+
+void initBiopassLogger(const std::string& username, spdlog::level::level_enum level) {
+  const std::string log_path = getBiopassLogPath(username);
+
+  try {
+    std::filesystem::create_directories(log_path);
+
+    auto logger = spdlog::daily_logger_mt("biopass", log_path + "/biopass.log", 0, 0, false, 30);
+    logger->set_level(level);
+    logger->flush_on(spdlog::level::err);
+    spdlog::set_default_logger(logger);
+  } catch (const std::exception&) {
+    auto null_sink = std::make_shared<spdlog::sinks::null_sink_mt>();
+    auto logger = std::make_shared<spdlog::logger>("biopass", null_sink);
+    logger->set_level(spdlog::level::off);
+    spdlog::set_default_logger(logger);
+  }
+}
+
+}  // namespace
 
 int cropFace(const std::string& inputPath, const std::string& outputPath,
                      const std::string& modelPath) {
@@ -52,6 +98,8 @@ int cropFace(const std::string& inputPath, const std::string& outputPath,
 int authenticate(const std::string& username, const std::string& service) {
   const char* pUsername = username.c_str();
 
+  initBiopassLogger(username, spdlog::level::off);
+
   // Load configuration from file
   if (!biopass::configExists(pUsername)) {
     // User has not configured biopass — skip this module transparently
@@ -65,8 +113,6 @@ int authenticate(const std::string& username, const std::string& service) {
     return 2;  // PAM_IGNORE
   }
 
-  auto stderr_sink = std::make_shared<spdlog::sinks::ansicolor_stderr_sink_mt>();
-  spdlog::set_default_logger(std::make_shared<spdlog::logger>("biopass", stderr_sink));
   if (config.strategy.debug) {
     spdlog::set_level(spdlog::level::debug);
   } else {
@@ -115,6 +161,8 @@ int authenticate(const std::string& username, const std::string& service) {
 }
 
 int migrateConfig(const std::string& username) {
+  initBiopassLogger(username, spdlog::level::info);
+
   if (getpwnam(username.c_str()) == nullptr) {
     spdlog::error("User '{}' not found", username);
     return 1;
@@ -159,6 +207,7 @@ int main(int argc, char** argv) {
   }
 
   if (app.got_subcommand(crop_cmd)) {
+    initBiopassLogger("", spdlog::level::info);
     return cropFace(inputPath, outputPath, modelPath);
   }
 

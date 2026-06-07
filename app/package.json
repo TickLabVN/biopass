@@ -41,7 +41,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.6",
+    "@biomejs/biome": "^2.4.16",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/router-plugin": "^1.167.18",

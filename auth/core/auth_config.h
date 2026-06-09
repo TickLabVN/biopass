@@ -46,6 +46,13 @@ struct AntiSpoofingConfig {
   AntiSpoofingModelConfig model;
   // Linux device path, e.g. "/dev/video2". nullopt means disabled.
   std::optional<std::string> ir_camera = std::nullopt;
+  // Extra delay (ms) inserted after the warmup-frame discard and before the
+  // actual IR capture. Gives IR LEDs and auto-exposure time to stabilise.
+  // Configurable via anti_spoofing.ir_warmup_delay_ms in config.yaml.
+  // NOTE: The IR check verifies that a face-shaped bounding box exists in the
+  // IR frame (presence check). It is NOT a full liveness detector. A printed
+  // photo that the YOLO model can detect in IR will still pass.
+  int ir_warmup_delay_ms = 300;
 };
 
 struct FaceMethodConfig {

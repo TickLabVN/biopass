@@ -92,14 +92,16 @@ bool checkAntiSpoof(const FaceMethodConfig& face_config, const std::string& user
     const auto detection_threshold = face_config.detection.threshold;
     const auto username_copy = username;
     const auto debug_enabled = config.debug;
+    const auto warmup_delay_ms = face_config.anti_spoofing.ir_warmup_delay_ms;
     auto* ir_camera_session_ptr = ir_camera_session;
     tasks.push_back(make_task(
         "IR", std::async(std::launch::async,
                          [ir_camera_path, detection_model, detection_threshold, username_copy,
-                          debug_enabled, ir_camera_session_ptr]() {
+                          debug_enabled, warmup_delay_ms, ir_camera_session_ptr]() {
                            return checkAntispoofByIRCamera(ir_camera_path, detection_model,
                                                            detection_threshold, username_copy,
-                                                           debug_enabled, ir_camera_session_ptr);
+                                                           debug_enabled, ir_camera_session_ptr,
+                                                           warmup_delay_ms);
         })));
   }
 

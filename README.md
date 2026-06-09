@@ -41,7 +41,8 @@ Biopass was developed by [@phucvinh57](https://github.com/phucvinh57) and [@thai
 
 - Debian and RPM package: https://github.com/TickLabVN/biopass/releases
 - AUR package: https://aur.archlinux.org/packages/biopass-bin
-- System sign-in setup is manual on all Linux distributions: [docs/PAM.md](docs/PAM.md)
+- System sign-in setup uses distro-managed PAM configuration when available (for example `pam-auth-update` on Debian/Ubuntu): [docs/PAM.md](docs/PAM.md)
+- Interactive `polkit` authentication setup: [docs/Polkit.md](docs/Polkit.md)
 - [IR camera setup guide](docs/IR%20camera.md)
 
 ## Features

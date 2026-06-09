@@ -5,12 +5,8 @@ function listImages() {
   return invokeCommand<string[]>("list_faces");
 }
 
-function saveImage(data: string) {
-  return invokeCommand<string>("capture_face", { data });
-}
-
-function captureNative(camera?: string | null) {
-  return invokeCommand<string>("capture_face_native", {
+function saveImage(camera?: string | null) {
+  return invokeCommand<string>("capture_face", {
     camera: camera ?? null,
   });
 }
@@ -37,7 +33,6 @@ function listVideoDevices() {
 export const face = {
   listImages,
   saveImage,
-  captureNative,
   startPreview,
   stopPreview,
   captureInSession,

@@ -8,7 +8,7 @@ pub mod paths;
 pub mod system;
 
 use config::{load_config, save_config};
-use face::{capture_face, capture_face_native, delete_face, list_faces};
+use face::{capture_face, delete_face, list_faces};
 use face_session::{capture_face_in_session, start_face_preview, stop_face_preview};
 use fingerprint::{
     add_fingerprint, delete_fingerprint, enroll_fingerprint, fingerprint_is_available,
@@ -46,7 +46,6 @@ pub fn run() {
             save_config,
             get_current_username,
             capture_face,
-            capture_face_native,
             start_face_preview,
             stop_face_preview,
             capture_face_in_session,

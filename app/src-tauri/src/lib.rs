@@ -1,6 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 pub mod config;
 pub mod face;
+pub mod face_session;
 pub mod fingerprint;
 pub mod fingerprint_ffi;
 pub mod paths;
@@ -8,6 +9,7 @@ pub mod system;
 
 use config::{load_config, save_config};
 use face::{capture_face, delete_face, list_faces};
+use face_session::{capture_face_in_session, start_face_preview, stop_face_preview};
 use fingerprint::{
     add_fingerprint, delete_fingerprint, enroll_fingerprint, fingerprint_is_available,
     list_enrolled_fingerprints, list_fingerprint_devices, remove_fingerprint,
@@ -44,6 +46,9 @@ pub fn run() {
             save_config,
             get_current_username,
             capture_face,
+            start_face_preview,
+            stop_face_preview,
+            capture_face_in_session,
             list_faces,
             list_video_devices,
             delete_face,

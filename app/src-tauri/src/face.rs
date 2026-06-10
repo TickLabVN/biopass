@@ -1,4 +1,3 @@
-use base64::{engine::general_purpose, Engine as _};
 use std::fs;
 use tauri::AppHandle;
 
@@ -6,42 +5,24 @@ use crate::config::{load_config, BiopassConfig};
 use crate::paths::get_faces_dir;
 
 #[tauri::command]
-pub fn capture_face(app: AppHandle, data: String) -> Result<String, String> {
+pub fn capture_face(app: AppHandle, camera: Option<String>) -> Result<String, String> {
     let faces_dir = get_faces_dir(&app)?;
     let app_config: BiopassConfig = load_config(app.clone())?;
 
-    // Decode base64 image data
-    let image_bytes = general_purpose::STANDARD
-        .decode(&data)
-        .map_err(|e| format!("Failed to decode image: {}", e))?;
-
-    // Generate filename with timestamp
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| format!("Failed to get timestamp: {}", e))?
         .as_millis();
     let filename = format!("face_{}.jpg", timestamp);
-    let temp_filename = format!("temp_face_{}.jpg", timestamp);
-
     let file_path = faces_dir.join(&filename);
-    let temp_file_path = faces_dir.join(&temp_filename);
 
-    // Create directory if needed
     if !faces_dir.exists() {
         fs::create_dir_all(&faces_dir)
             .map_err(|e| format!("Failed to create faces directory: {}", e))?;
     }
 
-    // Write temp file
-    fs::write(&temp_file_path, &image_bytes)
-        .map_err(|e| format!("Failed to write image: {}", e))?;
-    // DEBUG: Save a permanent copy to /tmp to see if the frontend is generating a valid jpeg
-    let _ = fs::write("/tmp/debug_capture.jpg", &image_bytes);
-
-    // Run cropper
     let detect_model = app_config.methods.face.detection.model;
 
-    // Resolve the helper from installed, development, then PATH locations.
     let helper_bin = if std::path::Path::new("/usr/bin/biopass-helper").exists() {
         "/usr/bin/biopass-helper".to_string()
     } else if std::path::Path::new("../../auth/build/pam/biopass-helper").exists() {
@@ -50,29 +31,33 @@ pub fn capture_face(app: AppHandle, data: String) -> Result<String, String> {
         "biopass-helper".to_string()
     };
 
-    let status = std::process::Command::new(&helper_bin)
-        .arg("crop-face")
-        .arg("--input")
-        .arg(&temp_file_path)
+    let mut cmd_builder = std::process::Command::new(&helper_bin);
+    cmd_builder
+        .arg("capture-face")
         .arg("--output")
         .arg(&file_path)
         .arg("--model")
-        .arg(&detect_model)
-        .status()
-        .map_err(|e| format!("Failed to execute face cropper: {}", e))?;
+        .arg(&detect_model);
 
-    // Delete temp file
-    let _ = fs::remove_file(&temp_file_path);
+    if let Some(cam) = camera.filter(|s| !s.is_empty()) {
+        cmd_builder.arg("--camera").arg(cam);
+    }
 
-    if status.success() {
+    let output = cmd_builder
+        .output()
+        .map_err(|e| format!("Failed to execute helper: {}", e))?;
+
+    if output.status.success() {
         Ok(file_path.to_string_lossy().to_string())
-    } else if status.code() == Some(2) {
-        Err(
-            "No face detected in the main image. Please make sure your face is visible."
-                .to_string(),
-        )
+    } else if output.status.code() == Some(2) {
+        Err("No face detected. Please position your face in front of the camera.".to_string())
     } else {
-        Err(format!("Cropper failed with exit status: {}", status))
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!(
+            "Capture failed (exit {}): {}",
+            output.status.code().unwrap_or(-1),
+            stderr
+        ))
     }
 }
 

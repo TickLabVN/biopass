@@ -1,24 +1,42 @@
-#include <spdlog/spdlog.h>
+#include <pwd.h>
 #include <spdlog/sinks/ansicolor_sink.h>
+#include <spdlog/spdlog.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pwd.h>
 
 #include <CLI/CLI.hpp>
 #include <algorithm>
+#include <iostream>
 #include <memory>
+#include <vector>
 
 #include "auth_config.h"
 #include "auth_manager.h"
+#include "common/camera_capture.h"
+#include "detection/face_detection.h"
 #include "face_auth.h"
 #include "fingerprint_auth.h"
 #include "image_utils.h"
+#include "stb_image_write.h"
 
-#include "detection/face_detection.h"
+namespace {
+
+void appendJpegToBuffer(void* context, void* data, int size) {
+  auto* buf = static_cast<std::vector<uint8_t>*>(context);
+  buf->insert(buf->end(), static_cast<uint8_t*>(data), static_cast<uint8_t*>(data) + size);
+}
+
+bool encodeJpeg(const ImageRGB& img, int quality, std::vector<uint8_t>& out) {
+  out.clear();
+  return stbi_write_jpg_to_func(&appendJpegToBuffer, &out, img.width, img.height, 3, img.ptr(),
+                                quality) != 0;
+}
+
+}  // namespace
 
 int cropFace(const std::string& inputPath, const std::string& outputPath,
-                     const std::string& modelPath) {
+             const std::string& modelPath) {
   ImageRGB image = readImage(inputPath);
   if (image.empty()) {
     spdlog::error("Could not read input image: {}", inputPath);
@@ -49,6 +67,143 @@ int cropFace(const std::string& inputPath, const std::string& outputPath,
   return 0;
 }
 
+// Long-running session that streams JPEG frames to stdout and accepts
+// commands on stdin. Protocol (line-based for commands, length-prefixed for
+// frame payloads):
+//
+//   FRAME              -> server captures a frame, encodes JPEG, and writes:
+//                         OK <byte_count>\n<bytes>
+//                         or  ERR <message>\n
+//   CAPTURE <path>     -> server captures, runs face detection + crop, saves
+//                         to <path>. Writes OK\n / NO_FACE\n / ERR <msg>\n
+//   QUIT               -> server cleans up and exits
+//
+// The session keeps the camera open across commands so streaming preview and
+// user-triggered capture share the same V4L2 handle (cameras are usually
+// single-consumer).
+int previewSession(const std::string& cameraPath, const std::string& modelPath, int jpegQuality) {
+  std::optional<std::string> deviceOpt;
+  if (!cameraPath.empty()) {
+    deviceOpt = cameraPath;
+  }
+
+  // Silence openpnp-capture's frame-size warnings while we set up.
+  spdlog::set_level(spdlog::level::err);
+  auto session = biopass::openCameraSession(deviceOpt);
+  spdlog::set_level(spdlog::level::info);
+  if (!session || !session->isOpen()) {
+    std::cout << "ERR failed to open camera\n" << std::flush;
+    return 1;
+  }
+
+  std::unique_ptr<FaceDetection> faceDetector;
+  if (!modelPath.empty()) {
+    try {
+      faceDetector = std::make_unique<FaceDetection>(modelPath);
+    } catch (const std::exception& e) {
+      std::cout << "ERR failed to load detection model: " << e.what() << "\n" << std::flush;
+      return 1;
+    }
+  }
+
+  std::cout << "READY\n" << std::flush;
+
+  std::vector<uint8_t> jpegBuf;
+  std::string line;
+  while (std::getline(std::cin, line)) {
+    if (line == "QUIT") {
+      break;
+    }
+
+    if (line == "FRAME") {
+      ImageRGB img = session->capture();
+      if (img.empty()) {
+        std::cout << "ERR capture failed\n" << std::flush;
+        continue;
+      }
+      if (!encodeJpeg(img, jpegQuality, jpegBuf)) {
+        std::cout << "ERR jpeg encode failed\n" << std::flush;
+        continue;
+      }
+      std::cout << "OK " << jpegBuf.size() << "\n";
+      std::cout.write(reinterpret_cast<const char*>(jpegBuf.data()),
+                      static_cast<std::streamsize>(jpegBuf.size()));
+      std::cout.flush();
+      continue;
+    }
+
+    if (line.rfind("CAPTURE ", 0) == 0) {
+      if (!faceDetector) {
+        std::cout << "ERR detection model not loaded\n" << std::flush;
+        continue;
+      }
+      std::string outPath = line.substr(8);
+      ImageRGB img = session->capture();
+      if (img.empty()) {
+        std::cout << "ERR capture failed\n" << std::flush;
+        continue;
+      }
+      auto faces = faceDetector->inference(img);
+      if (faces.empty()) {
+        std::cout << "NO_FACE\n" << std::flush;
+        continue;
+      }
+      if (!saveImage(outPath, faces[0].image)) {
+        std::cout << "ERR save failed\n" << std::flush;
+        continue;
+      }
+      std::cout << "OK\n" << std::flush;
+      continue;
+    }
+
+    std::cout << "ERR unknown command\n" << std::flush;
+  }
+
+  return 0;
+}
+
+int captureAndCropFace(const std::string& cameraPath, const std::string& outputPath,
+                       const std::string& modelPath) {
+  std::optional<std::string> deviceOpt;
+  if (!cameraPath.empty()) {
+    deviceOpt = cameraPath;
+  }
+
+  // Suppress openpnp-capture's noisy "queryFrameSize returned non-discrete..."
+  // warnings during enumeration; errors still propagate.
+  spdlog::set_level(spdlog::level::err);
+  ImageRGB image = biopass::captureImage(deviceOpt);
+  spdlog::set_level(spdlog::level::info);
+  if (image.empty()) {
+    spdlog::error("Failed to capture image from camera: {}",
+                  cameraPath.empty() ? "<auto>" : cameraPath);
+    return 1;
+  }
+
+  std::unique_ptr<FaceDetection> faceDetector;
+  try {
+    faceDetector = std::make_unique<FaceDetection>(modelPath);
+  } catch (const std::exception& e) {
+    spdlog::error("Failed to load detection model: {}", e.what());
+    return 1;
+  }
+
+  std::vector<Detection> detectedFaces = faceDetector->inference(image);
+  if (detectedFaces.empty()) {
+    spdlog::error("No face detected in the captured frame");
+    return 2;
+  }
+
+  ImageRGB faceCrop = detectedFaces[0].image;
+  if (!saveImage(outputPath, faceCrop)) {
+    spdlog::error("Could not save cropped image to: {}", outputPath);
+    return 1;
+  }
+
+  spdlog::info("Successfully captured + cropped face and saved to: {}", outputPath);
+  return 0;
+}
+
 int authenticate(const std::string& username, const std::string& service) {
   const char* pUsername = username.c_str();
 
@@ -75,10 +230,9 @@ int authenticate(const std::string& username, const std::string& service) {
 
   biopass::AuthConfig runtime_config;
   runtime_config.debug = config.strategy.debug;
-  runtime_config.antispoof =
-      config.methods.face.anti_spoofing.enable ||
-      (config.methods.face.anti_spoofing.ir_camera.has_value() &&
-       !config.methods.face.anti_spoofing.ir_camera->empty());
+  runtime_config.antispoof = config.methods.face.anti_spoofing.enable ||
+                             (config.methods.face.anti_spoofing.ir_camera.has_value() &&
+                              !config.methods.face.anti_spoofing.ir_camera->empty());
 
   // Create and configure AuthManager
   biopass::AuthManager manager;
@@ -140,6 +294,26 @@ int main(int argc, char** argv) {
   crop_cmd->add_option("--output,-o", outputPath, "Output image path")->required();
   crop_cmd->add_option("--model,-m", modelPath, "Detection model path")->required();
 
+  auto capture_cmd = app.add_subcommand("capture-face",
+                                        "Capture a frame from a camera and crop the detected face");
+  std::string capCameraPath, capOutputPath, capModelPath;
+  capture_cmd->add_option("--camera,-c", capCameraPath,
+                          "Camera device path (e.g. /dev/video0). Empty = auto-select first.");
+  capture_cmd->add_option("--output,-o", capOutputPath, "Output image path")->required();
+  capture_cmd->add_option("--model,-m", capModelPath, "Detection model path")->required();
+
+  auto preview_cmd = app.add_subcommand(
+      "preview-session",
+      "Long-running camera session: streams JPEG frames + handles capture via stdin/stdout");
+  std::string previewCameraPath, previewModelPath;
+  int previewQuality = 70;
+  preview_cmd->add_option("--camera,-c", previewCameraPath,
+                          "Camera device path (e.g. /dev/video0). Empty = auto-select first.");
+  preview_cmd->add_option("--model,-m", previewModelPath,
+                          "Detection model path (required for CAPTURE command)");
+  preview_cmd->add_option("--quality,-q", previewQuality,
+                          "JPEG encoding quality 1-100 (default 70)");
+
   std::string username;
   std::string pamService;
   auto auth_cmd = app.add_subcommand("auth", "Authenticate a user with Biopass");
@@ -147,8 +321,8 @@ int main(int argc, char** argv) {
   auth_cmd->add_option("--service,-s", pamService, "PAM service name");
 
   std::string migrateUsername;
-  auto migrate_cmd =
-      app.add_subcommand("migrate", "Migration tool for applying schema changes (run once after updates)");
+  auto migrate_cmd = app.add_subcommand(
+      "migrate", "Migration tool for applying schema changes (run once after updates)");
   migrate_cmd->add_option("--username,-u", migrateUsername, "Username to migrate")->required();
   migrate_cmd->group("");
 
@@ -160,6 +334,14 @@ int main(int argc, char** argv) {
 
   if (app.got_subcommand(crop_cmd)) {
     return cropFace(inputPath, outputPath, modelPath);
+  }
+
+  if (app.got_subcommand(capture_cmd)) {
+    return captureAndCropFace(capCameraPath, capOutputPath, capModelPath);
+  }
+
+  if (app.got_subcommand(preview_cmd)) {
+    return previewSession(previewCameraPath, previewModelPath, previewQuality);
   }
 
   if (app.got_subcommand(auth_cmd)) {

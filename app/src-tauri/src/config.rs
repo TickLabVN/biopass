@@ -35,6 +35,7 @@ pub struct FaceMethodConfig {
     pub enable: bool,
     pub retries: u32,
     pub retry_delay: u32,
+    pub camera: Option<String>,
     pub detection: DetectionConfig,
     pub recognition: RecognitionConfig,
     pub anti_spoofing: AntiSpoofingConfig,
@@ -69,6 +70,8 @@ struct FaceMethodConfigRaw {
     #[serde(default = "default_face_delay")]
     pub retry_delay: u32,
     #[serde(default)]
+    pub camera: Option<String>,
+    #[serde(default)]
     pub detection: DetectionConfig,
     #[serde(default)]
     pub recognition: RecognitionConfig,
@@ -99,6 +102,7 @@ impl<'de> Deserialize<'de> for FaceMethodConfig {
             enable: raw.enable,
             retries: raw.retries,
             retry_delay: raw.retry_delay,
+            camera: raw.camera,
             detection: raw.detection,
             recognition: raw.recognition,
             anti_spoofing,
@@ -262,6 +266,7 @@ fn get_default_config(app: &AppHandle) -> BiopassConfig {
                 enable: true,
                 retries: 5,
                 retry_delay: 200,
+                camera: None,
                 detection: DetectionConfig {
                     model: model_path("yolov8n-face.onnx"),
                     threshold: 0.8,

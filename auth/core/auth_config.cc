@@ -121,6 +121,9 @@ BiopassConfig readConfig(const std::string& username) {
           if (f["recognition"]["threshold"])
             config.methods.face.recognition.threshold = f["recognition"]["threshold"].as<float>();
         }
+        if (f["camera"] && !f["camera"].IsNull()) {
+          config.methods.face.camera = f["camera"].as<std::string>();
+        }
         if (f["anti_spoofing"]) {
           const auto& anti_spoofing = f["anti_spoofing"];
           if (anti_spoofing["enable"]) {
@@ -149,7 +152,8 @@ BiopassConfig readConfig(const std::string& username) {
           }
 
           if (anti_spoofing["ir_camera"] && !anti_spoofing["ir_camera"].IsNull()) {
-            config.methods.face.anti_spoofing.ir_camera = anti_spoofing["ir_camera"].as<std::string>();
+            config.methods.face.anti_spoofing.ir_camera =
+                anti_spoofing["ir_camera"].as<std::string>();
           }
 
           if (anti_spoofing["ir_warmup_delay_ms"]) {
@@ -303,14 +307,15 @@ bool migrateConfigSchema(const std::string& username, std::string* error) {
     const bool has_legacy_anti_threshold = anti && static_cast<bool>(anti["threshold"]);
     const bool has_legacy_anti_model_scalar =
         anti && static_cast<bool>(anti["model"]) && anti["model"].IsScalar();
-    const bool has_new_model_map = anti && static_cast<bool>(anti["model"]) && anti["model"].IsMap() &&
-                                   static_cast<bool>(anti["model"]["path"]) &&
-                                   static_cast<bool>(anti["model"]["threshold"]);
+    const bool has_new_model_map =
+        anti && static_cast<bool>(anti["model"]) && anti["model"].IsMap() &&
+        static_cast<bool>(anti["model"]["path"]) && static_cast<bool>(anti["model"]["threshold"]);
     const bool has_new_ir_key = anti && static_cast<bool>(anti["ir_camera"]);
     const bool needs_migration = has_legacy_face_ir || has_legacy_anti_threshold ||
                                  has_legacy_anti_model_scalar || !has_new_model_map ||
                                  !has_new_ir_key;
-    if (!needs_migration) return true;
+    if (!needs_migration)
+      return true;
 
     YAML::Node anti_new;
     anti_new["enable"] = enable;
@@ -402,7 +407,9 @@ std::vector<std::string> listFaces(const std::string& username) {
   return faces;
 }
 
-std::string getDebugPath(const std::string& username) { return user_data_dir(username) + "/debugs"; }
+std::string getDebugPath(const std::string& username) {
+  return user_data_dir(username) + "/debugs";
+}
 
 int setupConfig(const std::string& username) {
   const std::string dataDir = user_data_dir(username);

@@ -11,7 +11,7 @@
 # ---------------------------------------------------------------------------
 
 .PHONY: all build build-auth build-app \
-        package package-app \
+	package package-app install-keygen \
         clean clean-auth clean-app \
         install-deps
 
@@ -19,6 +19,11 @@
 BUILD_TYPE   ?= Release
 AUTH_BUILD   := auth/build
 APP_DIR      := app
+KEYGEN_SRC   := $(APP_DIR)/src-tauri/scripts/biopass_key_generator.py
+KEYTEST_SRC  := $(APP_DIR)/src-tauri/scripts/biopass_key_test.py
+KEYGEN_DST_DIR := /usr/lib/biopass
+KEYGEN_DST   := $(KEYGEN_DST_DIR)/biopass_key_generator.py
+KEYTEST_DST  := $(KEYGEN_DST_DIR)/biopass_key_test.py
 VERSION      ?= $(shell git describe --tags --always 2>/dev/null || echo "0.1.0")
 
 # ── Top-level aliases ──────────────────────────────────────────────────────
@@ -26,7 +31,7 @@ all: build
 
 build: build-auth build-app
 
-package: package-app
+package: package-app install-keygen
 
 # ── auth (CMake / C++) ────────────────────────────────────────────────────
 build-auth:
@@ -59,6 +64,24 @@ package-app: build-app
 	@echo "==> [app] Tauri packages are in app/src-tauri/target/release/bundle/"
 	@ls app/src-tauri/target/release/bundle/deb/*.deb \
 	     app/src-tauri/target/release/bundle/rpm/*.rpm 2>/dev/null || true
+
+install-keygen:
+	@if [ "$(shell id -u)" != "0" ]; then \
+		echo "ERROR: install-keygen must be run as root to write $(KEYGEN_DST_DIR)"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(KEYGEN_SRC)" ]; then \
+		echo "ERROR: missing source script $(KEYGEN_SRC)"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(KEYTEST_SRC)" ]; then \
+		echo "ERROR: missing source script $(KEYTEST_SRC)"; \
+		exit 1; \
+	fi
+	@echo "==> [app] Installing key scripts to $(KEYGEN_DST_DIR)"
+	install -d -m 755 "$(KEYGEN_DST_DIR)"
+	install -m 755 "$(KEYGEN_SRC)" "$(KEYGEN_DST)"
+	install -m 755 "$(KEYTEST_SRC)" "$(KEYTEST_DST)"
 
 clean-app:
 	@echo "==> [app] Cleaning build artifacts…"

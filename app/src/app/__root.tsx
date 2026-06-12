@@ -9,18 +9,32 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Cpu, Laptop, Moon, Settings, Sun, User } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 import { cmd } from "@/commands";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 
 function App() {
   const [username, setUsername] = useState("");
+  const [biopassKey, setBiopassKey] = useState("");
+  const [isCheckingLock, setIsCheckingLock] = useState(true);
+  const [isLockRequired, setIsLockRequired] = useState(false);
+  const [isValidatingKey, setIsValidatingKey] = useState(false);
   const { setTheme, theme } = useTheme();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
@@ -57,7 +71,25 @@ function App() {
   const initialized = useRef(false);
 
   useEffect(() => {
+    const checkConfigurationLock = async () => {
+      try {
+        const lockEnabled = await cmd.system.hasConfigurationLock();
+        setIsLockRequired(lockEnabled);
+      } catch (err) {
+        console.error("Failed to check configuration lock:", err);
+        setIsLockRequired(false);
+      } finally {
+        setIsCheckingLock(false);
+      }
+    };
+
+    checkConfigurationLock();
+  }, []);
+
+  useEffect(() => {
     const loadUsername = async () => {
+      if (isLockRequired) return;
+
       try {
         const u = await cmd.system.getCurrentUsername();
         setUsername(u);
@@ -67,6 +99,7 @@ function App() {
     };
 
     const loadInitialTheme = async () => {
+      if (isLockRequired) return;
       if (initialized.current) return;
       initialized.current = true;
 
@@ -82,10 +115,12 @@ function App() {
 
     loadUsername();
     loadInitialTheme();
-  }, [setTheme]);
+  }, [setTheme, isLockRequired]);
 
   // Update theme in config when it changes manually via toggle
   useEffect(() => {
+    if (isLockRequired) return;
+
     const updateConfigTheme = async () => {
       try {
         const config = await cmd.config.load();
@@ -98,7 +133,89 @@ function App() {
       }
     };
     if (theme) updateConfigTheme();
-  }, [theme]);
+  }, [theme, isLockRequired]);
+
+  const handleKeyPromptOpenChange = (open: boolean) => {
+    if (!open) {
+      getCurrentWindow().close();
+    }
+  };
+
+  const handleUnlock = async () => {
+    if (!biopassKey.trim()) {
+      toast.error("Biopass key is required");
+      return;
+    }
+
+    setIsValidatingKey(true);
+    try {
+      const valid = await cmd.system.validateConfigurationLockKey(biopassKey);
+      if (valid) {
+        setBiopassKey("");
+        setIsLockRequired(false);
+        return;
+      }
+
+      toast.error("Invalid Biopass key");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Failed to validate key: ${message}`);
+    } finally {
+      setIsValidatingKey(false);
+    }
+  };
+
+  if (isCheckingLock) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">
+          Checking configuration lock...
+        </p>
+      </div>
+    );
+  }
+
+  if (isLockRequired) {
+    return (
+      <Dialog open onOpenChange={handleKeyPromptOpenChange}>
+        <DialogContent showCloseButton>
+          <DialogHeader>
+            <DialogTitle>Biopass Key Required</DialogTitle>
+            <DialogDescription>
+              Configuration lock is enabled. Enter your Biopass key to continue.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-2">
+            <Input
+              type="password"
+              value={biopassKey}
+              onChange={(event) => setBiopassKey(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  handleUnlock();
+                }
+              }}
+              placeholder="Enter Biopass key"
+              autoFocus
+              disabled={isValidatingKey}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={handleUnlock}
+              disabled={isValidatingKey}
+              className="cursor-pointer"
+            >
+              {isValidatingKey ? "Validating..." : "Unlock"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">

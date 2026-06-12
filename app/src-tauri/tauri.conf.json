@@ -3,9 +3,9 @@
   "productName": "biopass",
   "identifier": "com.ticklab.biopass",
   "build": {
-    "beforeDevCommand": "bun run dev",
+    "beforeDevCommand": "make -C .. build-auth && bun run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun run build",
+    "beforeBuildCommand": "make -C .. build-auth && bun run build",
     "frontendDist": "../dist"
   },
   "app": {

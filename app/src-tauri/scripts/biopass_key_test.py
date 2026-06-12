@@ -18,12 +18,16 @@ from getpass import getpass
 try:
     from argon2.low_level import Type, hash_secret_raw
 except ImportError as exc:  # pragma: no cover - dependency check
-    print("ERROR: Missing dependency 'argon2-cffi'.")
-    print("Install with: pip install argon2-cffi")
+    print("ERROR: Missing dependency 'argon2-cffi'.", file=sys.stderr)
+    print("Install with: pip install argon2-cffi", file=sys.stderr)
     raise SystemExit(1) from exc
 
 INPUT_DIR = "/usr/lib/biopass"
 INPUT_PATH = f"{INPUT_DIR}/secret.yaml"
+
+
+def print_error(message: str) -> None:
+    print(message, file=sys.stderr)
 
 
 def parse_args() -> argparse.Namespace:
@@ -62,19 +66,19 @@ def xor_bytes(left: bytes, right: bytes) -> bytes:
 
 def is_root() -> None:
     if os.geteuid() == 0:
-        print("ERROR: BioPass Key Tester must not be run as root.")
+        print_error("ERROR: BioPass Key Tester must not be run as root.")
         raise SystemExit(1)
 
 
 def load_secret_yaml(path: str) -> dict:
     if not os.path.exists(path):
-        print(f"ERROR: Secret file not found at {path}.")
+        print_error(f"ERROR: Secret file not found at {path}.")
         raise SystemExit(1)
     if not os.path.isfile(path):
-        print(f"ERROR: Expected a file at {path}, but found a directory.")
+        print_error(f"ERROR: Expected a file at {path}, but found a directory.")
         raise SystemExit(1)
     if not os.access(path, os.R_OK):
-        print(f"ERROR: Secret file at {path} is not readable.")
+        print_error(f"ERROR: Secret file at {path} is not readable.")
         raise SystemExit(1)
 
     try:
@@ -98,14 +102,14 @@ def load_secret_yaml(path: str) -> dict:
 
             return secret_data
     except Exception as exc:
-        print(f"ERROR: Failed to read or parse secret file at {path}: {exc}")
+        print_error(f"ERROR: Failed to read or parse secret file at {path}: {exc}")
         raise SystemExit(1) from exc
 
 
 def prompt_master_key() -> bytes:
     master_key = getpass("Enter BioPass Master Key: ").strip()
     if not master_key:
-        print("ERROR: Master key cannot be empty.")
+        print_error("ERROR: Master key cannot be empty.")
         raise SystemExit(1)
     return master_key.encode("utf-8")
 
@@ -121,7 +125,7 @@ def read_master_key_from_args(args: argparse.Namespace) -> bytes:
         return prompt_master_key()
 
     if not master_key:
-        print("ERROR: Master key cannot be empty.")
+        print_error("ERROR: Master key cannot be empty.")
         raise SystemExit(1)
 
     return master_key.encode("utf-8")
@@ -157,7 +161,7 @@ def main() -> int:
     )
 
     if salt_key not in secret_data or hash_key not in secret_data:
-        print(
+        print_error(
             "ERROR: Secret file is missing required fields "
             "'salt_b64' and 'master_key_hash_b64'."
         )
@@ -167,13 +171,13 @@ def main() -> int:
         salt = base64.b64decode(secret_data[salt_key], validate=True)
         expected_master_key_hash = base64.b64decode(secret_data[hash_key], validate=True)
     except Exception as exc:
-        print(f"ERROR: Failed to decode base64 values from secret file: {exc}")
+        print_error(f"ERROR: Failed to decode base64 values from secret file: {exc}")
         raise SystemExit(1) from exc
 
     master_key = read_master_key_from_args(args)
 
     if len(salt) < 16:
-        print("ERROR: Decoded salt is too short; expected at least 16 bytes.")
+        print_error("ERROR: Decoded salt is too short; expected at least 16 bytes.")
         raise SystemExit(1)
 
     derived_master_key_hash = derive_master_key_hash(master_key, salt)
@@ -188,7 +192,7 @@ def main() -> int:
     if args.result_only:
         print("error")
     else:
-        print("ERROR: Master key is invalid.")
+        print_error("ERROR: Master key is invalid.")
     return 2
 
 

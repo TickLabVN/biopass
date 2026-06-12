@@ -79,7 +79,7 @@ function App() {
         console.error("Failed to check configuration lock:", err);
         const message = err instanceof Error ? err.message : String(err);
         toast.error(`Failed to check configuration lock: ${message}`);
-        setIsLockRequired(false);
+        setIsLockRequired(true);
       } finally {
         setIsCheckingLock(false);
       }

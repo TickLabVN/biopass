@@ -1,17 +1,16 @@
 use serde::Serialize;
 use std::fs;
+use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::time::Duration;
-
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
-
-use wait_timeout::ChildExt;
+use std::thread;
+use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
 
 const BIOPASS_SECRET_PATH: &str = "/usr/lib/biopass/secret.yaml";
 const BIOPASS_KEY_TEST_SCRIPT_PATH: &str = "/usr/lib/biopass/biopass_key_test.py";
+const PYTHON3_BIN: &str = "python3";
 const BIOPASS_KEY_VALIDATION_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Serialize, Clone)]
@@ -49,21 +48,32 @@ fn ensure_key_test_script_available() -> Result<(), String> {
         ));
     }
 
-    #[cfg(unix)]
-    {
-        let permissions = fs::metadata(script_path)
-            .map_err(|e| format!("Failed to read key validation script metadata: {}", e))?
-            .permissions();
-
-        if permissions.mode() & 0o111 == 0 {
-            return Err(format!(
-                "Key validation script is not executable at {}",
-                BIOPASS_KEY_TEST_SCRIPT_PATH
-            ));
-        }
-    }
+    fs::metadata(script_path)
+        .map_err(|e| format!("Failed to read key validation script metadata: {}", e))?;
 
     Ok(())
+}
+
+fn read_pipe_to_end<R: Read + Send + 'static>(
+    mut reader: R,
+    stream_name: &'static str,
+) -> JoinHandle<Result<Vec<u8>, String>> {
+    thread::spawn(move || {
+        let mut buffer = Vec::new();
+        reader
+            .read_to_end(&mut buffer)
+            .map(|_| buffer)
+            .map_err(|e| format!("Failed reading key validation {}: {}", stream_name, e))
+    })
+}
+
+fn join_reader(handle: Option<JoinHandle<Result<Vec<u8>, String>>>) -> Result<Vec<u8>, String> {
+    match handle {
+        Some(reader) => reader
+            .join()
+            .map_err(|_| "Key validation output reader thread panicked".to_string())?,
+        None => Ok(Vec::new()),
+    }
 }
 
 #[tauri::command]
@@ -74,7 +84,8 @@ pub fn validate_configuration_lock_key(key: String) -> Result<bool, String> {
 
     ensure_key_test_script_available()?;
 
-    let mut child = Command::new(BIOPASS_KEY_TEST_SCRIPT_PATH)
+    let mut child = Command::new(PYTHON3_BIN)
+        .arg(BIOPASS_KEY_TEST_SCRIPT_PATH)
         .arg("--password-stdin")
         .arg("--result-only")
         .stdin(Stdio::piped())
@@ -83,28 +94,51 @@ pub fn validate_configuration_lock_key(key: String) -> Result<bool, String> {
         .spawn()
         .map_err(|e| format!("Failed to start key validation script: {}", e))?;
 
+    let stdout_reader = child
+        .stdout
+        .take()
+        .map(|stdout| read_pipe_to_end(stdout, "stdout"));
+    let stderr_reader = child
+        .stderr
+        .take()
+        .map(|stderr| read_pipe_to_end(stderr, "stderr"));
+
     if let Some(mut stdin) = child.stdin.take() {
         stdin
             .write_all(key.as_bytes())
             .map_err(|e| format!("Failed writing key to validator stdin: {}", e))?;
     }
 
-    let exited = child
-        .wait_timeout(BIOPASS_KEY_VALIDATION_TIMEOUT)
-        .map_err(|e| format!("Failed waiting for key validation script: {}", e))?;
+    let deadline = Instant::now() + BIOPASS_KEY_VALIDATION_TIMEOUT;
+    let status = loop {
+        if Instant::now() >= deadline {
+            break None;
+        }
 
-    if exited.is_none() {
+        match child
+            .try_wait()
+            .map_err(|e| format!("Failed waiting for key validation script: {}", e))?
+        {
+            Some(status) => break Some(status),
+            None => thread::sleep(Duration::from_millis(25)),
+        }
+    };
+
+    if status.is_none() {
         let _ = child.kill();
         let _ = child.wait();
+        let _ = join_reader(stdout_reader);
+        let _ = join_reader(stderr_reader);
         return Err("Key validation timed out after 10 seconds".to_string());
     }
 
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("Failed collecting key validation output: {}", e))?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let output_status = status.expect("status must exist after timeout branch");
+    let stdout = String::from_utf8_lossy(&join_reader(stdout_reader)?)
+        .trim()
+        .to_string();
+    let stderr = String::from_utf8_lossy(&join_reader(stderr_reader)?)
+        .trim()
+        .to_string();
 
     if stdout.eq_ignore_ascii_case("success") {
         return Ok(true);
@@ -114,7 +148,7 @@ pub fn validate_configuration_lock_key(key: String) -> Result<bool, String> {
         return Ok(false);
     }
 
-    if output.status.success() {
+    if output_status.success() {
         return Ok(false);
     }
 

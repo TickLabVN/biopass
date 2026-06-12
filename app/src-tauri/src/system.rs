@@ -3,9 +3,16 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::time::Duration;
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
+use wait_timeout::ChildExt;
 
 const BIOPASS_SECRET_PATH: &str = "/usr/lib/biopass/secret.yaml";
 const BIOPASS_KEY_TEST_SCRIPT_PATH: &str = "/usr/lib/biopass/biopass_key_test.py";
+const BIOPASS_KEY_VALIDATION_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Serialize, Clone)]
 pub struct VideoDeviceInfo {
@@ -22,8 +29,41 @@ pub fn get_current_username() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn has_configuration_lock() -> bool {
-    Path::new(BIOPASS_SECRET_PATH).is_file()
+pub fn has_configuration_lock() -> Result<bool, String> {
+    if !Path::new(BIOPASS_SECRET_PATH).is_file() {
+        return Ok(false);
+    }
+
+    ensure_key_test_script_available()?;
+
+    Ok(true)
+}
+
+fn ensure_key_test_script_available() -> Result<(), String> {
+    let script_path = Path::new(BIOPASS_KEY_TEST_SCRIPT_PATH);
+
+    if !script_path.is_file() {
+        return Err(format!(
+            "Key validation script not found at {}",
+            BIOPASS_KEY_TEST_SCRIPT_PATH
+        ));
+    }
+
+    #[cfg(unix)]
+    {
+        let permissions = fs::metadata(script_path)
+            .map_err(|e| format!("Failed to read key validation script metadata: {}", e))?
+            .permissions();
+
+        if permissions.mode() & 0o111 == 0 {
+            return Err(format!(
+                "Key validation script is not executable at {}",
+                BIOPASS_KEY_TEST_SCRIPT_PATH
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -32,12 +72,7 @@ pub fn validate_configuration_lock_key(key: String) -> Result<bool, String> {
         return Ok(false);
     }
 
-    if !Path::new(BIOPASS_KEY_TEST_SCRIPT_PATH).is_file() {
-        return Err(format!(
-            "Key validation script not found at {}",
-            BIOPASS_KEY_TEST_SCRIPT_PATH
-        ));
-    }
+    ensure_key_test_script_available()?;
 
     let mut child = Command::new(BIOPASS_KEY_TEST_SCRIPT_PATH)
         .arg("--password-stdin")
@@ -54,9 +89,19 @@ pub fn validate_configuration_lock_key(key: String) -> Result<bool, String> {
             .map_err(|e| format!("Failed writing key to validator stdin: {}", e))?;
     }
 
+    let exited = child
+        .wait_timeout(BIOPASS_KEY_VALIDATION_TIMEOUT)
+        .map_err(|e| format!("Failed waiting for key validation script: {}", e))?;
+
+    if exited.is_none() {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err("Key validation timed out after 10 seconds".to_string());
+    }
+
     let output = child
         .wait_with_output()
-        .map_err(|e| format!("Failed waiting for key validation script: {}", e))?;
+        .map_err(|e| format!("Failed collecting key validation output: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();

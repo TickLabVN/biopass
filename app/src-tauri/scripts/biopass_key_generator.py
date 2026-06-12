@@ -17,6 +17,8 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from getpass import getpass
+import secrets
+import string
 
 try:
     from argon2.low_level import Type, hash_secret_raw
@@ -29,6 +31,8 @@ except ImportError as exc:  # pragma: no cover - dependency check
 ENTROPY_URL = "https://www.random.org/strings/?num=100&len=32&digits=on&upperalpha=on&loweralpha=on&unique=off&format=plain"
 OUTPUT_DIR = "/usr/lib/biopass"
 OUTPUT_PATH = f"{OUTPUT_DIR}/secret.yaml"
+FALLBACK_ENTROPY_LENGTH = 8192
+FALLBACK_ENTROPY_ALPHABET = string.ascii_letters + string.digits
 
 
 def xor_bytes(left: bytes, right: bytes) -> bytes:
@@ -49,8 +53,14 @@ def fetch_entropy_source(url: str) -> bytes:
         with urllib.request.urlopen(url, timeout=20) as response:
             return response.read()
     except urllib.error.URLError as exc:
-        print(f"ERROR: Failed to download entropy source from {url}: {exc}")
-        raise SystemExit(1) from exc
+        print(f"WARNING: Failed to download entropy source from {url}: {exc}")
+        print(
+            f"WARNING: Falling back to a local random string of {FALLBACK_ENTROPY_LENGTH} characters."
+        )
+        return "".join(
+            secrets.choice(FALLBACK_ENTROPY_ALPHABET)
+            for _ in range(FALLBACK_ENTROPY_LENGTH)
+        ).encode("utf-8")
 
 
 def prompt_master_key() -> bytes:

@@ -123,6 +123,8 @@ def save_secret_yaml(salt: bytes, master_hash: bytes) -> None:
     with open(tmp_path, "w", encoding="utf-8") as handle:
         handle.write(yaml_text)
 
+    # Keep the secret file globally readable because this lock is machine-wide,
+    # not tied to individual user accounts.
     os.chmod(
         tmp_path,
         stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH,

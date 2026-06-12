@@ -14,7 +14,10 @@ use fingerprint::{
     add_fingerprint, delete_fingerprint, enroll_fingerprint, fingerprint_is_available,
     list_enrolled_fingerprints, list_fingerprint_devices, remove_fingerprint,
 };
-use system::{get_current_username, list_video_devices};
+use system::{
+    get_current_username, has_configuration_lock, list_video_devices,
+    validate_configuration_lock_key,
+};
 
 use tauri::Manager;
 
@@ -45,6 +48,8 @@ pub fn run() {
             load_config,
             save_config,
             get_current_username,
+            has_configuration_lock,
+            validate_configuration_lock_key,
             capture_face,
             start_face_preview,
             stop_face_preview,

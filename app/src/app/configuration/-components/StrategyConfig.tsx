@@ -32,6 +32,8 @@ import { useConfigurationStore } from "../-stores/configuration-store";
 
 const PAM_MANUAL_SETUP_GUIDE_URL =
   "https://github.com/TickLabVN/biopass/blob/main/docs/PAM.md";
+const CONFIGURATION_LOCK_GUIDE_URL =
+  "https://github.com/TickLabVN/biopass/blob/main/docs/Configuration%20Lock.md";
 
 function parseIgnoredServicesInput(raw: string): string[] {
   return raw
@@ -97,6 +99,22 @@ export function StrategyConfig() {
             className="inline-block mt-2 text-xs text-primary hover:underline break-all"
           >
             {PAM_MANUAL_SETUP_GUIDE_URL}
+          </a>
+        </div>
+
+        <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-500/5">
+          <Label className="text-sm font-semibold">Configuration Lock</Label>
+          <p className="text-xs text-muted-foreground mt-1 max-w-140">
+            Biopass does not enable configuration lock automatically. To enable
+            configuration lock manually using this guide:
+          </p>
+          <a
+            href={CONFIGURATION_LOCK_GUIDE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block mt-2 text-xs text-primary hover:underline break-all"
+          >
+            {CONFIGURATION_LOCK_GUIDE_URL}
           </a>
         </div>
 

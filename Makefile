@@ -11,7 +11,7 @@
 # ---------------------------------------------------------------------------
 
 .PHONY: all build build-auth build-app \
-        package package-app \
+	package package-app \
         clean clean-auth clean-app \
         install-deps
 

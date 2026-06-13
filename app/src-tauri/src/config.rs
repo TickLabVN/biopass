@@ -59,6 +59,12 @@ struct AntiSpoofingConfigRaw {
     pub threshold: Option<f32>,
     #[serde(default)]
     pub ir_camera: Option<String>,
+    #[serde(default = "default_ir_warmup_delay_ms")]
+    pub ir_warmup_delay_ms: i32,
+    #[serde(default = "default_ir_min_face_area_ratio")]
+    pub ir_min_face_area_ratio: f32,
+    #[serde(default)]
+    pub ir_model_hard_fail: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -160,6 +166,9 @@ pub struct AntiSpoofingConfig {
     pub enable: bool,
     pub model: AntiSpoofingModelConfig,
     pub ir_camera: Option<String>,
+    pub ir_warmup_delay_ms: i32,
+    pub ir_min_face_area_ratio: f32,
+    pub ir_model_hard_fail: bool,
 }
 
 impl AntiSpoofingConfig {
@@ -201,6 +210,9 @@ impl AntiSpoofingConfig {
             enable: raw.enable,
             model,
             ir_camera: raw.ir_camera,
+            ir_warmup_delay_ms: raw.ir_warmup_delay_ms,
+            ir_min_face_area_ratio: raw.ir_min_face_area_ratio,
+            ir_model_hard_fail: raw.ir_model_hard_fail,
         }
     }
 }
@@ -242,6 +254,12 @@ fn default_fingerprint_retries() -> u32 {
 fn default_fingerprint_timeout() -> u32 {
     5000
 }
+fn default_ir_warmup_delay_ms() -> i32 {
+    150
+}
+fn default_ir_min_face_area_ratio() -> f32 {
+    0.08
+}
 
 fn default_ignored_services() -> Vec<String> {
     vec!["polkit-1".to_string(), "pkexec".to_string()]
@@ -282,6 +300,9 @@ fn get_default_config(app: &AppHandle) -> BiopassConfig {
                         threshold: 0.8,
                     },
                     ir_camera: None,
+                    ir_warmup_delay_ms: default_ir_warmup_delay_ms(),
+                    ir_min_face_area_ratio: default_ir_min_face_area_ratio(),
+                    ir_model_hard_fail: false,
                 },
             },
             fingerprint: FingerprintMethodConfig {

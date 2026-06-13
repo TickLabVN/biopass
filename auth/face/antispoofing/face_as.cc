@@ -1,17 +1,5 @@
 #include "face_as.h"
 
-int argmax(const float* data, int size) {
-  int max_index = 0;
-  float max_val = data[0];
-  for (int i = 1; i < size; i++) {
-    if (data[i] > max_val) {
-      max_val = data[i];
-      max_index = i;
-    }
-  }
-  return max_index;
-}
-
 FaceAntiSpoofing::FaceAntiSpoofing(const std::string& ckpt, int imgsz, const float threshold) {
   this->ckpt = ckpt;
   this->imgsz = imgsz;
@@ -41,10 +29,8 @@ void FaceAntiSpoofing::loadModel(const std::string& ckpt) {
     auto name = this->session->GetOutputNameAllocated(i, this->allocator);
     this->output_names_str.push_back(name.get());
   }
-  for (auto& s : this->input_names_str)
-    this->input_names_cstr.push_back(s.c_str());
-  for (auto& s : this->output_names_str)
-    this->output_names_cstr.push_back(s.c_str());
+  for (auto& s : this->input_names_str) this->input_names_cstr.push_back(s.c_str());
+  for (auto& s : this->output_names_str) this->output_names_cstr.push_back(s.c_str());
 }
 
 std::vector<float> FaceAntiSpoofing::preprocess(const ImageRGB& input_image) {
@@ -67,9 +53,25 @@ SpoofResult FaceAntiSpoofing::inference(const ImageRGB& image) {
       this->session->Run(Ort::RunOptions{nullptr}, this->input_names_cstr.data(), &input_tensor, 1,
                          this->output_names_cstr.data(), this->output_names_cstr.size());
 
-  const float* logits = output_tensors[0].GetTensorData<float>();
+  if (output_tensors.empty()) {
+    throw std::runtime_error("FaceAntiSpoofing: model returned no outputs");
+  }
 
-  int spoof_cls = argmax(logits, 2);
-  float score = logits[spoof_cls];
-  return SpoofResult(score, spoof_cls == 0 && score >= this->threshold);
+  const auto shape = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape();
+  if (shape.empty() || shape.back() != 2) {
+    throw std::runtime_error("FaceAntiSpoofing: unexpected output shape, expected [..., 2]");
+  }
+
+  // The model outputs post-softmax probabilities in [0, 1].
+  // Index 0 = REAL, index 1 = SPOOF.
+  const float* logits = output_tensors[0].GetTensorData<float>();
+  const float real_score = logits[0];
+  const float spoof_score = logits[1];
+
+  // Secure threshold logic: only allow passage if the real score is high-confidence
+  // (>= threshold) AND strictly greater than the spoof score.
+  // Otherwise, fail-closed (treat as spoof).
+  const bool is_real = (real_score >= this->threshold) && (real_score > spoof_score);
+
+  return SpoofResult(real_score, spoof_score, is_real);
 }

@@ -160,6 +160,16 @@ BiopassConfig readConfig(const std::string& username) {
             config.methods.face.anti_spoofing.ir_warmup_delay_ms =
                 anti_spoofing["ir_warmup_delay_ms"].as<int>();
           }
+
+          if (anti_spoofing["ir_min_face_area_ratio"]) {
+            config.methods.face.anti_spoofing.ir_min_face_area_ratio =
+                anti_spoofing["ir_min_face_area_ratio"].as<float>();
+          }
+
+          if (anti_spoofing["ir_model_hard_fail"]) {
+            config.methods.face.anti_spoofing.ir_model_hard_fail =
+                anti_spoofing["ir_model_hard_fail"].as<bool>();
+          }
         }
 
         // Backward compatibility with old schema:
@@ -258,6 +268,9 @@ bool migrateConfigSchema(const std::string& username, std::string* error) {
     std::string model_path = "models/mobilenetv3_antispoof.onnx";
     float threshold = 0.8f;
     std::string ir_camera_path;
+    int ir_warmup_delay_ms = 150;
+    float ir_min_face_area_ratio = 0.08f;
+    bool ir_model_hard_fail = false;
 
     if (anti) {
       if (anti["enable"]) {
@@ -283,6 +296,18 @@ bool migrateConfigSchema(const std::string& username, std::string* error) {
 
       if (anti["ir_camera"] && !anti["ir_camera"].IsNull()) {
         ir_camera_path = anti["ir_camera"].as<std::string>();
+      }
+
+      if (anti["ir_warmup_delay_ms"]) {
+        ir_warmup_delay_ms = anti["ir_warmup_delay_ms"].as<int>();
+      }
+
+      if (anti["ir_min_face_area_ratio"]) {
+        ir_min_face_area_ratio = anti["ir_min_face_area_ratio"].as<float>();
+      }
+
+      if (anti["ir_model_hard_fail"]) {
+        ir_model_hard_fail = anti["ir_model_hard_fail"].as<bool>();
       }
     }
 
@@ -311,10 +336,15 @@ bool migrateConfigSchema(const std::string& username, std::string* error) {
         anti && static_cast<bool>(anti["model"]) && anti["model"].IsMap() &&
         static_cast<bool>(anti["model"]["path"]) && static_cast<bool>(anti["model"]["threshold"]);
     const bool has_new_ir_key = anti && static_cast<bool>(anti["ir_camera"]);
+    const bool has_new_ir_warmup_key = anti && static_cast<bool>(anti["ir_warmup_delay_ms"]);
+    const bool has_new_ir_area_key = anti && static_cast<bool>(anti["ir_min_face_area_ratio"]);
+    const bool has_new_ir_model_hard_fail_key =
+        anti && static_cast<bool>(anti["ir_model_hard_fail"]);
     const bool needs_migration = has_legacy_face_ir || has_legacy_anti_threshold ||
                                  has_legacy_anti_model_scalar || !has_new_model_map ||
-                                 !has_new_ir_key;
-    if (!needs_migration)
+                                 !has_new_ir_key || !has_new_ir_warmup_key || !has_new_ir_area_key;
+    const bool needs_ir_model_policy_migration = !has_new_ir_model_hard_fail_key;
+    if (!needs_migration && !needs_ir_model_policy_migration)
       return true;
 
     YAML::Node anti_new;
@@ -328,6 +358,9 @@ bool migrateConfigSchema(const std::string& username, std::string* error) {
     } else {
       anti_new["ir_camera"] = ir_camera_path;
     }
+    anti_new["ir_warmup_delay_ms"] = ir_warmup_delay_ms;
+    anti_new["ir_min_face_area_ratio"] = ir_min_face_area_ratio;
+    anti_new["ir_model_hard_fail"] = ir_model_hard_fail;
 
     face["anti_spoofing"] = anti_new;
     if (face["ir_camera"]) {

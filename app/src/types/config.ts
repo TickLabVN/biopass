@@ -43,6 +43,9 @@ export interface FaceMethodConfig {
       threshold: number;
     };
     ir_camera: string | null;
+    ir_warmup_delay_ms: number;
+    ir_min_face_area_ratio: number;
+    ir_model_hard_fail: boolean;
   };
 }
 

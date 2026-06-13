@@ -1,26 +1,28 @@
 #pragma once
 
 #include <string>
+#include <vector>
+
+#include "image_utils.h"
+
+class FaceDetection;
+class FaceAntiSpoofing;
 
 namespace biopass {
 
 class ICameraCaptureSession;
 
-// IR face-presence check.
-// Returns true when the YOLO face-detection model finds at least one bounding
-// box in the captured IR frame.
-//
-// IMPORTANT — this is NOT a liveness detector. It verifies that a face shape
-// is visible in the IR stream; a printed photo placed in front of an IR camera
-// can still pass this check. Treat it as a "blank-frame guard" rather than
-// anti-spoofing in the strict sense.
-//
-// warmup_delay_ms: extra sleep (ms) inserted after the V4L2 warmup frames and
-// before the capture, giving IR LEDs and auto-exposure time to stabilise.
-bool checkAntispoofByIRCamera(const std::string& ir_camera_path,
-                               const std::string& detection_model_path,
-                               float detection_threshold, const std::string& username,
-                               bool debug, ICameraCaptureSession* session = nullptr,
-                               int warmup_delay_ms = 300);
+// IR face liveness classification.
+// Captures frames from the IR camera, retries if they are dark, detects faces,
+// filters by size, and scores them using the anti-spoofing model.
+bool checkAntispoofByIRCamera(ICameraCaptureSession* ir_camera_session,
+                              const std::string& ir_camera_path, FaceDetection* ir_det_model,
+                              FaceAntiSpoofing* ir_as_model, int warmup_delay_ms,
+                              float min_face_area_ratio, const std::string& username,
+                              bool debug_enabled, bool ai_enabled, bool ir_model_hard_fail);
+
+// IR face liveness classification for faces that have already been detected and cropped.
+bool checkAntispoofByIRCrops(const std::vector<ImageRGB>& ir_faces, FaceAntiSpoofing* face_as,
+                             const std::string& username, bool debug, bool is_diagnostic = false);
 
 }  // namespace biopass

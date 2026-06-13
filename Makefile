@@ -13,7 +13,7 @@
 .PHONY: all build build-auth build-app \
         package package-app \
         clean clean-auth clean-app \
-        install-deps
+        install-deps test-auth
 
 # ── Configurable defaults ──────────────────────────────────────────────────
 BUILD_TYPE   ?= Release
@@ -39,6 +39,20 @@ build-auth:
 	      -DPROJECT_VERSION=$(VERSION)
 	@echo "==> [auth] Building…"
 	cmake --build $(AUTH_BUILD) --config $(BUILD_TYPE) --parallel
+
+test-auth:
+	@echo "==> [auth] Configuring tests (BUILD_TYPE=$(BUILD_TYPE))…"
+	cmake -S auth -B $(AUTH_BUILD) \
+	      -Wno-deprecated \
+	      -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+	      -DCMAKE_WARN_DEPRECATED=OFF \
+	      -DCMAKE_ERROR_DEPRECATED=OFF \
+	      -DPROJECT_VERSION=$(VERSION) \
+	      -DBUILD_TESTS=ON
+	@echo "==> [auth] Building tests…"
+	cmake --build $(AUTH_BUILD) --config $(BUILD_TYPE) --parallel
+	@echo "==> [auth] Running tests…"
+	ctest --test-dir $(AUTH_BUILD) --output-on-failure
 
 
 clean-auth:
@@ -76,6 +90,7 @@ help:
 	@echo "  Targets:"
 	@echo "    build          Build both auth and app (default)"
 	@echo "    build-auth     Configure + build the C++ PAM module only"
+	@echo "    test-auth      Build and run C++ auth unit tests"
 	@echo "    build-app      Install JS deps + build the Tauri app only"
 	@echo "    package        Build + package everything into combined Linux bundles"
 	@echo "    package-app    Show Tauri combined bundle output paths"

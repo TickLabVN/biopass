@@ -10,6 +10,7 @@
 #include "antispoof_check.h"
 #include "camera_capture.h"
 #include "debug_image_io.h"
+#include "face_as.h"
 #include "face_detection.h"
 #include "face_recognition.h"
 #include "image_utils.h"
@@ -24,6 +25,8 @@ constexpr int kIrCapturePollIntervalMs = 10;
 
 }  // namespace
 
+FaceAuth::FaceAuth(const FaceMethodConfig& config) : face_config_(config) {}
+
 bool FaceAuth::isAvailable() const { return checkCameraAvailability(face_config_.camera); }
 
 void FaceAuth::beginAuthenticationSession() {
@@ -31,17 +34,90 @@ void FaceAuth::beginAuthenticationSession() {
     camera_session_ = openCameraSession(face_config_.camera);
   }
 
-  if (face_config_.anti_spoofing.ir_camera.has_value() &&
-      !face_config_.anti_spoofing.ir_camera->empty() && !ir_camera_session_) {
+  const bool ir_enabled = face_config_.anti_spoofing.ir_camera.has_value() &&
+                          !face_config_.anti_spoofing.ir_camera->empty();
+
+  if (ir_enabled && !ir_camera_session_) {
     ir_camera_session_ =
         openCameraSession(*face_config_.anti_spoofing.ir_camera, CameraCaptureFormat::V4L2Grey,
                           kIrCaptureWarmupFrames, kIrCaptureTimeoutMs, kIrCapturePollIntervalMs);
+  }
+
+  // Load models for caching. Guards ensure idempotency — if beginAuthenticationSession
+  // is called more than once, models are not reloaded.
+  std::string recogModelPath = face_config_.recognition.model;
+  std::string detectModelPath = face_config_.detection.model;
+
+  // Cache RGB face detector (always needed for face authentication)
+  if (!rgb_detector_ && std::ifstream(detectModelPath).good()) {
+    try {
+      rgb_detector_ = std::make_unique<FaceDetection>(
+          detectModelPath, 640, std::vector<std::string>{"face"}, face_config_.detection.threshold);
+      spdlog::debug("FaceAuth: RGB detection model cached");
+    } catch (const std::exception& e) {
+      spdlog::error("FaceAuth: Failed to cache RGB detection model: {}", e.what());
+    }
+  }
+
+  // Cache IR face detector only when IR camera is configured. Uses a lower
+  // confidence threshold than RGB because the IR detector only needs to prove
+  // face presence, not identity.
+  if (ir_enabled && !ir_detector_ && std::ifstream(detectModelPath).good()) {
+    try {
+      ir_detector_ = std::make_unique<FaceDetection>(detectModelPath, 640,
+                                                     std::vector<std::string>{"face"}, 0.05f);
+      spdlog::debug("FaceAuth: IR detection model cached");
+    } catch (const std::exception& e) {
+      spdlog::error("FaceAuth: Failed to cache IR detection model: {}", e.what());
+    }
+  }
+
+  // Cache recognition model
+  if (!face_recognition_ && std::ifstream(recogModelPath).good()) {
+    try {
+      face_recognition_ = std::make_unique<FaceRecognition>(recogModelPath, 112,
+                                                            face_config_.recognition.threshold);
+      spdlog::debug("FaceAuth: Recognition model cached");
+    } catch (const std::exception& e) {
+      spdlog::error("FaceAuth: Failed to cache recognition model: {}", e.what());
+    }
+  }
+
+  // Cache anti-spoofing model(s). When both AI and IR pipelines are enabled,
+  // use separate wrapper/session instances so the concurrent pipelines do not
+  // share mutable inference state.
+  const std::string asModelPath = face_config_.anti_spoofing.model.path;
+  const float asThreshold = face_config_.anti_spoofing.model.threshold;
+  const bool as_model_exists = !asModelPath.empty() && std::ifstream(asModelPath).good();
+
+  if (face_config_.anti_spoofing.enable && !rgb_antispoof_ && as_model_exists) {
+    try {
+      rgb_antispoof_ = std::make_unique<FaceAntiSpoofing>(asModelPath, 128, asThreshold);
+      spdlog::debug("FaceAuth: RGB anti-spoofing model cached");
+    } catch (const std::exception& e) {
+      spdlog::error("FaceAuth: Failed to cache RGB anti-spoofing model: {}", e.what());
+    }
+  }
+
+  if (ir_enabled && !ir_antispoof_ && as_model_exists) {
+    try {
+      ir_antispoof_ = std::make_unique<FaceAntiSpoofing>(asModelPath, 128, asThreshold);
+      spdlog::debug("FaceAuth: IR anti-spoofing model cached");
+    } catch (const std::exception& e) {
+      spdlog::error("FaceAuth: Failed to cache IR anti-spoofing model: {}", e.what());
+    }
   }
 }
 
 void FaceAuth::endAuthenticationSession() {
   ir_camera_session_.reset();
   camera_session_.reset();
+
+  rgb_detector_.reset();
+  face_recognition_.reset();
+  rgb_antispoof_.reset();
+  ir_detector_.reset();
+  ir_antispoof_.reset();
 }
 
 AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig& config,
@@ -63,41 +139,9 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
     return AuthResult::Unavailable;
   }
 
-  std::string recogModelPath = face_config_.recognition.model;
-  std::string detectModelPath = face_config_.detection.model;
-  if (!std::ifstream(recogModelPath).good() || !std::ifstream(detectModelPath).good()) {
-    spdlog::error("FaceAuth: Model files not found for user {}, skipping", username);
-    return AuthResult::Unavailable;
-  }
-
-  std::unique_ptr<FaceRecognition> faceReg;
-  std::unique_ptr<FaceDetection> detector;
-  try {
-    detector = std::make_unique<FaceDetection>(
-        detectModelPath, 640, std::vector<std::string>{"face"},
-        face_config_.detection.threshold);
-    spdlog::debug("FaceAuth: Detection model loaded | threshold={:.3f}",
-                  face_config_.detection.threshold);
-  } catch (const std::exception& e) {
-    std::string msg = e.what();
-    size_t first_line = msg.find('\n');
-    if (first_line != std::string::npos)
-      msg = msg.substr(0, first_line);
-    spdlog::error("FaceAuth: Failed to load detection model: {}, skipping", msg);
-    return AuthResult::Unavailable;
-  }
-
-  try {
-    faceReg = std::make_unique<FaceRecognition>(
-        recogModelPath, 112, face_config_.recognition.threshold);
-    spdlog::debug("FaceAuth: Recognition model loaded | threshold={:.3f}",
-                  face_config_.recognition.threshold);
-  } catch (const std::exception& e) {
-    std::string msg = e.what();
-    size_t first_line = msg.find('\n');
-    if (first_line != std::string::npos)
-      msg = msg.substr(0, first_line);
-    spdlog::error("FaceAuth: Failed to load recognition model: {}, skipping", msg);
+  // Check if cached models are available
+  if (!rgb_detector_ || !face_recognition_) {
+    spdlog::error("FaceAuth: Models not initialized in session");
     return AuthResult::Unavailable;
   }
 
@@ -112,7 +156,7 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
     return AuthResult::Retry;
   }
 
-  std::vector<Detection> detectedImages = detector->inference(loginFace);
+  std::vector<Detection> detectedImages = rgb_detector_->inference(loginFace);
   if (detectedImages.empty()) {
     spdlog::error("FaceAuth: No face detected");
     return AuthResult::Retry;
@@ -128,7 +172,14 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
                           kIrCaptureWarmupFrames, kIrCaptureTimeoutMs, kIrCapturePollIntervalMs);
   }
 
-  if (!checkAntiSpoof(face_config_, username, face, config, ir_camera_session_.get())) {
+  // NOTE on thread safety: checkAntiSpoof launches async tasks that use the
+  // raw pointers below. The function blocks on all task futures before
+  // returning, so the pointed-to objects remain alive for the entire call.
+  // Do NOT add early-return logic inside checkAntiSpoof without ensuring all
+  // async tasks have completed first — otherwise ir_camera_session_.reset()
+  // below would cause a use-after-free in the IR capture thread.
+  if (!checkAntiSpoof(face_config_, username, detectedImages[0], config, ir_camera_session_.get(),
+                      rgb_antispoof_.get(), ir_detector_.get(), ir_antispoof_.get())) {
     spdlog::warn("FaceAuth: Anti-spoofing failed — returning Failure (no retry allowed)");
     // Always tear down the IR session so a subsequent call cannot reuse a
     // partially-warmed camera to bypass the check.
@@ -146,12 +197,12 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
       continue;
     }
 
-    MatchResult match = faceReg->match(preparedFace, face);
+    MatchResult match = face_recognition_->match(preparedFace, face);
     spdlog::debug("FaceAuth: Recognition | face='{}' score={:.4f} threshold={:.3f} similar={}",
                   facePath, match.dist, face_config_.recognition.threshold, match.similar);
     if (match.similar) {
-      spdlog::debug("FaceAuth: Recognition PASSED | matched face='{}' score={:.4f}",
-                    facePath, match.dist);
+      spdlog::debug("FaceAuth: Recognition PASSED | matched face='{}' score={:.4f}", facePath,
+                    match.dist);
       return AuthResult::Success;
     }
   }
@@ -162,5 +213,7 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
 
   return AuthResult::Retry;
 }
+
+FaceAuth::~FaceAuth() = default;
 
 }  // namespace biopass

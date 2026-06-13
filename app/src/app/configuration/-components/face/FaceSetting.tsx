@@ -285,7 +285,7 @@ export function FaceSetting() {
           </Select>
         </div>
 
-        {config.anti_spoofing.enable && (
+        {(config.anti_spoofing.enable || !!config.anti_spoofing.ir_camera) && (
           <div className="w-48">
             <Threshold
               label="Threshold"

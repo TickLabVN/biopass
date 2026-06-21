@@ -28,7 +28,7 @@
     "@tanstack/react-router": "^1.168.18",
     "@tanstack/react-router-devtools": "^1.166.13",
     "@tauri-apps/api": "^2.10.1",
-    "@tauri-apps/plugin-fs": "^2.4.5",
+    "@tauri-apps/plugin-fs": "2.5.1",
     "@tauri-apps/plugin-opener": "^2.5.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

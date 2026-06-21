@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <fstream>
 
+#include "antispoof_policy.h"
+
 namespace biopass {
 
 std::string getConfigPath(const std::string& username) {
@@ -38,10 +40,8 @@ std::string user_data_dir(const std::string& username) {
   return "";
 }
 
-BiopassConfig readConfig(const std::string& username) {
+BiopassConfig readConfigFile(const std::string& config_path) {
   BiopassConfig config;
-
-  std::string config_path = getConfigPath(username);
 
   try {
     YAML::Node yaml = YAML::LoadFile(config_path);
@@ -160,6 +160,19 @@ BiopassConfig readConfig(const std::string& username) {
             config.methods.face.anti_spoofing.ir_warmup_delay_ms =
                 anti_spoofing["ir_warmup_delay_ms"].as<int>();
           }
+
+          if (anti_spoofing["ir_min_face_area_ratio"]) {
+            config.methods.face.anti_spoofing.ir_min_face_area_ratio =
+                anti_spoofing["ir_min_face_area_ratio"].as<float>();
+          }
+
+          if (anti_spoofing["ir_antispoof_mode"]) {
+            config.methods.face.anti_spoofing.ir_antispoof_mode =
+                normalizeIrAntispoofMode(anti_spoofing["ir_antispoof_mode"].as<std::string>());
+          } else if (anti_spoofing["ir_model_hard_fail"]) {
+            config.methods.face.anti_spoofing.ir_antispoof_mode =
+                anti_spoofing["ir_model_hard_fail"].as<bool>() ? "strict" : "balanced";
+          }
         }
 
         // Backward compatibility with old schema:
@@ -243,8 +256,11 @@ BiopassConfig readConfig(const std::string& username) {
   return config;
 }
 
-bool migrateConfigSchema(const std::string& username, std::string* error) {
-  const std::string config_path = getConfigPath(username);
+BiopassConfig readConfig(const std::string& username) {
+  return readConfigFile(getConfigPath(username));
+}
+
+bool migrateConfigFile(const std::string& config_path, std::string* error) {
   try {
     YAML::Node yaml = YAML::LoadFile(config_path);
     if (!yaml["methods"] || !yaml["methods"]["face"]) {
@@ -258,6 +274,9 @@ bool migrateConfigSchema(const std::string& username, std::string* error) {
     std::string model_path = "models/mobilenetv3_antispoof.onnx";
     float threshold = 0.8f;
     std::string ir_camera_path;
+    int ir_warmup_delay_ms = 150;
+    float ir_min_face_area_ratio = 0.08f;
+    std::string ir_antispoof_mode = "balanced";
 
     if (anti) {
       if (anti["enable"]) {
@@ -284,6 +303,20 @@ bool migrateConfigSchema(const std::string& username, std::string* error) {
       if (anti["ir_camera"] && !anti["ir_camera"].IsNull()) {
         ir_camera_path = anti["ir_camera"].as<std::string>();
       }
+
+      if (anti["ir_warmup_delay_ms"]) {
+        ir_warmup_delay_ms = anti["ir_warmup_delay_ms"].as<int>();
+      }
+
+      if (anti["ir_min_face_area_ratio"]) {
+        ir_min_face_area_ratio = anti["ir_min_face_area_ratio"].as<float>();
+      }
+
+      if (anti["ir_antispoof_mode"]) {
+        ir_antispoof_mode = normalizeIrAntispoofMode(anti["ir_antispoof_mode"].as<std::string>());
+      } else if (anti["ir_model_hard_fail"]) {
+        ir_antispoof_mode = anti["ir_model_hard_fail"].as<bool>() ? "strict" : "balanced";
+      }
     }
 
     if (ir_camera_path.empty() && face["ir_camera"]) {
@@ -307,14 +340,25 @@ bool migrateConfigSchema(const std::string& username, std::string* error) {
     const bool has_legacy_anti_threshold = anti && static_cast<bool>(anti["threshold"]);
     const bool has_legacy_anti_model_scalar =
         anti && static_cast<bool>(anti["model"]) && anti["model"].IsScalar();
+    const bool has_legacy_ir_model_hard_fail =
+        anti && static_cast<bool>(anti["ir_model_hard_fail"]);
     const bool has_new_model_map =
         anti && static_cast<bool>(anti["model"]) && anti["model"].IsMap() &&
         static_cast<bool>(anti["model"]["path"]) && static_cast<bool>(anti["model"]["threshold"]);
     const bool has_new_ir_key = anti && static_cast<bool>(anti["ir_camera"]);
+    const bool has_new_ir_warmup_key = anti && static_cast<bool>(anti["ir_warmup_delay_ms"]);
+    const bool has_new_ir_area_key = anti && static_cast<bool>(anti["ir_min_face_area_ratio"]);
+    const bool has_new_ir_antispoof_mode_key = anti && static_cast<bool>(anti["ir_antispoof_mode"]);
+    const bool has_valid_ir_antispoof_mode =
+        has_new_ir_antispoof_mode_key &&
+        (anti["ir_antispoof_mode"].as<std::string>() == "balanced" ||
+         anti["ir_antispoof_mode"].as<std::string>() == "strict");
     const bool needs_migration = has_legacy_face_ir || has_legacy_anti_threshold ||
-                                 has_legacy_anti_model_scalar || !has_new_model_map ||
-                                 !has_new_ir_key;
-    if (!needs_migration)
+                                 has_legacy_anti_model_scalar || has_legacy_ir_model_hard_fail ||
+                                 !has_new_model_map || !has_new_ir_key || !has_new_ir_warmup_key ||
+                                 !has_new_ir_area_key;
+    const bool needs_ir_model_policy_migration = !has_valid_ir_antispoof_mode;
+    if (!needs_migration && !needs_ir_model_policy_migration)
       return true;
 
     YAML::Node anti_new;
@@ -328,6 +372,9 @@ bool migrateConfigSchema(const std::string& username, std::string* error) {
     } else {
       anti_new["ir_camera"] = ir_camera_path;
     }
+    anti_new["ir_warmup_delay_ms"] = ir_warmup_delay_ms;
+    anti_new["ir_min_face_area_ratio"] = ir_min_face_area_ratio;
+    anti_new["ir_antispoof_mode"] = ir_antispoof_mode;
 
     face["anti_spoofing"] = anti_new;
     if (face["ir_camera"]) {
@@ -351,6 +398,10 @@ bool migrateConfigSchema(const std::string& username, std::string* error) {
       *error = e.what();
     return false;
   }
+}
+
+bool migrateConfigSchema(const std::string& username, std::string* error) {
+  return migrateConfigFile(getConfigPath(username), error);
 }
 
 // ---------------------------------------------------------------------------

@@ -59,6 +59,14 @@ struct AntiSpoofingConfigRaw {
     pub threshold: Option<f32>,
     #[serde(default)]
     pub ir_camera: Option<String>,
+    #[serde(default = "default_ir_warmup_delay_ms")]
+    pub ir_warmup_delay_ms: i32,
+    #[serde(default = "default_ir_min_face_area_ratio")]
+    pub ir_min_face_area_ratio: f32,
+    #[serde(default)]
+    pub ir_antispoof_mode: Option<String>,
+    #[serde(default)]
+    pub ir_model_hard_fail: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -160,6 +168,9 @@ pub struct AntiSpoofingConfig {
     pub enable: bool,
     pub model: AntiSpoofingModelConfig,
     pub ir_camera: Option<String>,
+    pub ir_warmup_delay_ms: i32,
+    pub ir_min_face_area_ratio: f32,
+    pub ir_antispoof_mode: String,
 }
 
 impl AntiSpoofingConfig {
@@ -197,11 +208,87 @@ impl AntiSpoofingConfig {
             model.threshold = threshold;
         }
 
+        let ir_antispoof_mode = match raw.ir_antispoof_mode.as_deref() {
+            Some("strict") => "strict",
+            Some(_) => "balanced",
+            None if raw.ir_model_hard_fail == Some(true) => "strict",
+            None => "balanced",
+        };
+
         Self {
             enable: raw.enable,
             model,
             ir_camera: raw.ir_camera,
+            ir_warmup_delay_ms: raw.ir_warmup_delay_ms,
+            ir_min_face_area_ratio: raw.ir_min_face_area_ratio,
+            ir_antispoof_mode: ir_antispoof_mode.to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod anti_spoofing_config_tests {
+    use super::*;
+
+    fn parse_anti_spoofing(yaml: &str) -> AntiSpoofingConfig {
+        let raw: AntiSpoofingConfigRaw = serde_yaml::from_str(yaml).unwrap();
+        AntiSpoofingConfig::from_raw(raw)
+    }
+
+    #[test]
+    fn defaults_to_balanced() {
+        let config = parse_anti_spoofing("{}");
+        assert_eq!(config.ir_antispoof_mode, "balanced");
+    }
+
+    #[test]
+    fn parses_strict_mode() {
+        let config = parse_anti_spoofing("ir_antispoof_mode: strict");
+        assert_eq!(config.ir_antispoof_mode, "strict");
+    }
+
+    #[test]
+    fn normalizes_unknown_mode_to_balanced() {
+        let config = parse_anti_spoofing("ir_antispoof_mode: experimental");
+        assert_eq!(config.ir_antispoof_mode, "balanced");
+    }
+
+    #[test]
+    fn migrates_legacy_hard_fail_true_to_strict() {
+        let config = parse_anti_spoofing("ir_model_hard_fail: true");
+        assert_eq!(config.ir_antispoof_mode, "strict");
+    }
+
+    #[test]
+    fn migrates_legacy_hard_fail_false_to_balanced() {
+        let config = parse_anti_spoofing("ir_model_hard_fail: false");
+        assert_eq!(config.ir_antispoof_mode, "balanced");
+    }
+
+    #[test]
+    fn explicit_balanced_mode_overrides_legacy_hard_fail() {
+        let config = parse_anti_spoofing("ir_antispoof_mode: balanced\nir_model_hard_fail: true");
+        assert_eq!(config.ir_antispoof_mode, "balanced");
+    }
+
+    #[test]
+    fn serialized_config_round_trips_without_legacy_key() {
+        let config = AntiSpoofingConfig {
+            enable: true,
+            model: AntiSpoofingModelConfig::default(),
+            ir_camera: Some("/dev/video2".to_string()),
+            ir_warmup_delay_ms: 150,
+            ir_min_face_area_ratio: 0.08,
+            ir_antispoof_mode: "strict".to_string(),
+        };
+
+        let yaml = serde_yaml::to_string(&config).unwrap();
+        assert!(yaml.contains("ir_antispoof_mode: strict"));
+        assert!(!yaml.contains("ir_model_hard_fail"));
+
+        let round_trip = parse_anti_spoofing(&yaml);
+        assert_eq!(round_trip.ir_antispoof_mode, "strict");
+        assert_eq!(round_trip.ir_camera.as_deref(), Some("/dev/video2"));
     }
 }
 
@@ -241,6 +328,15 @@ fn default_fingerprint_retries() -> u32 {
 }
 fn default_fingerprint_timeout() -> u32 {
     5000
+}
+fn default_ir_warmup_delay_ms() -> i32 {
+    150
+}
+fn default_ir_min_face_area_ratio() -> f32 {
+    0.08
+}
+fn default_ir_antispoof_mode() -> String {
+    "balanced".to_string()
 }
 
 fn default_ignored_services() -> Vec<String> {
@@ -282,6 +378,9 @@ fn get_default_config(app: &AppHandle) -> BiopassConfig {
                         threshold: 0.8,
                     },
                     ir_camera: None,
+                    ir_warmup_delay_ms: default_ir_warmup_delay_ms(),
+                    ir_min_face_area_ratio: default_ir_min_face_area_ratio(),
+                    ir_antispoof_mode: default_ir_antispoof_mode(),
                 },
             },
             fingerprint: FingerprintMethodConfig {

@@ -35,7 +35,7 @@ Biopass was developed by [@phucvinh57](https://github.com/phucvinh57) and [@thai
 | **Authentication methods** | Face + Fingerprint | Face only |
 | **User Interface** | Modern GUI for management | Command-line interface only |
 | **Configuration** | GUI | Manual |
-| **Face Anti-spoofing** | IR camera + Embedded AI model | IR camera only |
+| **Face Anti-spoofing** | IR liveness classification + Embedded AI model | IR camera only |
 
 ## Installation
 
@@ -62,6 +62,7 @@ Feel free to request new features or report bugs by opening an issue. For contri
 Models used in this project:
 - Face Recognition: **[EdgeFace](https://github.com/otroshi/edgeface)**
 - Face Detection: **[YOLO-Face](https://github.com/akanametov/yolo-face)**
+- Face Anti-Spoofing: **[mobilenetv3-antispoof](https://github.com/facenox/face-antispoof-onnx)** (used for both RGB and IR liveness classification)
 
 ## Star History
 

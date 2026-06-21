@@ -46,13 +46,16 @@ struct AntiSpoofingConfig {
   AntiSpoofingModelConfig model;
   // Linux device path, e.g. "/dev/video2". nullopt means disabled.
   std::optional<std::string> ir_camera = std::nullopt;
-  // Extra delay (ms) inserted after the warmup-frame discard and before the
-  // actual IR capture. Gives IR LEDs and auto-exposure time to stabilise.
+  // Extra delay (ms) kept for backwards compatibility with existing configs.
   // Configurable via anti_spoofing.ir_warmup_delay_ms in config.yaml.
-  // NOTE: The IR check verifies that a face-shaped bounding box exists in the
-  // IR frame (presence check). It is NOT a full liveness detector. A printed
-  // photo that the YOLO model can detect in IR will still pass.
-  int ir_warmup_delay_ms = 300;
+  int ir_warmup_delay_ms = 150;
+  // Minimum detected IR face bounding-box area as a fraction of the full frame.
+  // Smaller crops are treated as insufficient detail for reliable liveness.
+  float ir_min_face_area_ratio = 0.08f;
+  // "balanced": IR presence is required when configured, then either RGB AI
+  // or the IR anti-spoofing model may satisfy liveness.
+  // "strict": IR presence and every enabled liveness model must pass.
+  std::string ir_antispoof_mode = "balanced";
 };
 
 struct FaceMethodConfig {
@@ -105,8 +108,10 @@ struct BiopassConfig {
 };
 std::string getConfigPath(const std::string& username);
 BiopassConfig readConfig(const std::string& username);
+BiopassConfig readConfigFile(const std::string& config_path);
 bool configExists(const std::string& username);
 bool migrateConfigSchema(const std::string& username, std::string* error = nullptr);
+bool migrateConfigFile(const std::string& config_path, std::string* error = nullptr);
 
 std::vector<std::string> listFaces(const std::string& username);
 std::string getDebugPath(const std::string& username);

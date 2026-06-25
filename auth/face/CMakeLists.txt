@@ -2,6 +2,8 @@ add_subdirectory(detection)
 add_subdirectory(recognition)
 add_subdirectory(antispoofing)
 
+find_package(OpenCV QUIET COMPONENTS core imgproc videoio)
+
 # stb image library (JPEG/PNG/BMP/TGA read+write, vendored via FetchContent)
 add_library(biopass_stb STATIC
     stb_impl.cc
@@ -29,6 +31,11 @@ target_link_libraries(biopass_face_common
     openpnp-capture
     spdlog::spdlog_header_only
 )
+if(OpenCV_FOUND)
+    target_include_directories(biopass_face_common PRIVATE ${OpenCV_INCLUDE_DIRS})
+    target_link_libraries(biopass_face_common ${OpenCV_LIBS})
+    target_compile_definitions(biopass_face_common PRIVATE BIOPASS_HAS_OPENCV=1)
+endif()
 
 # Face auth wrapper library
 add_library(biopass_face STATIC

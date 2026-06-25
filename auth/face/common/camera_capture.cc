@@ -3,6 +3,10 @@
 #include <fcntl.h>
 #include <linux/videodev2.h>
 #include <openpnp-capture.h>
+#ifdef BIOPASS_HAS_OPENCV
+#include <opencv2/imgproc.hpp>
+#include <opencv2/videoio.hpp>
+#endif
 #include <poll.h>
 #include <spdlog/spdlog.h>
 #include <sys/ioctl.h>
@@ -410,6 +414,52 @@ class V4L2GreyCameraSession : public ICameraCaptureSession {
   bool stream_started_ = false;
 };
 
+#ifdef BIOPASS_HAS_OPENCV
+class OpenCvGreyCameraSession : public ICameraCaptureSession {
+ public:
+  OpenCvGreyCameraSession(std::string device_path, int warmup_frames)
+      : warmup_frames_(std::max(0, warmup_frames)) {
+    cap_.open(device_path, cv::CAP_V4L2);
+    if (!cap_.isOpened()) {
+      spdlog::warn("FaceAuth: OpenCV failed to open GREY camera '{}'", device_path);
+      return;
+    }
+  }
+
+  bool isOpen() const override { return cap_.isOpened(); }
+
+  ImageRGB capture() override {
+    if (!isOpen()) {
+      return {};
+    }
+
+    cv::Mat frame;
+    for (int i = 0; i <= warmup_frames_; ++i) {
+      if (!cap_.read(frame)) {
+        spdlog::warn("FaceAuth: OpenCV failed to read GREY frame");
+        cap_.release();
+        return {};
+      }
+    }
+    if (frame.empty()) {
+      return {};
+    }
+
+    cv::Mat rgb;
+    cv::cvtColor(frame, rgb, frame.channels() == 1 ? cv::COLOR_GRAY2RGB : cv::COLOR_BGR2RGB);
+
+    if (!rgb.isContinuous()) {
+      rgb = rgb.clone();
+    }
+    return ImageRGB(rgb.cols, rgb.rows, rgb.data);
+  }
+
+ private:
+  int warmup_frames_ = 0;
+  cv::VideoCapture cap_;
+};
+#endif
+
 void captureLogCallback(uint32_t level, const char* message) {
   if (!message) {
     return;
@@ -504,6 +554,15 @@ std::unique_ptr<ICameraCaptureSession> openCameraSession(
       Cap_releaseContext(ctx);
       return nullptr;
     }
+
+#ifdef BIOPASS_HAS_OPENCV
+    auto opencv_session =
+        std::make_unique<OpenCvGreyCameraSession>(*linux_video_device_path, warmup_frames);
+    if (opencv_session->isOpen()) {
+      Cap_releaseContext(ctx);
+      return opencv_session;
+    }
+#endif
 
     const auto grey_format = find_camera_format_by_fourcc(ctx, *device_index, V4L2_PIX_FMT_GREY);
     if (!grey_format.has_value()) {

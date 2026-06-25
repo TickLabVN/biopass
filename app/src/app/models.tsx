@@ -111,11 +111,12 @@ function ModelsRouteComponent() {
       if (config.methods.face.recognition.model) {
         inUsePaths.add(config.methods.face.recognition.model);
       }
+      const antiSpoofing = config.methods.face.anti_spoofing;
       if (
-        config.methods.face.anti_spoofing.enable &&
-        config.methods.face.anti_spoofing.model.path
+        (antiSpoofing.enable || !!antiSpoofing.ir_camera) &&
+        antiSpoofing.model.path
       ) {
-        inUsePaths.add(config.methods.face.anti_spoofing.model.path);
+        inUsePaths.add(antiSpoofing.model.path);
       }
       const checks = modelList.map(async (model) => {
         try {

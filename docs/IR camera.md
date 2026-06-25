@@ -22,7 +22,7 @@ The IR anti-spoofing pipeline runs as a layered liveness check:
 4. **Minimum face scale check** — the detected IR face must occupy enough of the frame for reliable texture-based liveness classification. Very small / distant faces are skipped instead of being treated as spoof evidence. The default threshold requires the IR face bounding box to cover at least 8% of the frame and can be tuned with `anti_spoofing.ir_min_face_area_ratio`.
 5. **Liveness classification** — a MobileNetV3 model (`mobilenetv3_antispoof.onnx`) classifies each selected crop as **real** or **spoof**. Since the model expects RGB, the single grayscale IR channel is cloned into all 3 color channels.
 
-For the sudo/PAM path, Biopass currently collects 2 usable IR face crops. A crop is accepted as real only when the real score meets the configured threshold and is greater than the spoof score.
+For the sudo/PAM path, Biopass currently collects 2 usable IR face crops. The IR model result passes only when every selected crop is accepted as real. A crop is accepted as real only when the real score meets the configured threshold and is greater than the spoof score.
 
 The RGB AI and IR anti-spoofing tasks run in parallel. Their results are combined according to `anti_spoofing.ir_antispoof_mode`:
 

@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import type { VideoDeviceInfo } from "@/types/config";
 import { useConfigurationStore } from "../../-stores/configuration-store";
 import { ModelSelect } from "../methods/shared/ModelSelect";
@@ -65,11 +66,9 @@ export function FaceSetting() {
   const irCameraValue = config.anti_spoofing.ir_camera
     ? (selectedIrCamera?.path ?? unavailableIrDeviceOption)
     : disabledOption;
-  const aiModelValue = config.anti_spoofing.enable
-    ? selectedAiModelExists
-      ? config.anti_spoofing.model.path
-      : unavailableAiModelOption
-    : disabledOption;
+  const antiSpoofModelValue = selectedAiModelExists
+    ? config.anti_spoofing.model.path
+    : unavailableAiModelOption;
 
   return (
     <div className="grid gap-4">
@@ -232,42 +231,50 @@ export function FaceSetting() {
 
       <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-3">
         <h4 className="font-medium text-sm">Anti-Spoofing</h4>
+        <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+          <Label
+            htmlFor="rgb-ai-enabled"
+            className="text-xs text-muted-foreground"
+          >
+            RGB AI
+          </Label>
+          <Switch
+            id="rgb-ai-enabled"
+            checked={config.anti_spoofing.enable}
+            onCheckedChange={(enable) =>
+              setFaceConfig({
+                ...config,
+                anti_spoofing: { ...config.anti_spoofing, enable },
+              })
+            }
+          />
+        </div>
         <div className="grid gap-2">
           <Label
             htmlFor="anti-spoofing-method"
             className="text-xs text-muted-foreground"
           >
-            AI Model
+            Liveness Model
           </Label>
           <Select
-            value={aiModelValue}
+            value={antiSpoofModelValue}
             onValueChange={(value) => {
-              if (value === disabledOption) {
-                setFaceConfig({
-                  ...config,
-                  anti_spoofing: { ...config.anti_spoofing, enable: false },
-                });
-                return;
-              }
-
               setFaceConfig({
                 ...config,
                 anti_spoofing: {
                   ...config.anti_spoofing,
-                  enable: true,
                   model: { ...config.anti_spoofing.model, path: value },
                 },
               });
             }}
           >
             <SelectTrigger id="anti-spoofing-method" className="h-10 w-full">
-              <SelectValue placeholder="Select AI anti-spoofing method" />
+              <SelectValue placeholder="Select liveness model" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={disabledOption}>Disable</SelectItem>
-              {aiModelValue === unavailableAiModelOption && (
+              {antiSpoofModelValue === unavailableAiModelOption && (
                 <SelectItem value={unavailableAiModelOption} disabled>
-                  Selected anti-spoofing model unavailable
+                  Selected liveness model unavailable
                 </SelectItem>
               )}
               {antiSpoofModels.length > 0 ? (

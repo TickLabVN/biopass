@@ -6,6 +6,9 @@ export async function validateConfig(config: BiopassConfig): Promise<boolean> {
   const registeredModelPaths = new Set(
     (config.models || []).map((m) => m.path),
   );
+  const antiSpoofing = config.methods.face.anti_spoofing;
+  const antiSpoofingModelRequired =
+    antiSpoofing.enable || !!antiSpoofing.ir_camera;
 
   if (config.methods.face.enable) {
     if (
@@ -23,11 +26,13 @@ export async function validateConfig(config: BiopassConfig): Promise<boolean> {
       return false;
     }
     if (
-      config.methods.face.anti_spoofing.enable &&
-      (!config.methods.face.anti_spoofing.model.path ||
-        !registeredModelPaths.has(config.methods.face.anti_spoofing.model.path))
+      antiSpoofingModelRequired &&
+      (!antiSpoofing.model.path ||
+        !registeredModelPaths.has(antiSpoofing.model.path))
     ) {
-      toast.error("Valid Anti-Spoofing model is required when enabled");
+      toast.error(
+        "Valid Anti-Spoofing model is required when RGB AI or IR liveness is enabled",
+      );
       return false;
     }
 
@@ -52,11 +57,8 @@ export async function validateConfig(config: BiopassConfig): Promise<boolean> {
       modelsToCheck.push(config.methods.face.detection.model);
     if (config.methods.face.recognition.model)
       modelsToCheck.push(config.methods.face.recognition.model);
-    if (
-      config.methods.face.anti_spoofing.enable &&
-      config.methods.face.anti_spoofing.model.path
-    ) {
-      modelsToCheck.push(config.methods.face.anti_spoofing.model.path);
+    if (antiSpoofingModelRequired && antiSpoofing.model.path) {
+      modelsToCheck.push(antiSpoofing.model.path);
     }
   }
   for (const path of modelsToCheck) {

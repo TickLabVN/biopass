@@ -252,7 +252,9 @@ bool checkAntispoofByIRCrops(const std::vector<ImageRGB>& ir_faces, FaceAntiSpoo
     for (size_t face_idx = 0; face_idx < ir_faces.size(); ++face_idx) {
       const auto& face = ir_faces[face_idx];
       if (face.empty()) {
-        continue;
+        spdlog::error("FaceAuth: IR liveness check — selected face {}/{} is empty/invalid",
+                      face_idx + 1, ir_faces.size());
+        return false;
       }
       valid_faces_processed++;
 
@@ -286,20 +288,17 @@ bool checkAntispoofByIRCrops(const std::vector<ImageRGB>& ir_faces, FaceAntiSpoo
 
     const float avg_real_score = real_score_sum / static_cast<float>(valid_faces_processed);
     const float avg_spoof_score = spoof_score_sum / static_cast<float>(valid_faces_processed);
-    const bool has_strict_real_face = passed_faces >= 1;
-    const bool aggregate_real =
-        avg_real_score >= antispoof_threshold && avg_real_score > avg_spoof_score;
-    const bool passed = has_strict_real_face && aggregate_real;
+    const bool passed = passed_faces == valid_faces_processed;
 
     if (passed) {
       spdlog::debug(
-          "FaceAuth: IR liveness check AGGREGATE PASSED — {}/{} strict face(s) passed, "
+          "FaceAuth: IR liveness check AGGREGATE PASSED — {}/{} selected crop(s) passed, "
           "avg_real={:.4f}, avg_spoof={:.4f}, threshold={:.3f}",
           passed_faces, valid_faces_processed, avg_real_score, avg_spoof_score,
           antispoof_threshold);
     } else {
       spdlog::warn(
-          "FaceAuth: IR liveness check AGGREGATE FAILED — {}/{} strict face(s) passed, "
+          "FaceAuth: IR liveness check AGGREGATE FAILED — {}/{} selected crop(s) passed, "
           "avg_real={:.4f}, avg_spoof={:.4f}, threshold={:.3f}",
           passed_faces, valid_faces_processed, avg_real_score, avg_spoof_score,
           antispoof_threshold);

@@ -506,21 +506,27 @@ std::unique_ptr<ICameraCaptureSession> openCameraSession(
     }
 
     const auto grey_format = find_camera_format_by_fourcc(ctx, *device_index, V4L2_PIX_FMT_GREY);
-    if (!grey_format.has_value()) {
-      spdlog::error("FaceAuth: Camera '{}' does not expose a GREY format for direct V4L2 capture",
-                    *linux_video_device_path);
+    if (grey_format.has_value()) {
       Cap_releaseContext(ctx);
-      return nullptr;
+      auto session = std::make_unique<V4L2GreyCameraSession>(*linux_video_device_path, *grey_format,
+                                                             warmup_frames, capture_timeout_ms,
+                                                             poll_interval_ms);
+      if (!session->isOpen()) {
+        return nullptr;
+      }
+      return session;
     }
 
-    Cap_releaseContext(ctx);
-    auto session = std::make_unique<V4L2GreyCameraSession>(*linux_video_device_path, *grey_format,
-                                                           warmup_frames, capture_timeout_ms,
-                                                           poll_interval_ms);
-    if (!session->isOpen()) {
-      return nullptr;
-    }
-    return session;
+    // No native GREY format. Some laptop IR sensors (e.g. Windows Hello cameras)
+    // expose the IR stream only as MJPG. Instead of failing, fall through to the
+    // openpnp capture path below, which decodes MJPG/YUYV to RGB. For an IR sensor
+    // the decoded frame is effectively grayscale (R=G=B) — exactly what the YOLO
+    // face-presence check consumes.
+    spdlog::warn(
+        "FaceAuth: Camera '{}' exposes no GREY format; falling back to decoded openpnp "
+        "capture (IR-as-MJPG).",
+        *linux_video_device_path);
+    // ctx intentionally kept alive; execution continues to the openpnp path below.
   }
 
   CapFormatInfo fmt {};

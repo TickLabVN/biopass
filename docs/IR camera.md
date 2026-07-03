@@ -1,24 +1,27 @@
 # IR Camera Guide
 
-Biopass supports an infrared (IR) camera for face liveness detection. When configured, the IR pipeline waits for the IR emitter/exposure to become visible, confirms that a face is present in IR, and can classify the selected crops with the MobileNetV3 anti-spoofing model. The model was originally trained on RGB imagery and is evaluated in grayscale-as-RGB mode by replicating the single IR channel.
+Biopass supports an infrared (IR) camera for face liveness detection. When configured, the IR pipeline waits for the IR emitter/exposure to become visible, verifies that the stream contains a real pulsed illumination pattern, confirms that a face is present in IR, and can classify the selected crops with the MobileNetV3 anti-spoofing model. The model was originally trained on RGB imagery and is evaluated in grayscale-as-RGB mode by replicating the single IR channel.
 
 This texture-based check is designed to help reject printed photos or screen replays. It is not an IR-domain fine-tuned model and does not provide hardware-backed depth or TPM-style guarantees.
 
 ## Requirements
 
 - A Linux system where the IR sensor is exposed as a `/dev/video*` device.
+- An IR camera/emitter stream that exposes alternating illuminated and dark frames.
 - A working face setup in Biopass.
 - Permission to access the camera device.
 
 Biopass only reads from the configured IR video device. It does not manage the hardware IR emitter for your laptop or webcam.
 
+When direct V4L2 GREY capture cannot open a device reliably, builds compiled with OpenCV support can fall back to OpenCV's V4L2 backend for the configured IR camera. This fallback is controlled at build time with `BIOPASS_OPENCV_GREY_CAPTURE` (`AUTO`, `ON`, or `OFF`).
+
 ## How It Works
 
 The IR anti-spoofing pipeline runs as a layered liveness check:
 
-1. **LED / exposure warm-up** — the IR camera may initially return a dark frame, so Biopass waits until brightness statistics (`mean` and `max`) show that the frame is usable.
-2. **Frame quality diagnostics** — dark or stale IR frames are logged as low-illumination candidates, but brightness alone does not block face detection or liveness evaluation.
-3. **Face crop selection** — a YOLO model (`yolov8n-face.onnx`) locates a face in usable IR frames. The current threshold for IR face presence is intentionally lower than identity recognition because this step only proves that the RGB face area has a usable IR face crop.
+1. **LED / exposure warm-up** — the IR camera may initially return a dark frame, so Biopass waits until brightness and contrast statistics (`mean`, `max`, and standard deviation) show that the frame is illuminated enough to use.
+2. **Illumination pulse validation** — the IR stream must contain a bright-dark-bright pattern. The dark frame must be almost black but not pure black, and it must contain local low-light structure rather than uniform random noise. This helps reject constant captured IR loops and simple black-frame/captured-frame replay streams.
+3. **Face crop selection** — a YOLO model (`yolov8n-face.onnx`) locates a face only in illuminated IR frames. The current threshold for IR face presence is intentionally lower than identity recognition because this step only proves that the RGB face area has a usable IR face crop.
 4. **Minimum face scale check** — the detected IR face must occupy enough of the frame for reliable texture-based liveness classification. Very small / distant faces are skipped instead of being treated as spoof evidence. The default threshold requires the IR face bounding box to cover at least 8% of the frame and can be tuned with `anti_spoofing.ir_min_face_area_ratio`.
 5. **Liveness classification** — a MobileNetV3 model (`mobilenetv3_antispoof.onnx`) classifies each selected crop as **real** or **spoof**. Since the model expects RGB, the single grayscale IR channel is cloned into all 3 color channels.
 
@@ -31,7 +34,7 @@ The RGB AI and IR anti-spoofing tasks run in parallel. Their results are combine
 
 When only one anti-spoofing method is enabled, both modes require that method to pass. Existing `ir_model_hard_fail: true` configurations are migrated to `ir_antispoof_mode: strict`; false or missing values migrate to `balanced`.
 
-When debug mode is enabled, Biopass saves additional IR diagnostics, including the selected IR face crop and the resized `128x128` image that is passed to the anti-spoofing model. These images can help distinguish between a real model mismatch and insufficient input detail caused by distance, blur, or poor crop scale.
+When debug mode is enabled, Biopass saves additional IR diagnostics, including raw IR attempts, the selected IR face crop, and the resized `128x128` image that is passed to the anti-spoofing model. These images can help distinguish between a real model mismatch, a missing illumination pulse, and insufficient input detail caused by distance, blur, or poor crop scale.
 
 ## 1. Find the IR Camera Device
 

@@ -18,8 +18,9 @@ struct IRLivenessResult {
 };
 
 // IR face liveness classification.
-// Captures frames from the IR camera, retries if they are dark, detects faces,
-// filters by size, and scores them using the anti-spoofing model.
+// Captures frames from the IR camera, validates pulsed illumination, detects
+// faces in illuminated frames, filters by size, and scores them using the
+// anti-spoofing model.
 IRLivenessResult checkAntispoofByIRCamera(ICameraCaptureSession* ir_camera_session,
                                           const std::string& ir_camera_path,
                                           FaceDetection* ir_det_model,

@@ -3,6 +3,10 @@
 #include <fcntl.h>
 #include <linux/videodev2.h>
 #include <openpnp-capture.h>
+#ifdef BIOPASS_HAS_OPENCV
+#include <opencv2/imgproc.hpp>
+#include <opencv2/videoio.hpp>
+#endif
 #include <poll.h>
 #include <spdlog/spdlog.h>
 #include <sys/ioctl.h>
@@ -413,6 +417,114 @@ class V4L2GreyCameraSession : public ICameraCaptureSession {
   bool stream_started_ = false;
 };
 
+#ifdef BIOPASS_HAS_OPENCV
+class OpenCvGreyCameraSession : public ICameraCaptureSession {
+ public:
+  OpenCvGreyCameraSession(std::string device_path, std::optional<CapFormatInfo> format,
+                          int warmup_frames)
+      : device_path_(std::move(device_path)), warmup_frames_(std::max(0, warmup_frames)) {
+    cap_.open(device_path_, cv::CAP_V4L2);
+    if (!cap_.isOpened()) {
+      spdlog::warn("FaceAuth: OpenCV failed to open GREY camera fallback '{}'", device_path_);
+      return;
+    }
+
+    cap_.set(cv::CAP_PROP_CONVERT_RGB, 0);
+    if (format.has_value()) {
+      cap_.set(cv::CAP_PROP_FRAME_WIDTH, format->width);
+      cap_.set(cv::CAP_PROP_FRAME_HEIGHT, format->height);
+      if (format->fps > 0) {
+        cap_.set(cv::CAP_PROP_FPS, format->fps);
+      }
+      cap_.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('G', 'R', 'E', 'Y'));
+    }
+
+    spdlog::debug("FaceAuth: OpenCV GREY camera fallback opened '{}'", device_path_);
+  }
+
+  ~OpenCvGreyCameraSession() override { close(); }
+
+  bool isOpen() const override { return cap_.isOpened(); }
+
+  ImageRGB capture() override {
+    if (!isOpen()) {
+      return {};
+    }
+
+    const int total_frames_needed = warmup_frames_ + 1;
+    cv::Mat frame;
+    for (int captured_frames = 0; captured_frames < total_frames_needed; ++captured_frames) {
+      if (!cap_.read(frame)) {
+        spdlog::warn("FaceAuth: OpenCV failed to read GREY frame from '{}'", device_path_);
+        close();
+        return {};
+      }
+    }
+    warmup_frames_ = 0;
+
+    if (frame.empty()) {
+      return {};
+    }
+
+    cv::Mat frame_u8;
+    if (frame.depth() == CV_8U) {
+      frame_u8 = frame;
+    } else {
+      frame.convertTo(frame_u8, CV_8U);
+    }
+
+    cv::Mat rgb;
+    switch (frame_u8.channels()) {
+      case 1:
+        cv::cvtColor(frame_u8, rgb, cv::COLOR_GRAY2RGB);
+        break;
+      case 2:
+        cv::cvtColor(frame_u8, rgb, cv::COLOR_YUV2RGB_YUYV);
+        break;
+      case 3:
+        cv::cvtColor(frame_u8, rgb, cv::COLOR_BGR2RGB);
+        break;
+      case 4:
+        cv::cvtColor(frame_u8, rgb, cv::COLOR_BGRA2RGB);
+        break;
+      default:
+        spdlog::warn(
+            "FaceAuth: OpenCV GREY fallback returned unsupported {}-channel frame from '{}'",
+            frame_u8.channels(), device_path_);
+        close();
+        return {};
+    }
+
+    if (!rgb.isContinuous()) {
+      rgb = rgb.clone();
+    }
+    return ImageRGB(rgb.cols, rgb.rows, rgb.data);
+  }
+
+ private:
+  void close() {
+    if (cap_.isOpened()) {
+      cap_.release();
+    }
+  }
+
+  std::string device_path_;
+  int warmup_frames_ = 0;
+  cv::VideoCapture cap_;
+};
+
+std::unique_ptr<ICameraCaptureSession> open_opencv_grey_camera_session(
+    const std::string& linux_video_device_path, std::optional<CapFormatInfo> format,
+    int warmup_frames) {
+  auto session =
+      std::make_unique<OpenCvGreyCameraSession>(linux_video_device_path, format, warmup_frames);
+  if (!session->isOpen()) {
+    return nullptr;
+  }
+  return session;
+}
+#endif
+
 void captureLogCallback(uint32_t level, const char* message) {
   if (!message) {
     return;
@@ -511,9 +623,20 @@ std::unique_ptr<ICameraCaptureSession> openCameraSession(
 
     const auto grey_format = find_camera_format_by_fourcc(ctx, *device_index, V4L2_PIX_FMT_GREY);
     if (!grey_format.has_value()) {
+      Cap_releaseContext(ctx);
+#ifdef BIOPASS_HAS_OPENCV
+      spdlog::warn(
+          "FaceAuth: Camera '{}' does not expose a GREY format through openpnp; trying OpenCV "
+          "GREY fallback",
+          *linux_video_device_path);
+      auto opencv_session =
+          open_opencv_grey_camera_session(*linux_video_device_path, std::nullopt, warmup_frames);
+      if (opencv_session) {
+        return opencv_session;
+      }
+#endif
       spdlog::error("FaceAuth: Camera '{}' does not expose a GREY format for direct V4L2 capture",
                     *linux_video_device_path);
-      Cap_releaseContext(ctx);
       return nullptr;
     }
 
@@ -522,6 +645,16 @@ std::unique_ptr<ICameraCaptureSession> openCameraSession(
                                                            warmup_frames, capture_timeout_ms,
                                                            poll_interval_ms);
     if (!session->isOpen()) {
+#ifdef BIOPASS_HAS_OPENCV
+      spdlog::warn(
+          "FaceAuth: Direct V4L2 GREY capture failed for '{}'; trying OpenCV GREY fallback",
+          *linux_video_device_path);
+      auto opencv_session =
+          open_opencv_grey_camera_session(*linux_video_device_path, grey_format, warmup_frames);
+      if (opencv_session) {
+        return opencv_session;
+      }
+#endif
       return nullptr;
     }
     return session;

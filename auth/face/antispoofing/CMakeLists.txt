@@ -1,5 +1,6 @@
 add_library(biopass_as SHARED
     face_as.cc
+    ir_liveness_analyzer.cc
     ir_camera_as.cc
     antispoof_check.cc
 )

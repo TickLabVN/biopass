@@ -4,9 +4,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cmath>
-#include <fstream>
-#include <limits>
 #include <thread>
 
 #include "auth_config.h"
@@ -14,40 +11,9 @@
 #include "debug_image_io.h"
 #include "face_as.h"
 #include "face_detection.h"
+#include "ir_liveness_analyzer.h"
 
 namespace biopass {
-
-namespace {
-
-struct IRFrameStats {
-  int min_val = 255;
-  int max_val = 0;
-  double mean_val = 0.0;
-};
-
-IRFrameStats calculate_ir_frame_stats(const ImageRGB& frame) {
-  IRFrameStats stats;
-  const int total_pixels = frame.width * frame.height;
-  if (frame.empty() || total_pixels <= 0) {
-    stats.min_val = 0;
-    return stats;
-  }
-
-  double sum_val = 0.0;
-  const uint8_t* ptr = frame.ptr();
-  for (int i = 0; i < total_pixels; ++i) {
-    uint8_t val = ptr[i * 3];
-    if (val < stats.min_val)
-      stats.min_val = val;
-    if (val > stats.max_val)
-      stats.max_val = val;
-    sum_val += val;
-  }
-  stats.mean_val = sum_val / total_pixels;
-  return stats;
-}
-
-}  // namespace
 
 IRLivenessResult checkAntispoofByIRCamera(ICameraCaptureSession* ir_camera_session,
                                           const std::string& ir_camera_path,
@@ -81,19 +47,19 @@ IRLivenessResult checkAntispoofByIRCamera(ICameraCaptureSession* ir_camera_sessi
   constexpr int kMaxLedWarmupRetryDelayMs = 300;
   const int led_warmup_retry_delay_ms =
       std::clamp(warmup_delay_ms, kMinLedWarmupRetryDelayMs, kMaxLedWarmupRetryDelayMs);
-  constexpr double kUsableIrMean = 35.0;
-  constexpr int kUsableIrMax = 120;
   constexpr float kIrFacePresentThreshold = 0.45f;
   constexpr int kRequiredUsableIrFrames = 2;
-  constexpr int kMaxIrFrameSelectionAttempts = 6;
-  constexpr int kIrFrameSelectionIntervalMs = 80;
+  constexpr int kMaxSelectedIrFaces = 3;
+  constexpr int kMaxIrFrameSelectionAttempts = 12;
+  constexpr int kIrFrameSelectionIntervalMs = 50;
 
-  auto process_and_log_ir_frame = [&](const ImageRGB& frame, int attempt) -> IRFrameStats {
+  auto process_and_log_ir_frame = [&](const ImageRGB& frame,
+                                      int attempt) -> ir_liveness::FrameStats {
     if (frame.empty()) {
       spdlog::debug("FaceAuth: IR frame stats (attempt {}) — frame is empty", attempt);
       return {};
     }
-    const IRFrameStats stats = calculate_ir_frame_stats(frame);
+    const ir_liveness::FrameStats stats = ir_liveness::calculateFrameStats(frame);
 
     if (debug_enabled) {
       const std::string path =
@@ -103,8 +69,10 @@ IRLivenessResult checkAntispoofByIRCamera(ICameraCaptureSession* ir_camera_sessi
 
     spdlog::debug(
         "FaceAuth: IR frame stats (attempt {}) — shape=({}x{}x3), "
-        "dtype=uint8, min={}, max={}, mean={:.2f}",
-        attempt, frame.width, frame.height, stats.min_val, stats.max_val, stats.mean_val);
+        "dtype=uint8, min={}, max={}, mean={:.2f}, stddev={:.2f}, "
+        "tile_mean_stddev={:.2f}, tile_stddev_mean={:.2f}",
+        attempt, frame.width, frame.height, stats.min_val, stats.max_val, stats.mean_val,
+        stats.stddev_val, stats.tile_mean_stddev, stats.tile_stddev_mean);
     return stats;
   };
 
@@ -115,48 +83,69 @@ IRLivenessResult checkAntispoofByIRCamera(ICameraCaptureSession* ir_camera_sessi
   process_and_log_ir_frame(ir_frame, 0);
 
   try {
-    IRFrameStats ir_stats = calculate_ir_frame_stats(ir_frame);
+    ir_liveness::FrameStats ir_stats = ir_liveness::calculateFrameStats(ir_frame);
     for (int attempt = 0; attempt < kMaxLedWarmupRetries && !ir_frame.empty(); ++attempt) {
-      if (ir_stats.mean_val >= kUsableIrMean && ir_stats.max_val >= kUsableIrMax) {
+      if (ir_liveness::isIlluminatedFrame(ir_stats)) {
         if (attempt > 0) {
           spdlog::debug(
               "FaceAuth: IR liveness check — LED ready after {} "
-              "recapture(s) (mean={:.2f}, max={})",
-              attempt, ir_stats.mean_val, ir_stats.max_val);
+              "recapture(s) (mean={:.2f}, max={}, stddev={:.2f})",
+              attempt, ir_stats.mean_val, ir_stats.max_val, ir_stats.stddev_val);
         }
         break;
       }
 
       spdlog::debug(
-          "FaceAuth: IR liveness check — IR frame is still dark "
-          "(mean={:.2f} < {:.2f} or max={} < {}), LED may not be ready — "
+          "FaceAuth: IR liveness check — IR frame is not illuminated enough "
+          "(mean={:.2f}, max={}, stddev={:.2f}), LED may not be ready — "
           "recapturing in {}ms (attempt {}/{})",
-          ir_stats.mean_val, kUsableIrMean, ir_stats.max_val, kUsableIrMax,
-          led_warmup_retry_delay_ms, attempt + 1, kMaxLedWarmupRetries);
+          ir_stats.mean_val, ir_stats.max_val, ir_stats.stddev_val, led_warmup_retry_delay_ms,
+          attempt + 1, kMaxLedWarmupRetries);
       std::this_thread::sleep_for(std::chrono::milliseconds(led_warmup_retry_delay_ms));
       ir_frame = capture_ir();
       ir_stats = process_and_log_ir_frame(ir_frame, attempt + 1);
     }
 
     std::vector<ImageRGB> ir_faces;
-    for (int attempt = 0;
-         attempt < kMaxIrFrameSelectionAttempts && (int)ir_faces.size() < kRequiredUsableIrFrames;
-         ++attempt) {
+    std::vector<int> ir_face_frame_indices;
+    std::vector<ir_liveness::FrameStats> pulse_stats;
+    ir_liveness::PulseValidationResult pulse_result;
+    for (int attempt = 0; attempt < kMaxIrFrameSelectionAttempts; ++attempt) {
       ImageRGB candidate = attempt == 0 ? ir_frame : capture_ir();
-      const IRFrameStats stats = process_and_log_ir_frame(candidate, 100 + attempt);
+      const ir_liveness::FrameStats stats = process_and_log_ir_frame(candidate, 100 + attempt);
       if (candidate.empty()) {
         continue;
       }
+      pulse_stats.push_back(stats);
+      const int pulse_frame_index = static_cast<int>(pulse_stats.size()) - 1;
 
-      const bool low_ir_quality = stats.mean_val < kUsableIrMean || stats.max_val < kUsableIrMax;
-      if (low_ir_quality) {
-        spdlog::debug(
-            "FaceAuth: IR liveness check — IR frame has low illumination; still "
-            "checking for face (mean={:.2f} < {:.2f} or max={} < {})",
-            stats.mean_val, kUsableIrMean, stats.max_val, kUsableIrMax);
+      const bool illuminated_frame = ir_liveness::isIlluminatedFrame(stats);
+      const bool dark_pulse_frame = ir_liveness::isDarkPulseFrame(stats);
+      if (!illuminated_frame) {
+        if (dark_pulse_frame) {
+          spdlog::debug(
+              "FaceAuth: IR liveness check — observed dark IR pulse frame "
+              "(mean={:.2f}, max={}, stddev={:.2f}, tile_mean_stddev={:.2f})",
+              stats.mean_val, stats.max_val, stats.stddev_val, stats.tile_mean_stddev);
+        } else {
+          spdlog::debug(
+              "FaceAuth: IR liveness check — skipping non-illuminated/non-pulse IR frame "
+              "(mean={:.2f}, max={}, stddev={:.2f}, tile_mean_stddev={:.2f})",
+              stats.mean_val, stats.max_val, stats.stddev_val, stats.tile_mean_stddev);
+        }
+
+        pulse_result = ir_liveness::validateIlluminationPulse(pulse_stats);
+        if ((int)ir_faces.size() >= kRequiredUsableIrFrames && pulse_result.passed &&
+            ir_liveness::acceptedFramesBracketDarkPulse(pulse_stats, ir_face_frame_indices)) {
+          break;
+        }
+        if (attempt + 1 < kMaxIrFrameSelectionAttempts) {
+          std::this_thread::sleep_for(std::chrono::milliseconds(kIrFrameSelectionIntervalMs));
+        }
+        continue;
       }
 
-      {
+      if ((int)ir_faces.size() < kMaxSelectedIrFaces) {
         const std::vector<Detection> raw = ir_det_model->inference(candidate);
         float max_conf = 0.0f;
         int best_detection_index = -1;
@@ -186,6 +175,7 @@ IRLivenessResult checkAntispoofByIRCamera(ICameraCaptureSession* ir_camera_sessi
                 max_conf, bbox_w, bbox_h, bbox_area_ratio, min_face_area_ratio);
           } else {
             ir_faces.push_back(best_detection.image);
+            ir_face_frame_indices.push_back(pulse_frame_index);
             if (debug_enabled) {
               saveFailedFace(username, best_detection.image, "ir_selected_crop");
               saveFailedFace(username, resizeImage(best_detection.image, 128, 128),
@@ -193,10 +183,11 @@ IRLivenessResult checkAntispoofByIRCamera(ICameraCaptureSession* ir_camera_sessi
             }
 
             spdlog::debug(
-                "FaceAuth: IR liveness check — accepted usable IR face {}/{} "
-                "(face_conf={:.4f}, bbox={}x{}, area_ratio={:.4f}, mean={:.2f}, max={})",
+                "FaceAuth: IR liveness check — accepted usable IR face {}/{} minimum "
+                "(face_conf={:.4f}, bbox={}x{}, area_ratio={:.4f}, mean={:.2f}, "
+                "max={}, stddev={:.2f})",
                 ir_faces.size(), kRequiredUsableIrFrames, max_conf, bbox_w, bbox_h, bbox_area_ratio,
-                stats.mean_val, stats.max_val);
+                stats.mean_val, stats.max_val, stats.stddev_val);
           }
         } else {
           spdlog::debug(
@@ -206,7 +197,13 @@ IRLivenessResult checkAntispoofByIRCamera(ICameraCaptureSession* ir_camera_sessi
         }
       }
 
-      if ((int)ir_faces.size() < kRequiredUsableIrFrames) {
+      pulse_result = ir_liveness::validateIlluminationPulse(pulse_stats);
+      if ((int)ir_faces.size() >= kRequiredUsableIrFrames && pulse_result.passed &&
+          ir_liveness::acceptedFramesBracketDarkPulse(pulse_stats, ir_face_frame_indices)) {
+        break;
+      }
+
+      if (attempt + 1 < kMaxIrFrameSelectionAttempts) {
         std::this_thread::sleep_for(std::chrono::milliseconds(kIrFrameSelectionIntervalMs));
       }
     }
@@ -218,6 +215,32 @@ IRLivenessResult checkAntispoofByIRCamera(ICameraCaptureSession* ir_camera_sessi
           ir_faces.size(), ir_camera_path);
       return {};
     }
+
+    if (!ir_liveness::acceptedFramesBracketDarkPulse(pulse_stats, ir_face_frame_indices)) {
+      spdlog::error(
+          "FaceAuth: IR liveness check — usable IR face frames did not bracket a valid "
+          "dark pulse frame (usable_faces={}, observed_frames={})",
+          ir_faces.size(), pulse_stats.size());
+      return {};
+    }
+
+    if (!pulse_result.passed) {
+      pulse_result = ir_liveness::validateIlluminationPulse(pulse_stats);
+      spdlog::error(
+          "FaceAuth: IR liveness check — IR illumination pulse validation failed: {} "
+          "(illuminated_frames={}, dark_frames={}, transitions={}, mean_swing={:.2f})",
+          pulse_result.reason, pulse_result.illuminated_frame_count, pulse_result.dark_frame_count,
+          pulse_result.transition_count, pulse_result.mean_swing);
+      return {};
+    }
+
+    spdlog::debug(
+        "FaceAuth: IR liveness check — IR illumination pulse validated "
+        "(illuminated_frames={}, dark_frames={}, transitions={}, mean_swing={:.2f}, "
+        "approx_bright_dark_bright_span={}ms)",
+        pulse_result.illuminated_frame_count, pulse_result.dark_frame_count,
+        pulse_result.transition_count, pulse_result.mean_swing,
+        pulse_result.pulse_span_frames * kIrFrameSelectionIntervalMs);
 
     return {true, checkAntispoofByIRCrops(ir_faces, ir_as_model, username, debug_enabled)};
   } catch (const std::exception& e) {

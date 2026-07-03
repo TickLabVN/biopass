@@ -2,6 +2,18 @@ add_subdirectory(detection)
 add_subdirectory(recognition)
 add_subdirectory(antispoofing)
 
+set(BIOPASS_OPENCV_GREY_CAPTURE "AUTO" CACHE STRING "OpenCV GREY camera fallback: AUTO, ON, or OFF")
+set_property(CACHE BIOPASS_OPENCV_GREY_CAPTURE PROPERTY STRINGS AUTO ON OFF)
+if(NOT BIOPASS_OPENCV_GREY_CAPTURE MATCHES "^(AUTO|ON|OFF)$")
+    message(FATAL_ERROR "BIOPASS_OPENCV_GREY_CAPTURE must be AUTO, ON, or OFF")
+endif()
+if(NOT BIOPASS_OPENCV_GREY_CAPTURE STREQUAL "OFF")
+    find_package(OpenCV QUIET COMPONENTS core imgproc videoio)
+    if(BIOPASS_OPENCV_GREY_CAPTURE STREQUAL "ON" AND NOT OpenCV_FOUND)
+        message(FATAL_ERROR "BIOPASS_OPENCV_GREY_CAPTURE=ON requires OpenCV core/imgproc/videoio")
+    endif()
+endif()
+
 # stb image library (JPEG/PNG/BMP/TGA read+write, vendored via FetchContent)
 add_library(biopass_stb STATIC
     stb_impl.cc
@@ -29,6 +41,14 @@ target_link_libraries(biopass_face_common
     openpnp-capture
     spdlog::spdlog_header_only
 )
+if(OpenCV_FOUND)
+    target_include_directories(biopass_face_common PRIVATE ${OpenCV_INCLUDE_DIRS})
+    target_link_libraries(biopass_face_common ${OpenCV_LIBS})
+    target_compile_definitions(biopass_face_common PRIVATE BIOPASS_HAS_OPENCV=1)
+    message(STATUS "OpenCV GREY camera fallback enabled")
+elseif(NOT BIOPASS_OPENCV_GREY_CAPTURE STREQUAL "OFF")
+    message(STATUS "OpenCV GREY camera fallback disabled (OpenCV not found)")
+endif()
 
 # Face auth wrapper library
 add_library(biopass_face STATIC

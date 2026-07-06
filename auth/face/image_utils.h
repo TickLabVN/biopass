@@ -2,6 +2,7 @@
 #define IMAGE_UTILS_H
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -129,6 +130,163 @@ inline ImageRGB imageLetterbox(const ImageRGB &src, int tw, int th, uint8_t pad_
  */
 inline ImageRGB imageResizePad(const ImageRGB &src, int tw, int th) {
   return imageLetterbox(src, tw, th, 0);
+}
+
+/**
+ * Area-average resize (downscaling).
+ */
+inline ImageRGB resizeImageArea(const ImageRGB &src, int tw, int th) {
+  if (src.empty() || tw <= 0 || th <= 0) return {};
+  ImageRGB dst(tw, th);
+
+  double sx = (double)src.width / tw;
+  double sy = (double)src.height / th;
+
+  for (int y = 0; y < th; y++) {
+    double y0 = y * sy;
+    double y1 = (y + 1) * sy;
+    int iy0 = (int)std::floor(y0);
+    int iy1 = std::min(src.height, (int)std::ceil(y1));
+
+    for (int x = 0; x < tw; x++) {
+      double x0 = x * sx;
+      double x1 = (x + 1) * sx;
+      int ix0 = (int)std::floor(x0);
+      int ix1 = std::min(src.width, (int)std::ceil(x1));
+
+      double acc[3] = {0, 0, 0};
+      double weight_sum = 0;
+      for (int sy_i = iy0; sy_i < iy1; sy_i++) {
+        double wy = std::min((double)(sy_i + 1), y1) - std::max((double)sy_i, y0);
+        if (wy <= 0) continue;
+        for (int sx_i = ix0; sx_i < ix1; sx_i++) {
+          double wx = std::min((double)(sx_i + 1), x1) - std::max((double)sx_i, x0);
+          if (wx <= 0) continue;
+          double w = wx * wy;
+          for (int c = 0; c < 3; c++) acc[c] += src.at(sy_i, sx_i, c) * w;
+          weight_sum += w;
+        }
+      }
+
+      for (int c = 0; c < 3; c++) {
+        double v = (weight_sum > 0) ? acc[c] / weight_sum : 0.0;
+        dst.at(y, x, c) = (uint8_t)std::min(255.0, std::max(0.0, std::round(v)));
+      }
+    }
+  }
+  return dst;
+}
+
+namespace image_utils_detail {
+
+// 4-lobe Lanczos kernel.
+inline double lanczos4(double x) {
+  constexpr double kA = 4.0;
+  if (x == 0.0) return 1.0;
+  if (x <= -kA || x >= kA) return 0.0;
+  const double px = M_PI * x;
+  return kA * std::sin(px) * std::sin(px / kA) / (px * px);
+}
+
+// Lanczos4 sample weights/indices for one output coordinate.
+inline void lanczos4Weights(double src_pos, int src_size, int *idx, double *w) {
+  int center = (int)std::floor(src_pos);
+  for (int k = -3; k <= 4; k++) {
+    int i = center + k;
+    double dist = src_pos - i;
+    w[k + 3] = lanczos4(dist);
+    idx[k + 3] = std::min(std::max(i, 0), src_size - 1);
+  }
+}
+
+}
+
+// Lanczos4 resize (upscaling): separable 8-tap windowed-sinc resampling.
+inline ImageRGB resizeImageLanczos4(const ImageRGB &src, int tw, int th) {
+  if (src.empty() || tw <= 0 || th <= 0) return {};
+  ImageRGB dst(tw, th);
+
+  double sx = (double)src.width / tw;
+  double sy = (double)src.height / th;
+
+  // Precompute horizontal weights/indices per output column.
+  std::vector<std::array<int, 8>> col_idx(tw);
+  std::vector<std::array<double, 8>> col_w(tw);
+  for (int x = 0; x < tw; x++) {
+    double src_x = (x + 0.5) * sx - 0.5;
+    image_utils_detail::lanczos4Weights(src_x, src.width, col_idx[x].data(), col_w[x].data());
+  }
+
+  for (int y = 0; y < th; y++) {
+    double src_y = (y + 0.5) * sy - 0.5;
+    int row_idx[8];
+    double row_w[8];
+    image_utils_detail::lanczos4Weights(src_y, src.height, row_idx, row_w);
+
+    for (int x = 0; x < tw; x++) {
+      double acc[3] = {0, 0, 0};
+      for (int ky = 0; ky < 8; ky++) {
+        for (int kx = 0; kx < 8; kx++) {
+          double w = row_w[ky] * col_w[x][kx];
+          for (int c = 0; c < 3; c++)
+            acc[c] += src.at(row_idx[ky], col_idx[x][kx], c) * w;
+        }
+      }
+      for (int c = 0; c < 3; c++) {
+        dst.at(y, x, c) = (uint8_t)std::min(255.0, std::max(0.0, std::round(acc[c])));
+      }
+    }
+  }
+  return dst;
+}
+
+/**
+ * Letterbox resize to imgsz x imgsz: Lanczos4 (upscale) or Area (downscale),
+ * then pad with reflect-101.
+ */
+inline ImageRGB imageLetterboxReflect101(const ImageRGB &src, int imgsz) {
+  if (src.empty() || imgsz <= 0) return {};
+
+  int old_h = src.height;
+  int old_w = src.width;
+  double ratio = (double)imgsz / std::max(old_h, old_w);
+  int scaled_h = (int)(old_h * ratio);
+  int scaled_w = (int)(old_w * ratio);
+
+  ImageRGB resized = (ratio > 1.0) ? resizeImageLanczos4(src, scaled_w, scaled_h)
+                                    : resizeImageArea(src, scaled_w, scaled_h);
+
+  int delta_w = imgsz - scaled_w;
+  int delta_h = imgsz - scaled_h;
+  int top = delta_h / 2;
+  int left = delta_w / 2;
+
+  ImageRGB out(imgsz, imgsz);
+  for (int y = 0; y < imgsz; y++) {
+    int sy = y - top;
+    // reflect-101: mirror without repeating the edge pixel.
+    if (scaled_h > 1) {
+      while (sy < 0 || sy >= scaled_h) {
+        if (sy < 0) sy = -sy;
+        if (sy >= scaled_h) sy = 2 * (scaled_h - 1) - sy;
+      }
+    } else {
+      sy = 0;
+    }
+    for (int x = 0; x < imgsz; x++) {
+      int sx = x - left;
+      if (scaled_w > 1) {
+        while (sx < 0 || sx >= scaled_w) {
+          if (sx < 0) sx = -sx;
+          if (sx >= scaled_w) sx = 2 * (scaled_w - 1) - sx;
+        }
+      } else {
+        sx = 0;
+      }
+      for (int c = 0; c < 3; c++) out.at(y, x, c) = resized.at(sy, sx, c);
+    }
+  }
+  return out;
 }
 
 /**

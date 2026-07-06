@@ -16,18 +16,24 @@ struct SpoofResult {
   SpoofResult(float score, bool spoof) : score(score), spoof(spoof) {}
 };
 
+// model_type: "minifasv2" or "mobilenetv3" (default)
 class FaceAntiSpoofing {
  public:
-  FaceAntiSpoofing(const std::string& ckpt, int imgsz = 128, const float threshold = 0.8);
+  FaceAntiSpoofing(const std::string& ckpt, int imgsz = 128, const float threshold = 0.8,
+                   const std::string& model_type = "mobilenetv3");
 
   void loadModel(const std::string& ckpt);
   SpoofResult inference(const ImageRGB& image);
   std::vector<float> preprocess(const ImageRGB& image);
 
  private:
+  std::vector<float> preprocessMobileNetV3(const ImageRGB& image);
+  std::vector<float> preprocessMiniFASv2(const ImageRGB& image);
+
   std::string ckpt;
   float threshold;
   int imgsz;
+  std::string model_type;
 
   Ort::Env env{ORT_LOGGING_LEVEL_WARNING, "FaceAntiSpoofing"};
   std::unique_ptr<Ort::Session> session;

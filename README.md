@@ -56,7 +56,7 @@ Biopass was developed by [@phucvinh57](https://github.com/phucvinh57) and [@thai
     - [x] Fingerprint
 - [ ] Local AI model management: User can download, update, and delete AI models for supported authentication methods.
 
-Feel free to request new features or report bugs by opening an issue. For contributing, please read [CONTRIBUTING.md](docs/contributing.md).
+Feel free to request new features or report bugs by opening an issue. For contributing, please read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## References
 Models used in this project:

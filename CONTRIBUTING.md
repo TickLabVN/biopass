@@ -2,6 +2,21 @@
 
 Welcome to Biopass! We appreciate your interest in contributing. This guide outlines how to get the project running locally, explains the core architecture, and provides important debugging guidelines.
 
+## Contribution rules
+
+We encourage you to use AI tools for coding help, but pull request descriptions and issues MUST be written in your own words. We need to understand what you changed, why you changed it, and how you verified it without having to review a large AI-generated explanation.
+
+Open a discussion before starting changes that affect project direction, for examples:
+
+- Adding or replacing dependencies.
+- Changing authentication, installation, packaging, PAM, or application flows.
+- Introducing a new feature or changing existing behavior.
+- Large refactors that make behavior hard to review.
+
+The discussion should explain the problem, the proposed solution, expected impact, and any distro-specific risks. Pull requests without clear evidence for the change may be closed.
+
+AI-like issues or pull requests, including generic generated text, vague impact statements, or submissions that do not show personal understanding of the change, will be closed as not planned.
+
 ## 1. How to Run
 
 Biopass consists of a backend C++ authentication module and a frontend Tauri desktop application. You will need to install dependencies for both.

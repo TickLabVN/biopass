@@ -6,9 +6,9 @@
 
 // Image utilities (replaces OpenCV)
 #include "image_utils.h"
+#include "onnx_session.h"
 
-// ONNX Runtime
-#include <onnxruntime_cxx_api.h>
+namespace biopass {
 
 struct SpoofResult {
   float score;
@@ -22,26 +22,19 @@ class FaceAntiSpoofing {
   FaceAntiSpoofing(const std::string& ckpt, int imgsz = 128, const float threshold = 0.8,
                    const std::string& model_type = "mobilenetv3");
 
-  void loadModel(const std::string& ckpt);
   SpoofResult inference(const ImageRGB& image);
-  std::vector<float> preprocess(const ImageRGB& image);
 
  private:
+  std::vector<float> preprocess(const ImageRGB& image);
   std::vector<float> preprocessMobileNetV3(const ImageRGB& image);
   std::vector<float> preprocessMiniFASv2(const ImageRGB& image);
 
-  std::string ckpt;
   float threshold;
   int imgsz;
   std::string model_type;
-
-  Ort::Env env{ORT_LOGGING_LEVEL_WARNING, "FaceAntiSpoofing"};
-  std::unique_ptr<Ort::Session> session;
-  Ort::AllocatorWithDefaultOptions allocator;
-  std::vector<std::string> input_names_str;
-  std::vector<std::string> output_names_str;
-  std::vector<const char*> input_names_cstr;
-  std::vector<const char*> output_names_cstr;
+  OnnxSession session;
 };
+
+}  // namespace biopass
 
 #endif  // FACE_AS_H

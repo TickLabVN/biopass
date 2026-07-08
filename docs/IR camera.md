@@ -26,6 +26,8 @@ v4l2-ctl --list-devices
 
 Look for the device node that belongs to your IR sensor, for example `/dev/video2`.
 
+Biopass captures through libcamera; you can also identify devices with `cam -l` (from `libcamera-tools`) or the bundled `camera_capture_test --list-devices` / `--list-formats /dev/videoN` debug tool.
+
 ## 2. Enable It In Biopass
 
 Open the Biopass desktop app and go to the face settings.
@@ -64,3 +66,11 @@ sudo systemctl enable --now linux-enable-ir-emitter
 ```
 
 Thanks @notherealmarco for help me on this https://github.com/TickLabVN/biopass/discussions/60#discussioncomment-16521628.
+
+## 4. If The IR Presence Check Fails Intermittently
+
+Some IR emitters blink rapidly, so an individual captured frame can be over-exposed
+(all-white) or under-exposed (all-dark) and yield no detectable face. Biopass retries
+the IR presence check (capture + detection) for up to `anti_spoofing.ir_presence_timeout_ms`
+milliseconds (default `1500`) in `config.yaml` before giving up, so a single bad frame
+should no longer fail the check. If failures persist, try increasing this value.

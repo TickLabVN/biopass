@@ -12,9 +12,24 @@ target_include_directories(biopass_stb PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# Shared ONNX Runtime session plumbing (env/session/allocator/IO names) used
+# by the detection, recognition, and anti-spoofing inference engines.
+add_library(biopass_onnx STATIC
+    common/onnx_session.cc
+)
+set_target_properties(biopass_onnx PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(biopass_onnx PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/common
+    ${ONNXRUNTIME_INCLUDE_DIRS}
+)
+target_link_libraries(biopass_onnx PUBLIC
+    ${ONNXRUNTIME_LIB}
+)
+
 # Shared face utilities (camera capture, debug image I/O).
 add_library(biopass_face_common STATIC
     common/camera_capture.cc
+    common/pixel_convert.cc
     common/debug_image_io.cc
 )
 set_target_properties(biopass_face_common PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -26,7 +41,8 @@ target_include_directories(biopass_face_common PUBLIC
 target_link_libraries(biopass_face_common
     biopass_stb
     biopass_core
-    openpnp-capture
+    PkgConfig::LIBCAMERA
+    PkgConfig::TURBOJPEG
     spdlog::spdlog_header_only
 )
 

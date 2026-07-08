@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <cmath>
 
+namespace biopass {
+
+namespace {
+
 int argmax(const float* data, int size) {
   int max_index = 0;
   float max_val = data[0];
@@ -15,47 +19,19 @@ int argmax(const float* data, int size) {
   return max_index;
 }
 
-FaceAntiSpoofing::FaceAntiSpoofing(const std::string& ckpt, int imgsz, const float threshold,
-                                   const std::string& model_type) {
-  this->ckpt = ckpt;
-  this->imgsz = imgsz;
-  this->threshold = threshold;
-  this->model_type = model_type;
+}  // namespace
 
+FaceAntiSpoofing::FaceAntiSpoofing(const std::string& ckpt, int imgsz, const float threshold,
+                                   const std::string& model_type)
+    : threshold(threshold),
+      imgsz(imgsz),
+      model_type(model_type),
+      session(ckpt, "FaceAntiSpoofing") {
   // Unrecognized model_type: infer from the checkpoint filename.
   if (this->model_type != "minifasv2" && this->model_type != "mobilenetv3") {
-    this->model_type = (ckpt.find("mobilenetv3") != std::string::npos) ? "mobilenetv3" : "minifasv2";
+    this->model_type =
+        (ckpt.find("mobilenetv3") != std::string::npos) ? "mobilenetv3" : "minifasv2";
   }
-
-  this->loadModel(ckpt);
-}
-
-void FaceAntiSpoofing::loadModel(const std::string& ckpt) {
-  this->ckpt = ckpt;
-
-  Ort::SessionOptions opts;
-  opts.SetIntraOpNumThreads(1);
-  opts.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-
-  this->session = std::make_unique<Ort::Session>(this->env, ckpt.c_str(), opts);
-
-  this->input_names_str.clear();
-  this->output_names_str.clear();
-  this->input_names_cstr.clear();
-  this->output_names_cstr.clear();
-
-  for (size_t i = 0; i < this->session->GetInputCount(); i++) {
-    auto name = this->session->GetInputNameAllocated(i, this->allocator);
-    this->input_names_str.push_back(name.get());
-  }
-  for (size_t i = 0; i < this->session->GetOutputCount(); i++) {
-    auto name = this->session->GetOutputNameAllocated(i, this->allocator);
-    this->output_names_str.push_back(name.get());
-  }
-  for (auto& s : this->input_names_str)
-    this->input_names_cstr.push_back(s.c_str());
-  for (auto& s : this->output_names_str)
-    this->output_names_cstr.push_back(s.c_str());
 }
 
 std::vector<float> FaceAntiSpoofing::preprocessMobileNetV3(const ImageRGB& image) {
@@ -82,13 +58,7 @@ SpoofResult FaceAntiSpoofing::inference(const ImageRGB& image) {
   std::vector<float> input_data = this->preprocess(image);
 
   std::vector<int64_t> input_shape = {1, 3, (int64_t)this->imgsz, (int64_t)this->imgsz};
-  auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-  Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
-      memory_info, input_data.data(), input_data.size(), input_shape.data(), input_shape.size());
-
-  auto output_tensors =
-      this->session->Run(Ort::RunOptions{nullptr}, this->input_names_cstr.data(), &input_tensor, 1,
-                         this->output_names_cstr.data(), this->output_names_cstr.size());
+  auto output_tensors = this->session.run(input_data, input_shape);
 
   const float* logits = output_tensors[0].GetTensorData<float>();
 
@@ -106,3 +76,5 @@ SpoofResult FaceAntiSpoofing::inference(const ImageRGB& image) {
   float spoof_prob = exp_spoof / (exp_real + exp_spoof);
   return SpoofResult(spoof_prob, spoof_prob >= this->threshold);
 }
+
+}  // namespace biopass

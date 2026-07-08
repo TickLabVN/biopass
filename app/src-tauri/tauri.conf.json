@@ -36,7 +36,12 @@
     ],
     "linux": {
       "deb": {
-        "depends": ["fprintd", "libwebkit2gtk-4.1-0"],
+        "depends": [
+          "fprintd",
+          "libwebkit2gtk-4.1-0",
+          "libturbojpeg0",
+          "libcamera0.7 | libcamera0.5 | libcamera0.3 | libcamera0.2"
+        ],
         "postInstallScript": "scripts/deb/postinst",
         "files": {
           "/usr/share/com.ticklab.biopass/download_models.sh": "scripts/download_models.sh",
@@ -46,13 +51,12 @@
           "/usr/lib/biopass/libbiopass_reg.so": "../../auth/build/face/recognition/libbiopass_reg.so",
           "/usr/lib/biopass/libbiopass_as.so": "../../auth/build/face/antispoofing/libbiopass_as.so",
           "/usr/lib/biopass/libonnxruntime.so.1": "../../auth/build/_deps/onnxruntime-src/lib/libonnxruntime.so.1.19.2",
-          "/usr/lib/biopass/libopenpnp-capture.so.0": "../../auth/build/_deps/openpnp-capture-build/libopenpnp-capture.so.0.0.28",
           "/etc/ld.so.conf.d/biopass.conf": "scripts/ldconf",
           "/usr/share/pam-configs/biopass": "scripts/pam.conf"
         }
       },
       "rpm": {
-        "depends": ["fprintd"],
+        "depends": ["fprintd", "libcamera", "turbojpeg"],
         "postInstallScript": "scripts/rpm/postinst",
         "postRemoveScript": "scripts/rpm/postrm",
         "files": {
@@ -63,7 +67,6 @@
           "/usr/lib/biopass/libbiopass_reg.so": "../../auth/build/face/recognition/libbiopass_reg.so",
           "/usr/lib/biopass/libbiopass_as.so": "../../auth/build/face/antispoofing/libbiopass_as.so",
           "/usr/lib/biopass/libonnxruntime.so.1": "../../auth/build/_deps/onnxruntime-src/lib/libonnxruntime.so.1.19.2",
-          "/usr/lib/biopass/libopenpnp-capture.so.0": "../../auth/build/_deps/openpnp-capture-build/libopenpnp-capture.so.0.0.28",
           "/etc/ld.so.conf.d/biopass.conf": "scripts/ldconf",
           "/usr/share/pam-configs/biopass": "scripts/pam.conf"
         }

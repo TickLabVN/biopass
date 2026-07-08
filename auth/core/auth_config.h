@@ -53,6 +53,12 @@ struct AntiSpoofingConfig {
   // IR frame (presence check). It is NOT a full liveness detector. A printed
   // photo that the YOLO model can detect in IR will still pass.
   int ir_warmup_delay_ms = 300;
+  // Total wall-clock budget (ms) for the IR presence check to find a face
+  // across repeated capture+inference attempts. The IR emitter blinks, so a
+  // single frame may be unusable (all-white or all-dark); retrying within
+  // this budget catches a good frame. 0 disables retry (single attempt).
+  // Configurable via anti_spoofing.ir_presence_timeout_ms in config.yaml.
+  int ir_presence_timeout_ms = 1500;
 };
 
 struct FaceMethodConfig {
@@ -106,7 +112,6 @@ struct BiopassConfig {
 std::string getConfigPath(const std::string& username);
 BiopassConfig readConfig(const std::string& username);
 bool configExists(const std::string& username);
-bool migrateConfigSchema(const std::string& username, std::string* error = nullptr);
 
 std::vector<std::string> listFaces(const std::string& username);
 std::string getDebugPath(const std::string& username);

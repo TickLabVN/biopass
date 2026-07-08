@@ -9,6 +9,11 @@
 #include "face_recognition.h"
 #include "image_utils.h"
 
+using biopass::Detection;
+using biopass::FaceDetection;
+using biopass::FaceRecognition;
+using biopass::MatchResult;
+
 namespace {
 
 std::string default_model_dir() {

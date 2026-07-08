@@ -1,10 +1,11 @@
 #include "antispoof_check.h"
 
+#include <spdlog/spdlog.h>
+
 #include <fstream>
 #include <future>
+#include <memory>
 #include <vector>
-
-#include <spdlog/spdlog.h>
 
 #include "debug_image_io.h"
 #include "face_as.h"
@@ -56,7 +57,7 @@ bool checkAntiSpoofByAIModel(const FaceMethodConfig& faceCfg, const std::string&
 }  // namespace
 
 bool checkAntiSpoof(const FaceMethodConfig& face_config, const std::string& username,
-                    const ImageRGB& face, const AuthConfig& config,
+                    const ImageRGB& face, const AuthConfig& config, FaceDetection* shared_detector,
                     ICameraCaptureSession* ir_camera_session) {
   const bool ai_enabled = face_config.anti_spoofing.enable;
   const bool ir_enabled = face_config.anti_spoofing.ir_camera.has_value() &&
@@ -68,40 +69,36 @@ bool checkAntiSpoof(const FaceMethodConfig& face_config, const std::string& user
   }
 
   spdlog::debug("FaceAuth: Anti-spoofing started (ai_enabled={}, ir_enabled={}, ir_camera='{}')",
-                ai_enabled, ir_enabled,
-                face_config.anti_spoofing.ir_camera.value_or(""));
+                ai_enabled, ir_enabled, face_config.anti_spoofing.ir_camera.value_or(""));
 
   std::vector<AntiSpoofTask> tasks;
 
   if (ai_enabled) {
     const auto face_config_copy = face_config;
     const auto username_copy = username;
-    const auto face_copy = face;
     const auto config_copy = config;
-    tasks.push_back(make_task(
-        "AI", std::async(std::launch::async,
-                         [face_config_copy, username_copy, face_copy, config_copy]() {
-                           return checkAntiSpoofByAIModel(face_config_copy, username_copy, face_copy,
-                                                          config_copy);
-                         })));
+    auto shared_face = std::make_shared<const ImageRGB>(face);
+    tasks.push_back(make_task("AI", std::async(std::launch::async, [face_config_copy, username_copy,
+                                                                    shared_face, config_copy]() {
+                                return checkAntiSpoofByAIModel(face_config_copy, username_copy,
+                                                               *shared_face, config_copy);
+                              })));
   }
 
   if (ir_enabled) {
     const auto ir_camera_path = *face_config.anti_spoofing.ir_camera;
-    const auto detection_model = face_config.detection.model;
-    const auto detection_threshold = face_config.detection.threshold;
     const auto username_copy = username;
     const auto debug_enabled = config.debug;
     const auto warmup_delay_ms = face_config.anti_spoofing.ir_warmup_delay_ms;
+    const auto presence_timeout_ms = face_config.anti_spoofing.ir_presence_timeout_ms;
     auto* ir_camera_session_ptr = ir_camera_session;
     tasks.push_back(make_task(
-        "IR", std::async(std::launch::async,
-                         [ir_camera_path, detection_model, detection_threshold, username_copy,
-                          debug_enabled, warmup_delay_ms, ir_camera_session_ptr]() {
-                           return checkAntispoofByIRCamera(ir_camera_path, detection_model,
-                                                           detection_threshold, username_copy,
-                                                           debug_enabled, ir_camera_session_ptr,
-                                                           warmup_delay_ms);
+        "IR", std::async(std::launch::async, [ir_camera_path, shared_detector, username_copy,
+                                              debug_enabled, warmup_delay_ms, presence_timeout_ms,
+                                              ir_camera_session_ptr]() {
+          return checkAntispoofByIRCamera(ir_camera_path, shared_detector, username_copy,
+                                          debug_enabled, ir_camera_session_ptr, warmup_delay_ms,
+                                          presence_timeout_ms);
         })));
   }
 

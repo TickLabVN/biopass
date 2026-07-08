@@ -1,7 +1,7 @@
 # Face Engine in Face Pass
 ## Preparation
 
-Dependencies (ONNX Runtime and openpnp-capture) are automatically fetched via CMake FetchContent. No manual installation required.
+ONNX Runtime is automatically fetched via CMake FetchContent. Camera capture uses the system libcamera and libjpeg-turbo packages (`libcamera-dev`, `libturbojpeg0-dev`) found via pkg-config — install them before configuring.
 
 ## Build
 ```bash

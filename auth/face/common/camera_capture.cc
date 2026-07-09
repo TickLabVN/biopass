@@ -199,7 +199,10 @@ bool negotiate(libcamera::CameraConfiguration& config, CameraCaptureFormat reque
 
   std::vector<libcamera::PixelFormat> preference;
   if (requested_format == CameraCaptureFormat::V4L2Grey) {
-    preference = {libcamera::formats::R8};
+    // Prefer a true grey stream, but some laptop IR sensors (e.g. Windows
+    // Hello cameras) only expose the IR stream as YUYV/MJPEG; decode those
+    // instead of failing outright.
+    preference = {libcamera::formats::R8, libcamera::formats::YUYV, libcamera::formats::MJPEG};
   } else {
     preference = {libcamera::formats::YUYV, libcamera::formats::MJPEG, libcamera::formats::R8};
   }
@@ -227,13 +230,17 @@ bool negotiate(libcamera::CameraConfiguration& config, CameraCaptureFormat reque
     return false;
   }
 
-  if (!isSupportedPixelFormat(stream_config.pixelFormat) ||
-      (requested_format == CameraCaptureFormat::V4L2Grey &&
-       stream_config.pixelFormat != libcamera::formats::R8)) {
+  if (!isSupportedPixelFormat(stream_config.pixelFormat)) {
     spdlog::error(
         "FaceAuth: Camera '{}' adjusted configuration to unsupported format {} (available: {})",
         camera_label, stream_config.pixelFormat.toString(), listAvailableFormats(formats));
     return false;
+  }
+
+  if (requested_format == CameraCaptureFormat::V4L2Grey &&
+      stream_config.pixelFormat != libcamera::formats::R8) {
+    spdlog::warn("FaceAuth: Camera '{}' exposes no GREY format; falling back to decoded {} capture",
+                 camera_label, stream_config.pixelFormat.toString());
   }
 
   return true;

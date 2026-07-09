@@ -37,6 +37,7 @@
     "linux": {
       "deb": {
         "depends": [
+          "curl",
           "fprintd",
           "libwebkit2gtk-4.1-0",
           "libturbojpeg0",
@@ -56,7 +57,7 @@
         }
       },
       "rpm": {
-        "depends": ["fprintd", "libcamera", "turbojpeg"],
+        "depends": ["curl", "fprintd", "libcamera", "turbojpeg"],
         "postInstallScript": "scripts/rpm/postinst",
         "postRemoveScript": "scripts/rpm/postrm",
         "files": {

@@ -4,13 +4,17 @@
 
 set -euo pipefail
 
-BASE_URL="https://biopass.ticklab.site/models"
+# Overwritten at package/bundle time (see Makefile build-app) to pin this to
+# the exact release tag being built, so RC/beta bundles fetch their own
+# models instead of whatever the latest stable release happens to be.
+BASE_URL="https://github.com/TickLabVN/biopass/releases/latest/download"
 
 MODELS=(
     "${BASE_URL}/yolov8n-face.onnx"
     "${BASE_URL}/edgeface_s_gamma_05.onnx"
     "${BASE_URL}/edgeface_xs_gamma_06.onnx"
     "${BASE_URL}/mobilenetv3_antispoof.onnx"
+    "${BASE_URL}/minifas_v2.onnx"
 )
 
 LEGACY_MODELS=(

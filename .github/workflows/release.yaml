@@ -92,3 +92,4 @@ jobs:
           files: |
             app/src-tauri/target/release/bundle/deb/*.deb
             app/src-tauri/target/release/bundle/rpm/*.rpm
+            auth/face/models/*.onnx

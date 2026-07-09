@@ -1,4 +1,3 @@
-#include <pwd.h>
 #include <spdlog/sinks/ansicolor_sink.h>
 #include <spdlog/spdlog.h>
 #include <stdio.h>
@@ -19,6 +18,9 @@
 #include "fingerprint_auth.h"
 #include "image_utils.h"
 #include "stb_image_write.h"
+
+using biopass::Detection;
+using biopass::FaceDetection;
 
 namespace {
 
@@ -87,7 +89,7 @@ int previewSession(const std::string& cameraPath, const std::string& modelPath, 
     deviceOpt = cameraPath;
   }
 
-  // Silence openpnp-capture's frame-size warnings while we set up.
+  // Silence libcamera's info-level setup noise while we set up.
   spdlog::set_level(spdlog::level::err);
   auto session = biopass::openCameraSession(deviceOpt);
   spdlog::set_level(spdlog::level::info);
@@ -169,8 +171,8 @@ int captureAndCropFace(const std::string& cameraPath, const std::string& outputP
     deviceOpt = cameraPath;
   }
 
-  // Suppress openpnp-capture's noisy "queryFrameSize returned non-discrete..."
-  // warnings during enumeration; errors still propagate.
+  // Silence libcamera's info-level setup noise during enumeration; errors
+  // still propagate.
   spdlog::set_level(spdlog::level::err);
   ImageRGB image = biopass::captureImage(deviceOpt);
   spdlog::set_level(spdlog::level::info);
@@ -268,22 +270,6 @@ int authenticate(const std::string& username, const std::string& service) {
   }
 }
 
-int migrateConfig(const std::string& username) {
-  if (getpwnam(username.c_str()) == nullptr) {
-    spdlog::error("User '{}' not found", username);
-    return 1;
-  }
-
-  std::string error;
-  if (!biopass::migrateConfigSchema(username, &error)) {
-    spdlog::error("Failed to migrate config schema: {}", error);
-    return 1;
-  }
-
-  spdlog::info("Biopass: Config migration completed for user '{}'", username);
-  return 0;
-}
-
 int main(int argc, char** argv) {
   CLI::App app{"Biopass Helper Tool"};
   app.require_subcommand(1, 1);
@@ -320,12 +306,6 @@ int main(int argc, char** argv) {
   auth_cmd->add_option("--username,-u", username, "Username for authentication")->required();
   auth_cmd->add_option("--service,-s", pamService, "PAM service name");
 
-  std::string migrateUsername;
-  auto migrate_cmd = app.add_subcommand(
-      "migrate", "Migration tool for applying schema changes (run once after updates)");
-  migrate_cmd->add_option("--username,-u", migrateUsername, "Username to migrate")->required();
-  migrate_cmd->group("");
-
   try {
     app.parse(argc, argv);
   } catch (const CLI::ParseError& e) {
@@ -350,14 +330,6 @@ int main(int argc, char** argv) {
       return 2;  // PAM_IGNORE logic / error
     }
     return authenticate(username, pamService);
-  }
-
-  if (app.got_subcommand(migrate_cmd)) {
-    if (migrateUsername.empty()) {
-      spdlog::info("{}", app.help());
-      return 1;
-    }
-    return migrateConfig(migrateUsername);
   }
 
   spdlog::error("No valid subcommand provided");

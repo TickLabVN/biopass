@@ -2,16 +2,14 @@
 #define FACE_DET_H
 
 // CPP native
-#include <fstream>
-#include <random>
 #include <string>
 #include <vector>
 
 // Image utilities (replaces OpenCV)
 #include "image_utils.h"
+#include "onnx_session.h"
 
-// ONNX Runtime
-#include <onnxruntime_cxx_api.h>
+namespace biopass {
 
 struct Box {
   int x1, y1, x2, y2;
@@ -37,28 +35,20 @@ struct Detection {
 
 class FaceDetection {
  public:
-  FaceDetection(const std::string& ckpt, int imgsz = 640,
-                const std::vector<std::string>& classes = {"face"}, const float conf = 0.50,
+  FaceDetection(const std::string& ckpt, int imgsz = 640, const float conf = 0.50,
                 const float iou = 0.50);
 
-  void loadModel(const std::string& ckpt);
   std::vector<Detection> inference(const ImageRGB& image);
-  std::vector<float> preprocess(const ImageRGB& image);
 
  private:
+  std::vector<float> preprocess(const ImageRGB& image);
+
   float conf;
   float iou;
   int imgsz;
-  std::string ckpt{};
-  std::vector<std::string> classes{"face"};
-
-  Ort::Env env{ORT_LOGGING_LEVEL_WARNING, "FaceDetection"};
-  std::unique_ptr<Ort::Session> session;
-  Ort::AllocatorWithDefaultOptions allocator;
-  std::vector<std::string> input_names_str;
-  std::vector<std::string> output_names_str;
-  std::vector<const char*> input_names_cstr;
-  std::vector<const char*> output_names_cstr;
+  OnnxSession session;
 };
+
+}  // namespace biopass
 
 #endif  // FACE_DET_H

@@ -6,7 +6,7 @@
 #    app/   → Tauri desktop application
 #
 #  Prerequisites
-#    auth : cmake, ninja/make, libpam0g-dev, libcli11-dev
+#    auth : cmake, ninja/make, libpam0g-dev, libcli11-dev, libcamera-dev, libturbojpeg0-dev
 #    app  : bun, rustup/cargo, tauri-cli v2, webkit2gtk, libssl-dev …
 # ---------------------------------------------------------------------------
 
@@ -51,6 +51,9 @@ clean-auth:
 build-app: build-auth
 	@echo "==> [app] Installing JS dependencies…"
 	cd $(APP_DIR) && bun install --frozen-lockfile
+	@echo "==> [app] Pinning model downloader to release $(VERSION)…"
+	sed -i -E 's#^BASE_URL="https://github.com/TickLabVN/biopass/releases/(latest/download|download/[^"]+)"#BASE_URL="https://github.com/TickLabVN/biopass/releases/download/$(VERSION)"#' \
+	    $(APP_DIR)/src-tauri/scripts/download_models.sh
 	@echo "==> [app] Building Tauri application…"
 	cd $(APP_DIR) && bun run tauri build
 

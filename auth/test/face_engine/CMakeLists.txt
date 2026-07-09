@@ -11,6 +11,7 @@ target_link_libraries(${FACE_TEST} PRIVATE
     biopass_det
     biopass_reg
     biopass_stb
+    biopass_onnx
     CLI11::CLI11
 )
 

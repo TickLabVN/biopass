@@ -4,6 +4,8 @@
 // CPP native
 #include <vector>
 
+namespace biopass {
+
 struct RawDet {
   float x1, y1, x2, y2, conf;
   int cls;
@@ -15,5 +17,7 @@ std::vector<RawDet> non_max_suppression(const float* output, int num_preds, int 
 
 void scale_boxes(const std::vector<int>& img1_shape, std::vector<RawDet>& dets,
                  const std::vector<int>& img0_shape);
+
+}  // namespace biopass
 
 #endif  // FACE_DET_UTILS_H

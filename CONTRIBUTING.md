@@ -25,10 +25,10 @@ Biopass consists of a backend C++ authentication module and a frontend Tauri des
 
 **For the C++ Backend:**
 
-You need to install CMake, Make, PAM headers, CLI11 and nasm
+You need to install CMake, Make, PAM headers, CLI11, libcamera and libjpeg-turbo
 ```bash
 sudo apt update
-sudo apt install cmake make g++ libpam0g-dev libcli11-dev nasm
+sudo apt install cmake make g++ pkg-config libpam0g-dev libcli11-dev libcamera-dev libturbojpeg0-dev
 ```
 
 **For the Tauri Application:**
@@ -80,7 +80,7 @@ Biopass is built using modern and reliable technologies across both the backend 
 ### Backend Authentication Module (`auth/`)
 - **C++17**: High performance system-level execution.
 - **CMake**: Build system.
-- **openpnp-capture**: Camera capture (vendored via CMake FetchContent).
+- **libcamera**: Camera capture (system dependency via pkg-config).
 - **ONNX Runtime**: Running the machine learning models (YOLO for detection, EdgeFace for recognition, MobileNetV3 for anti-spoofing).
 - **Linux PAM**: Pluggable Authentication Module integration for the OS.
 

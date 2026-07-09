@@ -24,15 +24,10 @@ set(ONNXRUNTIME_INCLUDE_DIRS "${ONNXRUNTIME_ROOT}/include")
 set(ONNXRUNTIME_LIB_DIR "${ONNXRUNTIME_ROOT}/lib")
 find_library(ONNXRUNTIME_LIB onnxruntime PATHS ${ONNXRUNTIME_LIB_DIR} NO_DEFAULT_PATH)
 
-# openpnp-capture (replaces OpenCV for camera capture)
-set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
-FetchContent_Declare(
-    openpnp-capture
-    GIT_REPOSITORY https://github.com/openpnp/openpnp-capture.git
-    GIT_TAG        32a9bdd3e8e3a31b12cb6573e7c6076208421651
-)
-FetchContent_MakeAvailable(openpnp-capture)
-unset(CMAKE_POLICY_VERSION_MINIMUM CACHE)
+# libcamera + libjpeg-turbo (camera capture; system packages via pkg-config)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBCAMERA REQUIRED IMPORTED_TARGET libcamera)
+pkg_check_modules(TURBOJPEG REQUIRED IMPORTED_TARGET libturbojpeg)
 
 FetchContent_Declare(
     stb

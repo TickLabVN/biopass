@@ -1,26 +1,27 @@
 #include "camera_capture.h"
 
-#include <fcntl.h>
-#include <linux/videodev2.h>
-#include <openpnp-capture.h>
-#include <poll.h>
+#include <dirent.h>
+#include <libcamera/libcamera.h>
 #include <spdlog/spdlog.h>
-#include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <unistd.h>
+#include <sys/stat.h>
 
 #include <algorithm>
-#include <cerrno>
 #include <chrono>
-#include <cstdio>
+#include <condition_variable>
 #include <cstring>
+#include <deque>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <utility>
 #include <vector>
+
+#include "pixel_convert.h"
 
 namespace biopass {
 
@@ -28,451 +29,515 @@ namespace {
 
 constexpr int kDefaultWarmupFrames = 5;
 constexpr int kDefaultCaptureTimeoutMs = 10000;
-constexpr int kDefaultCapturePollIntervalMs = 10;
-
-void captureLog();
-std::optional<CapDeviceID> resolveCameraDeviceIdx(
-    CapContext ctx, const std::optional<std::string>& linux_video_device_path);
 
 std::string device_label(const std::optional<std::string>& linux_video_device_path) {
   return linux_video_device_path.has_value() ? *linux_video_device_path : std::string("<default>");
 }
 
-std::vector<std::string> enumerate_linux_video_capture_paths() {
-  std::vector<std::string> paths;
-  constexpr uint32_t kMaxDevices = 64;
-
-  for (uint32_t index = 0; index < kMaxDevices; ++index) {
-    char device_path[32];
-    std::snprintf(device_path, sizeof(device_path), "/dev/video%u", index);
-
-    const int fd = ::open(device_path, O_RDWR | O_NONBLOCK);
-    if (fd == -1) {
-      continue;
+// Routes libcamera's internal logging through spdlog so it lands in the same
+// /var/log/biopass/<user>/ files the rest of the process writes to.
+class SpdlogStreambuf : public std::streambuf {
+ public:
+  int overflow(int ch) override {
+    if (ch == EOF) {
+      return ch;
     }
-
-    v4l2_capability video_cap {};
-    if (::ioctl(fd, VIDIOC_QUERYCAP, &video_cap) == 0 &&
-        (video_cap.device_caps & V4L2_CAP_VIDEO_CAPTURE) != 0) {
-      paths.emplace_back(device_path);
+    if (ch == '\n') {
+      flushLine();
+    } else {
+      line_.push_back(static_cast<char>(ch));
     }
-
-    ::close(fd);
+    return ch;
   }
 
+ private:
+  void flushLine() {
+    if (!line_.empty()) {
+      if (line_.find(" ERROR ") != std::string::npos ||
+          line_.find(" FATAL ") != std::string::npos) {
+        spdlog::error("libcamera: {}", line_);
+      } else if (line_.find(" WARN ") != std::string::npos) {
+        spdlog::warn("libcamera: {}", line_);
+      } else {
+        spdlog::info("libcamera: {}", line_);
+      }
+      line_.clear();
+    }
+  }
+
+  std::string line_;
+};
+
+// The manager (and its logging redirection) is process-wide and outlives all
+// sessions; RGB and IR capture can run concurrently against two Camera
+// objects from a single CameraManager.
+std::shared_ptr<libcamera::CameraManager> cameraManager() {
+  static std::mutex init_mutex;
+  static std::shared_ptr<libcamera::CameraManager> manager;
+
+  std::lock_guard<std::mutex> lock(init_mutex);
+  if (manager) {
+    return manager;
+  }
+
+  if (!std::getenv("LIBCAMERA_LOG_LEVELS") && !std::getenv("LIBCAMERA_LOG_FILE")) {
+    static SpdlogStreambuf log_streambuf;
+    static std::ostream log_stream(&log_streambuf);
+    libcamera::logSetStream(&log_stream);
+  }
+
+  auto candidate = std::make_shared<libcamera::CameraManager>();
+  if (candidate->start() != 0) {
+    spdlog::error("FaceAuth: Failed to start libcamera CameraManager");
+    return nullptr;
+  }
+
+  manager = std::move(candidate);
+  return manager;
+}
+
+std::shared_ptr<libcamera::Camera> findCameraByPath(libcamera::CameraManager& manager,
+                                                    const std::string& linux_video_device_path) {
+  struct stat device_info{};
+  if (stat(linux_video_device_path.c_str(), &device_info) != 0 || !S_ISCHR(device_info.st_mode)) {
+    return nullptr;
+  }
+
+  for (const auto& camera : manager.cameras()) {
+    const auto devices = camera->properties().get(libcamera::properties::SystemDevices);
+    if (!devices) {
+      continue;
+    }
+    for (const int64_t device : *devices) {
+      if (device == static_cast<int64_t>(device_info.st_rdev)) {
+        return camera;
+      }
+    }
+  }
+  return nullptr;
+}
+
+std::shared_ptr<libcamera::Camera> findCamera(
+    libcamera::CameraManager& manager, const std::optional<std::string>& linux_video_device_path) {
+  if (linux_video_device_path.has_value()) {
+    auto camera = findCameraByPath(manager, *linux_video_device_path);
+    if (!camera) {
+      spdlog::error("FaceAuth: Camera path '{}' was not found among libcamera devices",
+                    *linux_video_device_path);
+    }
+    return camera;
+  }
+
+  const auto cameras = manager.cameras();
+  if (cameras.empty()) {
+    spdlog::error("FaceAuth: No camera devices reported by libcamera");
+    return nullptr;
+  }
+  return cameras.front();
+}
+
+// Reverse-maps a libcamera Camera's SystemDevices dev_t entries back to
+// /dev/video* node paths, for field-debugging output (listCameraDevices).
+std::vector<std::string> videoPathsForCamera(const libcamera::Camera& camera) {
+  std::vector<std::string> paths;
+  const auto devices = camera.properties().get(libcamera::properties::SystemDevices);
+  if (!devices) {
+    return paths;
+  }
+
+  DIR* dir = opendir("/dev");
+  if (!dir) {
+    return paths;
+  }
+  struct dirent* entry;
+  while ((entry = readdir(dir)) != nullptr) {
+    const std::string name(entry->d_name);
+    if (name.rfind("video", 0) != 0) {
+      continue;
+    }
+    const std::string path = "/dev/" + name;
+    struct stat st{};
+    if (stat(path.c_str(), &st) != 0 || !S_ISCHR(st.st_mode)) {
+      continue;
+    }
+    for (const int64_t device : *devices) {
+      if (device == static_cast<int64_t>(st.st_rdev)) {
+        paths.push_back(path);
+        break;
+      }
+    }
+  }
+  closedir(dir);
+  std::sort(paths.begin(), paths.end());
   return paths;
 }
 
-std::optional<std::string> linux_device_path_from_index(CapDeviceID device_index) {
-  const auto paths = enumerate_linux_video_capture_paths();
-  if (device_index >= paths.size()) {
-    return std::nullopt;
-  }
-  return paths[device_index];
+bool isSupportedPixelFormat(const libcamera::PixelFormat& format) {
+  return format == libcamera::formats::YUYV || format == libcamera::formats::MJPEG ||
+         format == libcamera::formats::R8;
 }
 
-int xioctl_retry(int fd, unsigned long request, void* arg) {
-  int rc = 0;
-  do {
-    rc = ::ioctl(fd, request, arg);
-  } while (rc == -1 && errno == EINTR);
-  return rc;
+std::string listAvailableFormats(const libcamera::StreamFormats& formats) {
+  std::ostringstream oss;
+  bool first = true;
+  for (const auto& format : formats.pixelformats()) {
+    if (!first) {
+      oss << ", ";
+    }
+    oss << format.toString();
+    first = false;
+  }
+  return oss.str();
 }
 
-std::optional<CapFormatInfo> find_camera_format_by_fourcc(CapContext ctx, CapDeviceID device_index,
-                                                           uint32_t fourcc) {
-  const int32_t format_count = Cap_getNumFormats(ctx, device_index);
-  if (format_count <= 0) {
-    return std::nullopt;
+// Picks a pixel format for the given capture request out of what the camera
+// actually offers, in preference order, then validates the configuration.
+bool negotiate(libcamera::CameraConfiguration& config, CameraCaptureFormat requested_format,
+               const std::string& camera_label) {
+  libcamera::StreamConfiguration& stream_config = config.at(0);
+  const auto& formats = stream_config.formats();
+
+  std::vector<libcamera::PixelFormat> preference;
+  if (requested_format == CameraCaptureFormat::V4L2Grey) {
+    // Prefer a true grey stream, but some laptop IR sensors (e.g. Windows
+    // Hello cameras) only expose the IR stream as YUYV/MJPEG; decode those
+    // instead of failing outright.
+    preference = {libcamera::formats::R8, libcamera::formats::YUYV, libcamera::formats::MJPEG};
+  } else {
+    preference = {libcamera::formats::YUYV, libcamera::formats::MJPEG, libcamera::formats::R8};
   }
 
-  for (int32_t format_index = 0; format_index < format_count; ++format_index) {
-    CapFormatInfo format {};
-    if (Cap_getFormatInfo(ctx, device_index, static_cast<CapFormatID>(format_index), &format) !=
-        CAPRESULT_OK) {
-      continue;
-    }
-    if (format.fourcc == fourcc) {
-      return format;
+  const auto available = formats.pixelformats();
+  bool picked = false;
+  for (const auto& candidate : preference) {
+    if (std::find(available.begin(), available.end(), candidate) != available.end()) {
+      stream_config.pixelFormat = candidate;
+      picked = true;
+      break;
     }
   }
 
-  return std::nullopt;
+  if (!picked) {
+    spdlog::error(
+        "FaceAuth: Camera '{}' exposes none of the required pixel formats (available: {})",
+        camera_label, listAvailableFormats(formats));
+    return false;
+  }
+
+  const auto validation = config.validate();
+  if (validation == libcamera::CameraConfiguration::Invalid) {
+    spdlog::error("FaceAuth: Invalid camera configuration for '{}'", camera_label);
+    return false;
+  }
+
+  if (!isSupportedPixelFormat(stream_config.pixelFormat)) {
+    spdlog::error(
+        "FaceAuth: Camera '{}' adjusted configuration to unsupported format {} (available: {})",
+        camera_label, stream_config.pixelFormat.toString(), listAvailableFormats(formats));
+    return false;
+  }
+
+  if (requested_format == CameraCaptureFormat::V4L2Grey &&
+      stream_config.pixelFormat != libcamera::formats::R8) {
+    spdlog::warn("FaceAuth: Camera '{}' exposes no GREY format; falling back to decoded {} capture",
+                 camera_label, stream_config.pixelFormat.toString());
+  }
+
+  return true;
 }
 
-bool capture_frame_openpnp(CapContext ctx, CapStream stream, uint8_t* buffer, size_t buffer_size,
-                           int capture_timeout_ms, int poll_interval_ms) {
-  const auto capture_deadline = std::chrono::steady_clock::now() +
-                                std::chrono::milliseconds(std::max(0, capture_timeout_ms));
-  const bool has_timeout = capture_timeout_ms > 0;
-  const auto sleep_interval = std::chrono::milliseconds(std::max(1, poll_interval_ms));
+// Converts one captured plane's bytes into RGB according to the negotiated
+// pixel format.
+bool convertFrame(const libcamera::PixelFormat& pixel_format, const uint8_t* data,
+                  size_t bytes_used, int width, int height, int stride, ImageRGB& out) {
+  if (pixel_format == libcamera::formats::YUYV) {
+    return yuyvToRgb(data, bytes_used, width, height, stride, out);
+  }
+  if (pixel_format == libcamera::formats::R8) {
+    return greyToRgb(data, bytes_used, width, height, stride, out);
+  }
+  if (pixel_format == libcamera::formats::MJPEG) {
+    return mjpegToRgb(data, bytes_used, out);
+  }
+  return false;
+}
 
-  while (!has_timeout || std::chrono::steady_clock::now() < capture_deadline) {
-    if (!Cap_hasNewFrame(ctx, stream)) {
-      std::this_thread::sleep_for(sleep_interval);
-      continue;
+class LibcameraCaptureSession : public ICameraCaptureSession {
+ public:
+  static std::unique_ptr<LibcameraCaptureSession> open(
+      std::shared_ptr<libcamera::CameraManager> manager, std::shared_ptr<libcamera::Camera> camera,
+      CameraCaptureFormat requested_format, std::string camera_label, int warmup_frames,
+      int capture_timeout_ms) {
+    auto session = std::unique_ptr<LibcameraCaptureSession>(
+        new LibcameraCaptureSession(std::move(manager), std::move(camera), requested_format,
+                                    std::move(camera_label), warmup_frames, capture_timeout_ms));
+    if (!session->setup()) {
+      return nullptr;
+    }
+    return session;
+  }
+
+  ~LibcameraCaptureSession() override { close(); }
+
+  bool isOpen() const override { return started_; }
+
+  ImageRGB capture() override {
+    if (!isOpen()) {
+      return {};
     }
 
-    if (Cap_captureFrame(ctx, stream, buffer, buffer_size) != CAPRESULT_OK) {
-      continue;
+    const bool has_timeout = capture_timeout_ms_ > 0;
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(std::max(0, capture_timeout_ms_));
+
+    // Drop any frames that completed before this call so a long-idle session
+    // never returns a stale frame.
+    drainPending();
+
+    // Color sessions warm up once per session (mirrors the always-running
+    // openpnp stream); grey/IR sessions warm up on every capture to let the
+    // IR emitter/AE settle (mirrors the old V4L2 GREY fallback).
+    const int discard_count = (is_grey_ || !warmed_up_) ? warmup_frames_ : 0;
+    warmed_up_ = true;
+    for (int i = 0; i < discard_count; ++i) {
+      libcamera::Request* request = waitForRequest(deadline, has_timeout);
+      if (!request) {
+        return {};
+      }
+      requeue(request);
+    }
+
+    libcamera::Request* request = waitForRequest(deadline, has_timeout);
+    if (!request) {
+      return {};
+    }
+
+    ImageRGB image;
+    const bool ok = extractFrame(request, image);
+    requeue(request);
+    if (!ok) {
+      spdlog::error("FaceAuth: Failed to convert frame from '{}'", camera_label_);
+      return {};
+    }
+    return image;
+  }
+
+ private:
+  LibcameraCaptureSession(std::shared_ptr<libcamera::CameraManager> manager,
+                          std::shared_ptr<libcamera::Camera> camera,
+                          CameraCaptureFormat requested_format, std::string camera_label,
+                          int warmup_frames, int capture_timeout_ms)
+      : manager_(std::move(manager)),
+        camera_(std::move(camera)),
+        camera_label_(std::move(camera_label)),
+        is_grey_(requested_format == CameraCaptureFormat::V4L2Grey),
+        warmup_frames_(std::max(0, warmup_frames)),
+        capture_timeout_ms_(capture_timeout_ms) {}
+
+  bool setup() {
+    config_ = camera_->generateConfiguration({libcamera::StreamRole::StillCapture});
+    if (!config_ || config_->size() == 0) {
+      spdlog::error("FaceAuth: Failed to generate camera configuration for '{}'", camera_label_);
+      return false;
+    }
+
+    if (!negotiate(*config_,
+                   is_grey_ ? CameraCaptureFormat::V4L2Grey : CameraCaptureFormat::Default,
+                   camera_label_)) {
+      return false;
+    }
+
+    if (camera_->acquire() != 0) {
+      spdlog::error("FaceAuth: Failed to acquire camera '{}'", camera_label_);
+      return false;
+    }
+    acquired_ = true;
+
+    if (camera_->configure(config_.get()) != 0) {
+      spdlog::error("FaceAuth: Failed to configure camera '{}'", camera_label_);
+      return false;
+    }
+
+    libcamera::StreamConfiguration& stream_config = config_->at(0);
+    pixel_format_ = stream_config.pixelFormat;
+    width_ = static_cast<int>(stream_config.size.width);
+    height_ = static_cast<int>(stream_config.size.height);
+    stride_ = static_cast<int>(stream_config.stride);
+    stream_ = stream_config.stream();
+
+    allocator_ = std::make_unique<libcamera::FrameBufferAllocator>(camera_);
+    if (allocator_->allocate(stream_) < 0) {
+      spdlog::error("FaceAuth: Failed to allocate buffers for '{}'", camera_label_);
+      return false;
+    }
+
+    for (const auto& buffer : allocator_->buffers(stream_)) {
+      auto request = camera_->createRequest();
+      if (!request || request->addBuffer(stream_, buffer.get()) < 0) {
+        spdlog::error("FaceAuth: Failed to create capture request for '{}'", camera_label_);
+        return false;
+      }
+      if (!mapBuffer(buffer.get())) {
+        spdlog::error("FaceAuth: Failed to mmap buffer for '{}'", camera_label_);
+        return false;
+      }
+      requests_.push_back(std::move(request));
+    }
+
+    camera_->requestCompleted.connect(&connection_token_, [this](libcamera::Request* request) {
+      if (request->status() == libcamera::Request::RequestCancelled) {
+        return;
+      }
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        completed_.push_back(request);
+      }
+      ready_.notify_one();
+    });
+
+    if (camera_->start() < 0) {
+      spdlog::error("FaceAuth: Failed to start camera '{}'", camera_label_);
+      camera_->requestCompleted.disconnect(&connection_token_);
+      return false;
+    }
+    started_ = true;
+
+    for (auto& request : requests_) {
+      if (camera_->queueRequest(request.get()) < 0) {
+        spdlog::error("FaceAuth: Failed to queue initial request for '{}'", camera_label_);
+        started_ = false;
+        return false;
+      }
     }
 
     return true;
   }
 
-  return false;
-}
-
-class OpenPnpCameraSession : public ICameraCaptureSession {
- public:
-  OpenPnpCameraSession(CapContext ctx, CapStream stream, uint32_t width, uint32_t height,
-                       std::string camera_label, int capture_timeout_ms, int poll_interval_ms)
-      : ctx_(ctx),
-        stream_(stream),
-        width_(width),
-        height_(height),
-        camera_label_(std::move(camera_label)),
-        capture_timeout_ms_(capture_timeout_ms),
-        poll_interval_ms_(poll_interval_ms),
-        buffer_(static_cast<size_t>(width) * static_cast<size_t>(height) * 3) {}
-
-  ~OpenPnpCameraSession() override { close(); }
-
-  bool isOpen() const override { return ctx_ != nullptr && stream_ >= 0; }
-
-  ImageRGB capture() override {
-    if (!isOpen()) {
-      return {};
+  bool mapBuffer(libcamera::FrameBuffer* buffer) {
+    const auto planes = buffer->planes();
+    if (planes.empty()) {
+      return false;
     }
-
-    if (!capture_frame_openpnp(ctx_, stream_, buffer_.data(), buffer_.size(), capture_timeout_ms_,
-                               poll_interval_ms_)) {
-      spdlog::error("FaceAuth: Failed to capture frame from '{}'", camera_label_);
-      close();
-      return {};
+    const auto& plane = planes[0];
+    const size_t mapping_size = plane.offset + plane.length;
+    void* mapping = mmap(nullptr, mapping_size, PROT_READ, MAP_SHARED, plane.fd.get(), 0);
+    if (mapping == MAP_FAILED) {
+      return false;
     }
-
-    return ImageRGB(static_cast<int>(width_), static_cast<int>(height_), buffer_.data());
+    mappings_[buffer] = Mapping{mapping, mapping_size, plane.offset};
+    return true;
   }
 
- private:
+  // Blocks until a completed request is available or the deadline passes.
+  libcamera::Request* waitForRequest(std::chrono::steady_clock::time_point deadline,
+                                     bool has_timeout) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    bool have_request;
+    if (has_timeout) {
+      have_request = ready_.wait_until(lock, deadline, [this] { return !completed_.empty(); });
+    } else {
+      ready_.wait(lock, [this] { return !completed_.empty(); });
+      have_request = true;
+    }
+    if (!have_request) {
+      spdlog::error("FaceAuth: Timed out waiting for frame from '{}'", camera_label_);
+      lock.unlock();
+      close();
+      return nullptr;
+    }
+    libcamera::Request* request = completed_.front();
+    completed_.pop_front();
+    return request;
+  }
+
+  void drainPending() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    while (!completed_.empty()) {
+      libcamera::Request* request = completed_.front();
+      completed_.pop_front();
+      request->reuse(libcamera::Request::ReuseBuffers);
+      camera_->queueRequest(request);
+    }
+  }
+
+  void requeue(libcamera::Request* request) {
+    request->reuse(libcamera::Request::ReuseBuffers);
+    camera_->queueRequest(request);
+  }
+
+  bool extractFrame(libcamera::Request* request, ImageRGB& out) {
+    libcamera::FrameBuffer* buffer = request->findBuffer(stream_);
+    if (!buffer) {
+      return false;
+    }
+    const auto it = mappings_.find(buffer);
+    if (it == mappings_.end()) {
+      return false;
+    }
+    const auto metadata = buffer->metadata().planes();
+    if (metadata.empty()) {
+      return false;
+    }
+    const size_t bytes_used = metadata[0].bytesused;
+    const uint8_t* data = static_cast<const uint8_t*>(it->second.base) + it->second.plane_offset;
+    return convertFrame(pixel_format_, data, bytes_used, width_, height_, stride_, out);
+  }
+
   void close() {
-    if (ctx_ && stream_ >= 0) {
-      Cap_closeStream(ctx_, stream_);
-      stream_ = -1;
+    if (started_) {
+      camera_->stop();
+      started_ = false;
     }
-    if (ctx_) {
-      Cap_releaseContext(ctx_);
-      ctx_ = nullptr;
+    camera_->requestCompleted.disconnect(&connection_token_);
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      completed_.clear();
+    }
+    for (auto& [buffer, mapping] : mappings_) {
+      munmap(mapping.base, mapping.size);
+    }
+    mappings_.clear();
+    requests_.clear();
+    allocator_.reset();
+    if (acquired_) {
+      camera_->release();
+      acquired_ = false;
     }
   }
 
-  CapContext ctx_ = nullptr;
-  CapStream stream_ = -1;
-  uint32_t width_ = 0;
-  uint32_t height_ = 0;
-  std::string camera_label_;
-  int capture_timeout_ms_ = 0;
-  int poll_interval_ms_ = 0;
-  std::vector<uint8_t> buffer_;
-};
-
-class V4L2GreyCameraSession : public ICameraCaptureSession {
- public:
-  V4L2GreyCameraSession(std::string device_path, const CapFormatInfo& format, int warmup_frames,
-                        int capture_timeout_ms, int poll_interval_ms)
-      : device_path_(std::move(device_path)),
-        warmup_frames_(std::max(0, warmup_frames)),
-        capture_timeout_ms_(capture_timeout_ms),
-        poll_interval_ms_(std::max(1, poll_interval_ms)) {
-    if (format.fourcc != V4L2_PIX_FMT_GREY) {
-      spdlog::error("FaceAuth: V4L2 GREY session requires GREY camera format");
-      return;
-    }
-
-    fd_ = ::open(device_path_.c_str(), O_RDWR | O_NONBLOCK);
-    if (fd_ == -1) {
-      spdlog::error("FaceAuth: Failed to open {} for V4L2 fallback: {}", device_path_,
-                    std::strerror(errno));
-      return;
-    }
-
-    v4l2_format v4l2_format_info {};
-    v4l2_format_info.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    v4l2_format_info.fmt.pix.width = format.width;
-    v4l2_format_info.fmt.pix.height = format.height;
-    v4l2_format_info.fmt.pix.pixelformat = format.fourcc;
-    v4l2_format_info.fmt.pix.field = V4L2_FIELD_NONE;
-    if (xioctl_retry(fd_, VIDIOC_S_FMT, &v4l2_format_info) == -1) {
-      spdlog::error("FaceAuth: VIDIOC_S_FMT failed for {}: {}", device_path_, std::strerror(errno));
-      close();
-      return;
-    }
-
-    if (format.fps > 0) {
-      v4l2_streamparm stream_params {};
-      stream_params.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-      stream_params.parm.capture.timeperframe.numerator = 1;
-      stream_params.parm.capture.timeperframe.denominator = format.fps;
-      xioctl_retry(fd_, VIDIOC_S_PARM, &stream_params);
-    }
-
-    width_ = v4l2_format_info.fmt.pix.width;
-    height_ = v4l2_format_info.fmt.pix.height;
-    bytes_per_line_ =
-        std::max<uint32_t>(v4l2_format_info.fmt.pix.bytesperline, v4l2_format_info.fmt.pix.width);
-
-    v4l2_requestbuffers request_buffers {};
-    request_buffers.count = 4;
-    request_buffers.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    request_buffers.memory = V4L2_MEMORY_MMAP;
-    if (xioctl_retry(fd_, VIDIOC_REQBUFS, &request_buffers) == -1 || request_buffers.count == 0) {
-      spdlog::error("FaceAuth: VIDIOC_REQBUFS failed for {}: {}", device_path_, std::strerror(errno));
-      close();
-      return;
-    }
-
-    buffers_.resize(request_buffers.count);
-    for (uint32_t index = 0; index < request_buffers.count; ++index) {
-      v4l2_buffer buffer {};
-      buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-      buffer.memory = V4L2_MEMORY_MMAP;
-      buffer.index = index;
-      if (xioctl_retry(fd_, VIDIOC_QUERYBUF, &buffer) == -1) {
-        spdlog::error("FaceAuth: VIDIOC_QUERYBUF failed for {}: {}", device_path_,
-                      std::strerror(errno));
-        close();
-        return;
-      }
-
-      buffers_[index].length = buffer.length;
-      buffers_[index].start = ::mmap(nullptr, buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED,
-                                     fd_, buffer.m.offset);
-      if (buffers_[index].start == MAP_FAILED) {
-        spdlog::error("FaceAuth: mmap failed for {}: {}", device_path_, std::strerror(errno));
-        close();
-        return;
-      }
-    }
-
-    for (uint32_t index = 0; index < buffers_.size(); ++index) {
-      v4l2_buffer buffer {};
-      buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-      buffer.memory = V4L2_MEMORY_MMAP;
-      buffer.index = index;
-      if (xioctl_retry(fd_, VIDIOC_QBUF, &buffer) == -1) {
-        spdlog::error("FaceAuth: VIDIOC_QBUF failed for {}: {}", device_path_, std::strerror(errno));
-        close();
-        return;
-      }
-    }
-
-    if (xioctl_retry(fd_, VIDIOC_STREAMON, &buffer_type_) == -1) {
-      spdlog::error("FaceAuth: VIDIOC_STREAMON failed for {}: {}", device_path_,
-                    std::strerror(errno));
-      close();
-      return;
-    }
-
-    stream_started_ = true;
-  }
-
-  ~V4L2GreyCameraSession() override { close(); }
-
-  bool isOpen() const override { return fd_ >= 0 && stream_started_; }
-
-  ImageRGB capture() override {
-    if (!isOpen()) {
-      return {};
-    }
-
-    const int total_frames_needed = warmup_frames_ + 1;
-    int captured_frames = 0;
-    const bool has_timeout = capture_timeout_ms_ > 0;
-    const auto capture_deadline = std::chrono::steady_clock::now() +
-                                  std::chrono::milliseconds(std::max(0, capture_timeout_ms_));
-
-    while (captured_frames < total_frames_needed) {
-      pollfd poll_info {};
-      poll_info.fd = fd_;
-      poll_info.events = POLLIN;
-
-      int poll_timeout_ms = -1;
-      if (has_timeout) {
-        const auto now = std::chrono::steady_clock::now();
-        if (now >= capture_deadline) {
-          spdlog::error("FaceAuth: Timed out waiting for V4L2 GREY frame from {}", device_path_);
-          close();
-          return {};
-        }
-
-        const auto remaining_ms =
-            std::chrono::duration_cast<std::chrono::milliseconds>(capture_deadline - now).count();
-        poll_timeout_ms =
-            std::max(1, std::min(poll_interval_ms_, static_cast<int>(remaining_ms)));
-      }
-
-      const int poll_rc = ::poll(&poll_info, 1, poll_timeout_ms);
-      if (poll_rc == -1) {
-        if (errno == EINTR) {
-          continue;
-        }
-        spdlog::error("FaceAuth: poll failed for {}: {}", device_path_, std::strerror(errno));
-        close();
-        return {};
-      }
-      if (poll_rc == 0) {
-        continue;
-      }
-
-      v4l2_buffer buffer {};
-      buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-      buffer.memory = V4L2_MEMORY_MMAP;
-      if (xioctl_retry(fd_, VIDIOC_DQBUF, &buffer) == -1) {
-        if (errno == EAGAIN) {
-          continue;
-        }
-        spdlog::error("FaceAuth: VIDIOC_DQBUF failed for {}: {}", device_path_,
-                      std::strerror(errno));
-        close();
-        return {};
-      }
-
-      const uint8_t* grey = static_cast<const uint8_t*>(buffers_.at(buffer.index).start);
-      ++captured_frames;
-
-      ImageRGB image;
-      if (captured_frames >= total_frames_needed) {
-        image = ImageRGB(static_cast<int>(width_), static_cast<int>(height_));
-        for (uint32_t y = 0; y < height_; ++y) {
-          const uint8_t* src_row = grey + y * bytes_per_line_;
-          uint8_t* dst_row = image.ptr() + y * width_ * 3;
-          for (uint32_t x = 0; x < width_; ++x) {
-            const uint8_t value = src_row[x];
-            dst_row[x * 3 + 0] = value;
-            dst_row[x * 3 + 1] = value;
-            dst_row[x * 3 + 2] = value;
-          }
-        }
-      }
-
-      if (xioctl_retry(fd_, VIDIOC_QBUF, &buffer) == -1) {
-        spdlog::error("FaceAuth: VIDIOC_QBUF failed for {}: {}", device_path_, std::strerror(errno));
-        close();
-        return {};
-      }
-
-      if (!image.empty()) {
-        return image;
-      }
-    }
-
-    return {};
-  }
-
- private:
-  struct MappedBuffer {
-    void* start = MAP_FAILED;
-    size_t length = 0;
+  struct Mapping {
+    void* base = nullptr;
+    size_t size = 0;
+    size_t plane_offset = 0;
   };
 
-  void close() {
-    if (fd_ >= 0 && stream_started_) {
-      xioctl_retry(fd_, VIDIOC_STREAMOFF, &buffer_type_);
-      stream_started_ = false;
-    }
-
-    for (auto& buffer : buffers_) {
-      if (buffer.start != MAP_FAILED) {
-        ::munmap(buffer.start, buffer.length);
-        buffer.start = MAP_FAILED;
-        buffer.length = 0;
-      }
-    }
-    buffers_.clear();
-
-    if (fd_ >= 0) {
-      ::close(fd_);
-      fd_ = -1;
-    }
-  }
-
-  std::string device_path_;
-  int fd_ = -1;
-  uint32_t width_ = 0;
-  uint32_t height_ = 0;
-  uint32_t bytes_per_line_ = 0;
+  std::shared_ptr<libcamera::CameraManager> manager_;
+  std::shared_ptr<libcamera::Camera> camera_;
+  std::string camera_label_;
+  bool is_grey_ = false;
   int warmup_frames_ = 0;
   int capture_timeout_ms_ = 0;
-  int poll_interval_ms_ = 0;
-  std::vector<MappedBuffer> buffers_;
-  v4l2_buf_type buffer_type_ = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-  bool stream_started_ = false;
+  bool warmed_up_ = false;
+
+  std::unique_ptr<libcamera::CameraConfiguration> config_;
+  libcamera::Stream* stream_ = nullptr;
+  libcamera::PixelFormat pixel_format_;
+  int width_ = 0;
+  int height_ = 0;
+  int stride_ = 0;
+
+  std::unique_ptr<libcamera::FrameBufferAllocator> allocator_;
+  std::vector<std::unique_ptr<libcamera::Request>> requests_;
+  std::map<libcamera::FrameBuffer*, Mapping> mappings_;
+
+  std::mutex mutex_;
+  std::condition_variable ready_;
+  std::deque<libcamera::Request*> completed_;
+  int connection_token_ = 0;
+
+  bool acquired_ = false;
+  bool started_ = false;
 };
-
-void captureLogCallback(uint32_t level, const char* message) {
-  if (!message) {
-    return;
-  }
-  if (std::strstr(message, "tjDecompressHeader2 failed: No error") != nullptr) {
-    return;
-  }
-
-  std::string msg(message);
-  while (!msg.empty() && (msg.back() == '\n' || msg.back() == '\r')) {
-    msg.pop_back();
-  }
-
-  if (level <= 3) {
-    spdlog::error("openpnp-capture: {}", msg);
-  } else if (level == 4) {
-    spdlog::warn("openpnp-capture: {}", msg);
-  } else {
-    spdlog::info("openpnp-capture: {}", msg);
-  }
-}
-
-void captureLog() {
-  static std::once_flag once;
-  std::call_once(once, []() { Cap_installCustomLogFunction(captureLogCallback); });
-}
-
-std::optional<CapDeviceID> resolveCameraDeviceIdx(
-    CapContext ctx, const std::optional<std::string>& linux_video_device_path) {
-  const uint32_t count = Cap_getDeviceCount(ctx);
-  if (count == 0) {
-    spdlog::error("FaceAuth: No camera devices reported by openpnp-capture");
-    return std::nullopt;
-  }
-
-  if (linux_video_device_path.has_value()) {
-    const auto capture_paths = enumerate_linux_video_capture_paths();
-    for (size_t index = 0; index < capture_paths.size(); ++index) {
-      if (capture_paths[index] == *linux_video_device_path) {
-        if (index < count) {
-          return static_cast<CapDeviceID>(index);
-        }
-        spdlog::error(
-            "FaceAuth: Camera path '{}' resolved to index {} but openpnp reports only {} device(s)",
-            *linux_video_device_path, index, count);
-        return std::nullopt;
-      }
-    }
-
-    for (uint32_t i = 0; i < count; ++i) {
-      const char* uid = Cap_getDeviceUniqueID(ctx, static_cast<CapDeviceID>(i));
-      if (uid && std::string(uid).find(*linux_video_device_path) != std::string::npos) {
-        return static_cast<CapDeviceID>(i);
-      }
-    }
-
-    spdlog::error("FaceAuth: Camera path '{}' was not found among capture-capable /dev/video* devices",
-                  *linux_video_device_path);
-    return std::nullopt;
-  }
-
-  return static_cast<CapDeviceID>(0);
-}
 
 }  // namespace
 
@@ -483,102 +548,26 @@ bool checkCameraAvailability(const std::optional<std::string>& linux_video_devic
 
 std::unique_ptr<ICameraCaptureSession> openCameraSession(
     const std::optional<std::string>& linux_video_device_path, CameraCaptureFormat format,
-    int warmup_frames, int capture_timeout_ms, int poll_interval_ms) {
-  captureLog();
-  CapContext ctx = Cap_createContext();
-  if (!ctx) {
-    spdlog::error("FaceAuth: Failed to create capture context for '{}'",
-                  device_label(linux_video_device_path));
+    int warmup_frames, int capture_timeout_ms) {
+  auto manager = cameraManager();
+  if (!manager) {
     return nullptr;
   }
 
-  const auto device_index = resolveCameraDeviceIdx(ctx, linux_video_device_path);
-  if (!device_index.has_value()) {
-    Cap_releaseContext(ctx);
+  auto camera = findCamera(*manager, linux_video_device_path);
+  if (!camera) {
     return nullptr;
   }
 
-  if (format == CameraCaptureFormat::V4L2Grey) {
-    if (!linux_video_device_path.has_value()) {
-      spdlog::error("FaceAuth: Direct V4L2 GREY capture requires a /dev/video* path");
-      Cap_releaseContext(ctx);
-      return nullptr;
-    }
-
-    const auto grey_format = find_camera_format_by_fourcc(ctx, *device_index, V4L2_PIX_FMT_GREY);
-    if (!grey_format.has_value()) {
-      spdlog::error("FaceAuth: Camera '{}' does not expose a GREY format for direct V4L2 capture",
-                    *linux_video_device_path);
-      Cap_releaseContext(ctx);
-      return nullptr;
-    }
-
-    Cap_releaseContext(ctx);
-    auto session = std::make_unique<V4L2GreyCameraSession>(*linux_video_device_path, *grey_format,
-                                                           warmup_frames, capture_timeout_ms,
-                                                           poll_interval_ms);
-    if (!session->isOpen()) {
-      return nullptr;
-    }
-    return session;
-  }
-
-  CapFormatInfo fmt {};
-  CapResult fmt_result = Cap_getFormatInfo(ctx, *device_index, 0, &fmt);
-  if (fmt_result != CAPRESULT_OK) {
-    spdlog::error("FaceAuth: Failed to get camera format info for '{}' (index {}, code {})",
-                  device_label(linux_video_device_path), *device_index, static_cast<int>(fmt_result));
-    Cap_releaseContext(ctx);
-    return nullptr;
-  }
-
-  if (fmt.fourcc == V4L2_PIX_FMT_GREY) {
-    auto linux_path = linux_video_device_path;
-    if (!linux_path.has_value()) {
-      linux_path = linux_device_path_from_index(*device_index);
-    }
-
-    if (!linux_path.has_value()) {
-      spdlog::error(
-          "FaceAuth: Device index {} requires GREY fallback but has no resolvable /dev/video path",
-          *device_index);
-      Cap_releaseContext(ctx);
-      return nullptr;
-    }
-
-    spdlog::warn(
-        "FaceAuth: Device '{}' reports GREY format; using V4L2 GREY fallback on '{}'",
-        device_label(linux_video_device_path), *linux_path);
-    Cap_releaseContext(ctx);
-    auto session = std::make_unique<V4L2GreyCameraSession>(*linux_path, fmt, warmup_frames,
-                                                           capture_timeout_ms, poll_interval_ms);
-    if (!session->isOpen()) {
-      return nullptr;
-    }
-    return session;
-  }
-
-  CapStream stream = Cap_openStream(ctx, *device_index, 0);
-  if (stream < 0 || !Cap_isOpenStream(ctx, stream)) {
-    spdlog::error("FaceAuth: Failed to open camera stream for '{}' (index {})",
-                  device_label(linux_video_device_path), *device_index);
-    Cap_releaseContext(ctx);
-    return nullptr;
-  }
-
-  auto session = std::make_unique<OpenPnpCameraSession>(
-      ctx, stream, fmt.width, fmt.height, device_label(linux_video_device_path), capture_timeout_ms,
-      poll_interval_ms);
-  if (!session->isOpen()) {
-    return nullptr;
-  }
-  return session;
+  return LibcameraCaptureSession::open(manager, camera, format,
+                                       device_label(linux_video_device_path), warmup_frames,
+                                       capture_timeout_ms);
 }
 
 ImageRGB captureImage(const std::optional<std::string>& linux_video_device_path,
                       CameraCaptureFormat format) {
   auto session = openCameraSession(linux_video_device_path, format, kDefaultWarmupFrames,
-                                   kDefaultCaptureTimeoutMs, kDefaultCapturePollIntervalMs);
+                                   kDefaultCaptureTimeoutMs);
   if (!session) {
     return {};
   }
@@ -587,19 +576,67 @@ ImageRGB captureImage(const std::optional<std::string>& linux_video_device_path,
 }
 
 ImageRGB captureImageByIRCamera(const std::string& device_path, int warmup_frames,
-                                int capture_timeout_ms, int poll_interval_ms) {
+                                int capture_timeout_ms) {
   if (device_path.empty()) {
     spdlog::error("FaceAuth: IR camera capture requires a /dev/video* path");
     return {};
   }
 
   auto session = openCameraSession(device_path, CameraCaptureFormat::V4L2Grey, warmup_frames,
-                                   capture_timeout_ms, poll_interval_ms);
+                                   capture_timeout_ms);
   if (!session) {
     return {};
   }
 
   return session->capture();
+}
+
+std::vector<CameraDeviceInfo> listCameraDevices() {
+  std::vector<CameraDeviceInfo> result;
+  auto manager = cameraManager();
+  if (!manager) {
+    return result;
+  }
+
+  for (const auto& camera : manager->cameras()) {
+    CameraDeviceInfo info;
+    info.id = camera->id();
+    const auto model = camera->properties().get(libcamera::properties::Model);
+    info.model = model ? std::string(*model) : info.id;
+    info.video_paths = videoPathsForCamera(*camera);
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+std::vector<CameraFormatDesc> listCameraFormats(const std::string& device_path) {
+  std::vector<CameraFormatDesc> result;
+  auto manager = cameraManager();
+  if (!manager) {
+    return result;
+  }
+
+  auto camera = findCameraByPath(*manager, device_path);
+  if (!camera) {
+    return result;
+  }
+
+  auto config = camera->generateConfiguration({libcamera::StreamRole::StillCapture});
+  if (!config || config->size() == 0) {
+    return result;
+  }
+
+  const auto& formats = config->at(0).formats();
+  for (const auto& pixel_format : formats.pixelformats()) {
+    CameraFormatDesc desc;
+    desc.pixel_format = pixel_format.toString();
+    desc.supported = isSupportedPixelFormat(pixel_format);
+    for (const auto& size : formats.sizes(pixel_format)) {
+      desc.sizes.emplace_back(static_cast<int>(size.width), static_cast<int>(size.height));
+    }
+    result.push_back(std::move(desc));
+  }
+  return result;
 }
 
 }  // namespace biopass

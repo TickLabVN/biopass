@@ -130,25 +130,12 @@ BiopassConfig readConfig(const std::string& username) {
             config.methods.face.anti_spoofing.enable = anti_spoofing["enable"].as<bool>();
           }
 
-          if (anti_spoofing["model"]) {
+          if (anti_spoofing["model"] && anti_spoofing["model"].IsMap()) {
             const auto& model = anti_spoofing["model"];
-            if (model.IsMap()) {
-              if (model["path"])
-                config.methods.face.anti_spoofing.model.path = model["path"].as<std::string>();
-              if (model["threshold"])
-                config.methods.face.anti_spoofing.model.threshold = model["threshold"].as<float>();
-            } else if (model.IsScalar()) {
-              // Backward compatibility with old schema:
-              // anti_spoofing.model: "<path>"
-              config.methods.face.anti_spoofing.model.path = model.as<std::string>();
-            }
-          }
-
-          // Backward compatibility with old schema:
-          // anti_spoofing.threshold: <float>
-          if (anti_spoofing["threshold"]) {
-            config.methods.face.anti_spoofing.model.threshold =
-                anti_spoofing["threshold"].as<float>();
+            if (model["path"])
+              config.methods.face.anti_spoofing.model.path = model["path"].as<std::string>();
+            if (model["threshold"])
+              config.methods.face.anti_spoofing.model.threshold = model["threshold"].as<float>();
           }
 
           if (anti_spoofing["ir_camera"] && !anti_spoofing["ir_camera"].IsNull()) {
@@ -160,22 +147,10 @@ BiopassConfig readConfig(const std::string& username) {
             config.methods.face.anti_spoofing.ir_warmup_delay_ms =
                 anti_spoofing["ir_warmup_delay_ms"].as<int>();
           }
-        }
 
-        // Backward compatibility with old schema:
-        // methods.face.ir_camera.enable + methods.face.ir_camera.device_id
-        const bool ir_camera_missing = !config.methods.face.anti_spoofing.ir_camera.has_value() ||
-                                       config.methods.face.anti_spoofing.ir_camera->empty();
-        if (f["ir_camera"] && ir_camera_missing) {
-          bool ir_enable = false;
-          int ir_device_id = 0;
-          if (f["ir_camera"]["enable"])
-            ir_enable = f["ir_camera"]["enable"].as<bool>();
-          if (f["ir_camera"]["device_id"])
-            ir_device_id = f["ir_camera"]["device_id"].as<int>();
-          if (ir_enable) {
-            config.methods.face.anti_spoofing.ir_camera =
-                "/dev/video" + std::to_string(ir_device_id);
+          if (anti_spoofing["ir_presence_timeout_ms"]) {
+            config.methods.face.anti_spoofing.ir_presence_timeout_ms =
+                anti_spoofing["ir_presence_timeout_ms"].as<int>();
           }
         }
       }
@@ -189,8 +164,6 @@ BiopassConfig readConfig(const std::string& username) {
           config.methods.fingerprint.retries = fp["retries"].as<uint32_t>();
         if (fp["timeout"])
           config.methods.fingerprint.timeout = fp["timeout"].as<uint32_t>();
-        else if (fp["retry_delay"])
-          config.methods.fingerprint.timeout = fp["retry_delay"].as<uint32_t>();
 
         if (fp["fingers"] && fp["fingers"].IsSequence()) {
           config.methods.fingerprint.fingers.clear();
@@ -241,116 +214,6 @@ BiopassConfig readConfig(const std::string& username) {
   }
 
   return config;
-}
-
-bool migrateConfigSchema(const std::string& username, std::string* error) {
-  const std::string config_path = getConfigPath(username);
-  try {
-    YAML::Node yaml = YAML::LoadFile(config_path);
-    if (!yaml["methods"] || !yaml["methods"]["face"]) {
-      return true;
-    }
-
-    YAML::Node face = yaml["methods"]["face"];
-    YAML::Node anti = face["anti_spoofing"];
-
-    bool enable = false;
-    std::string model_path = "models/mobilenetv3_antispoof.onnx";
-    float threshold = 0.8f;
-    std::string ir_camera_path;
-
-    if (anti) {
-      if (anti["enable"]) {
-        enable = anti["enable"].as<bool>();
-      }
-
-      if (anti["model"]) {
-        YAML::Node model = anti["model"];
-        if (model.IsMap()) {
-          if (model["path"])
-            model_path = model["path"].as<std::string>();
-          if (model["threshold"])
-            threshold = model["threshold"].as<float>();
-        } else if (model.IsScalar()) {
-          model_path = model.as<std::string>();
-        }
-      }
-
-      // Old schema path.
-      if (anti["threshold"]) {
-        threshold = anti["threshold"].as<float>();
-      }
-
-      if (anti["ir_camera"] && !anti["ir_camera"].IsNull()) {
-        ir_camera_path = anti["ir_camera"].as<std::string>();
-      }
-    }
-
-    if (ir_camera_path.empty() && face["ir_camera"]) {
-      bool ir_enable = false;
-      int ir_device_id = 0;
-      if (face["ir_camera"]["enable"]) {
-        ir_enable = face["ir_camera"]["enable"].as<bool>();
-      }
-      if (face["ir_camera"]["device_id"]) {
-        ir_device_id = face["ir_camera"]["device_id"].as<int>();
-      }
-      if (ir_enable) {
-        ir_camera_path = "/dev/video" + std::to_string(ir_device_id);
-      }
-    }
-
-    // Idempotency guard:
-    // If config is already in the new schema and there are no legacy fields left,
-    // skip writing to disk.
-    const bool has_legacy_face_ir = static_cast<bool>(face["ir_camera"]);
-    const bool has_legacy_anti_threshold = anti && static_cast<bool>(anti["threshold"]);
-    const bool has_legacy_anti_model_scalar =
-        anti && static_cast<bool>(anti["model"]) && anti["model"].IsScalar();
-    const bool has_new_model_map =
-        anti && static_cast<bool>(anti["model"]) && anti["model"].IsMap() &&
-        static_cast<bool>(anti["model"]["path"]) && static_cast<bool>(anti["model"]["threshold"]);
-    const bool has_new_ir_key = anti && static_cast<bool>(anti["ir_camera"]);
-    const bool needs_migration = has_legacy_face_ir || has_legacy_anti_threshold ||
-                                 has_legacy_anti_model_scalar || !has_new_model_map ||
-                                 !has_new_ir_key;
-    if (!needs_migration)
-      return true;
-
-    YAML::Node anti_new;
-    anti_new["enable"] = enable;
-    YAML::Node model_new;
-    model_new["path"] = model_path;
-    model_new["threshold"] = threshold;
-    anti_new["model"] = model_new;
-    if (ir_camera_path.empty()) {
-      anti_new["ir_camera"] = YAML::Node();
-    } else {
-      anti_new["ir_camera"] = ir_camera_path;
-    }
-
-    face["anti_spoofing"] = anti_new;
-    if (face["ir_camera"]) {
-      face.remove("ir_camera");
-    }
-    yaml["methods"]["face"] = face;
-
-    std::ofstream out(config_path, std::ios::trunc);
-    if (!out.is_open()) {
-      if (error)
-        *error = "Failed to open config for writing: " + config_path;
-      return false;
-    }
-    out << yaml;
-    return true;
-  } catch (const YAML::BadFile&) {
-    // No config yet is valid; migration is a no-op.
-    return true;
-  } catch (const std::exception& e) {
-    if (error)
-      *error = e.what();
-    return false;
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -13,4 +13,5 @@ target_include_directories(biopass_det PUBLIC
 target_link_libraries(biopass_det PRIVATE
     ${ONNXRUNTIME_LIB}
     biopass_stb
+    biopass_onnx
 )

@@ -4,7 +4,11 @@
 #include <cmath>
 #include <numeric>
 
-static std::vector<int> nms(const std::vector<RawDet>& dets, float iou_threshold) {
+namespace biopass {
+
+namespace {
+
+std::vector<int> nms(const std::vector<RawDet>& dets, float iou_threshold) {
   if (dets.empty())
     return {};
 
@@ -46,6 +50,8 @@ static std::vector<int> nms(const std::vector<RawDet>& dets, float iou_threshold
   }
   return keep;
 }
+
+}  // namespace
 
 std::vector<RawDet> non_max_suppression(const float* output, int num_preds, int pred_dim,
                                         float conf_thres, float iou_thres, int max_det) {
@@ -105,3 +111,5 @@ void scale_boxes(const std::vector<int>& img1_shape, std::vector<RawDet>& dets,
     d.y2 = (d.y2 - pad1) / gain;
   }
 }
+
+}  // namespace biopass

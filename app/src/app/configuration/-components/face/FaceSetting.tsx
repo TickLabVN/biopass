@@ -164,10 +164,16 @@ export function FaceSetting() {
             value={cameraValue}
             onValueChange={(value) => {
               if (value === disabledOption) {
-                setFaceConfig({ ...config, camera: null });
+                setValue("methods.face.camera", null, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
                 return;
               }
-              setFaceConfig({ ...config, camera: value });
+              setValue("methods.face.camera", value, {
+                shouldDirty: true,
+                shouldValidate: true,
+              });
             }}
           >
             <SelectTrigger id="camera-device" className="h-10 w-full">
@@ -351,18 +357,14 @@ export function FaceSetting() {
           <Select
             value={irCameraValue}
             onValueChange={(value) => {
-              if (value === disabledOption) {
-                setValue("methods.face.anti_spoofing.ir_camera", null, {
+              setValue(
+                "methods.face.anti_spoofing.ir_camera",
+                value === disabledOption ? null : value,
+                {
                   shouldDirty: true,
                   shouldValidate: true,
-                });
-                return;
-              }
-
-              setValue("methods.face.anti_spoofing.ir_camera", value, {
-                shouldDirty: true,
-                shouldValidate: true,
-              });
+                },
+              );
             }}
           >
             <SelectTrigger id="ir-device" className="h-10 w-full">

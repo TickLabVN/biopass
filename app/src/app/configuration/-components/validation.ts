@@ -24,15 +24,15 @@ export const biopassConfigSchema = z
     methods: z.object({
       face: z.object({
         enable: z.boolean(),
+        camera: z.string().nullable(),
         retries: z
           .number("Max retries must be a number")
           .int("Max retries must be a whole number")
-          .min(0, "Max retries must be at least 0")
-          .max(10, "Max retries must be at most 10"),
+          .min(1, "Max retries must be at least 1"),
         retry_delay: z
           .number("Retry delay must be a number")
           .int("Retry delay must be a whole number")
-          .min(0, "Retry delay must be at least 0 ms")
+          .min(1, "Retry delay must be at least 1 ms")
           .max(5000, "Retry delay must be at most 5000 ms"),
         detection: z.object({
           model: z.string(),
@@ -56,12 +56,11 @@ export const biopassConfigSchema = z
         retries: z
           .number("Max retries must be a number")
           .int("Max retries must be a whole number")
-          .min(0, "Max retries must be at least 0")
-          .max(10, "Max retries must be at most 10"),
+          .min(1, "Max retries must be at least 1"),
         timeout: z
           .number("Timeout must be a number")
           .int("Timeout must be a whole number")
-          .min(0, "Timeout must be at least 0 ms")
+          .min(1, "Timeout must be at least 1 ms")
           .max(5000, "Timeout must be at most 5000 ms"),
         fingers: z.array(
           z.object({

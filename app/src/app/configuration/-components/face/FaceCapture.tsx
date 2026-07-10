@@ -1,28 +1,29 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { Camera, Circle, Square, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { cmd } from "@/commands";
 import { Button } from "@/components/ui/button";
-import { useConfigurationStore } from "../../-stores/configuration-store";
+import type { BiopassConfig } from "@/types/config";
 
 export function FaceCapture() {
   const previewRef = useRef<HTMLImageElement>(null);
   const [capturing, setCapturing] = useState(false);
   const [faceImages, setFaceImages] = useState<string[]>([]);
-  const camera = useConfigurationStore(
-    (state) => state.config?.methods.face.camera ?? null,
-  );
+  const camera = useWatch<BiopassConfig, "methods.face.camera">({
+    name: "methods.face.camera",
+  });
 
-  const loadFaceImages = useCallback(async () => {
+  async function loadFaceImages() {
     try {
       const images = await cmd.face.listImages();
       setFaceImages(images);
     } catch (err) {
       console.error("Failed to load face images:", err);
     }
-  }, []);
+  }
 
   useEffect(() => {
     loadFaceImages();
@@ -147,17 +148,17 @@ export function FaceCapture() {
         {/* Controls */}
         <div className="flex gap-2">
           {!capturing ? (
-            <Button onClick={startCamera} className="flex-1">
+            <Button type="button" onClick={startCamera} className="flex-1">
               <Camera className="w-4 h-4 mr-2" />
               Start Camera
             </Button>
           ) : (
             <>
-              <Button onClick={capturePhoto} className="flex-1">
+              <Button type="button" onClick={capturePhoto} className="flex-1">
                 <Circle className="w-4 h-4 mr-2" />
                 Capture
               </Button>
-              <Button variant="outline" onClick={stopCamera}>
+              <Button type="button" variant="outline" onClick={stopCamera}>
                 <Square className="w-4 h-4 mr-2" />
                 Stop
               </Button>

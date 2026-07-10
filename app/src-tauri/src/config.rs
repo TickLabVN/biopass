@@ -18,7 +18,9 @@ pub struct BiopassConfig {
 pub struct StrategyConfig {
     #[serde(default)]
     pub debug: bool,
+    #[serde(default = "default_execution_mode")]
     pub execution_mode: String,
+    #[serde(default = "default_order")]
     pub order: Vec<String>,
     #[serde(default = "default_ignored_services")]
     pub ignore_services: Vec<String>,
@@ -59,11 +61,15 @@ struct AntiSpoofingConfigRaw {
     pub threshold: Option<f32>,
     #[serde(default)]
     pub ir_camera: Option<String>,
+    #[serde(default)]
+    pub ir_warmup_delay_ms: Option<i32>,
+    #[serde(default)]
+    pub ir_presence_timeout_ms: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
 struct FaceMethodConfigRaw {
-    #[serde(default)]
+    #[serde(default = "default_face_enable")]
     pub enable: bool,
     #[serde(default = "default_face_retries")]
     pub retries: u32,
@@ -160,6 +166,8 @@ pub struct AntiSpoofingConfig {
     pub enable: bool,
     pub model: AntiSpoofingModelConfig,
     pub ir_camera: Option<String>,
+    pub ir_warmup_delay_ms: i32,
+    pub ir_presence_timeout_ms: i32,
 }
 
 impl AntiSpoofingConfig {
@@ -201,12 +209,17 @@ impl AntiSpoofingConfig {
             enable: raw.enable,
             model,
             ir_camera: raw.ir_camera,
+            ir_warmup_delay_ms: raw.ir_warmup_delay_ms.unwrap_or(DEFAULT_IR_WARMUP_DELAY_MS),
+            ir_presence_timeout_ms: raw
+                .ir_presence_timeout_ms
+                .unwrap_or(DEFAULT_IR_PRESENCE_TIMEOUT_MS),
         }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FingerprintMethodConfig {
+    #[serde(default)]
     pub enable: bool,
     #[serde(default = "default_fingerprint_retries")]
     pub retries: u32,
@@ -236,6 +249,9 @@ fn default_face_retries() -> u32 {
 fn default_face_delay() -> u32 {
     200
 }
+fn default_face_enable() -> bool {
+    true
+}
 fn default_fingerprint_retries() -> u32 {
     1
 }
@@ -246,6 +262,18 @@ fn default_fingerprint_timeout() -> u32 {
 fn default_ignored_services() -> Vec<String> {
     vec!["polkit-1".to_string(), "pkexec".to_string()]
 }
+
+fn default_execution_mode() -> String {
+    "parallel".to_string()
+}
+
+fn default_order() -> Vec<String> {
+    vec!["face".to_string(), "fingerprint".to_string()]
+}
+
+// Mirrors the defaults in auth/core/auth_config.h's AntiSpoofingConfig.
+const DEFAULT_IR_WARMUP_DELAY_MS: i32 = 300;
+const DEFAULT_IR_PRESENCE_TIMEOUT_MS: i32 = 1500;
 
 fn get_default_config(app: &AppHandle) -> BiopassConfig {
     let models_dir = get_data_dir(app)
@@ -282,6 +310,8 @@ fn get_default_config(app: &AppHandle) -> BiopassConfig {
                         threshold: 0.8,
                     },
                     ir_camera: None,
+                    ir_warmup_delay_ms: DEFAULT_IR_WARMUP_DELAY_MS,
+                    ir_presence_timeout_ms: DEFAULT_IR_PRESENCE_TIMEOUT_MS,
                 },
             },
             fingerprint: FingerprintMethodConfig {

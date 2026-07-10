@@ -43,6 +43,8 @@ export interface FaceMethodConfig {
       threshold: number;
     };
     ir_camera: string | null;
+    ir_warmup_delay_ms: number;
+    ir_presence_timeout_ms: number;
   };
 }
 

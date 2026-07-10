@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { Controller, useFormContext, useWatch } from "react-hook-form";
 import { cmd } from "@/commands";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,16 +10,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { VideoDeviceInfo } from "@/types/config";
-import { useConfigurationStore } from "../../-stores/configuration-store";
+import type { BiopassConfig, VideoDeviceInfo } from "@/types/config";
 import { ModelSelect } from "../methods/shared/ModelSelect";
 import { Threshold } from "../methods/shared/Threshold";
 import { FaceCapture } from "./FaceCapture";
 
+function parseNumberInput(value: string): number {
+  return value === "" ? Number.NaN : Number(value);
+}
+
 export function FaceSetting() {
-  const config = useConfigurationStore((state) => state.config?.methods.face);
-  const models = useConfigurationStore((state) => state.config?.models ?? []);
-  const setFaceConfig = useConfigurationStore((state) => state.setFaceConfig);
+  const {
+    control,
+    formState: { errors },
+    setValue,
+  } = useFormContext<BiopassConfig>();
+  const config = useWatch<BiopassConfig, "methods.face">({
+    name: "methods.face",
+  });
+  const models =
+    useWatch<BiopassConfig, "models">({
+      name: "models",
+    }) ?? [];
   const [videoDevices, setVideoDevices] = useState<VideoDeviceInfo[]>([]);
 
   useEffect(() => {
@@ -33,24 +46,16 @@ export function FaceSetting() {
     fetchDevices();
   }, []);
 
-  const selectedCamera = useMemo(() => {
-    if (!config) return null;
-    if (!config.camera) return null;
-    return videoDevices.find((device) => device.path === config.camera) ?? null;
-  }, [config, videoDevices]);
+  const selectedCamera = config.camera
+    ? (videoDevices.find((device) => device.path === config.camera) ?? null)
+    : null;
 
-  const selectedIrCamera = useMemo(() => {
-    if (!config) return null;
-    const irCameraPath = config.anti_spoofing.ir_camera;
-    if (!irCameraPath) return null;
-    return videoDevices.find((device) => device.path === irCameraPath) ?? null;
-  }, [config, videoDevices]);
-  const antiSpoofModels = useMemo(
-    () => models.filter((m) => m.type === "anti-spoofing"),
-    [models],
-  );
+  const irCameraPath = config.anti_spoofing.ir_camera;
+  const selectedIrCamera = irCameraPath
+    ? (videoDevices.find((device) => device.path === irCameraPath) ?? null)
+    : null;
 
-  if (!config) return null;
+  const antiSpoofModels = models.filter((m) => m.type === "anti-spoofing");
 
   const disabledOption = "__disabled__";
   const unavailableAiModelOption = "__unavailable_ai_model__";
@@ -65,6 +70,7 @@ export function FaceSetting() {
   const irCameraValue = config.anti_spoofing.ir_camera
     ? (selectedIrCamera?.path ?? unavailableIrDeviceOption)
     : disabledOption;
+
   const aiModelValue = config.anti_spoofing.enable
     ? selectedAiModelExists
       ? config.anti_spoofing.model.path
@@ -81,19 +87,29 @@ export function FaceSetting() {
           >
             Max Retries
           </Label>
-          <Input
-            id="face-max-retries"
-            type="number"
-            min="0"
-            max="10"
-            value={config.retries}
-            onChange={(e) =>
-              setFaceConfig({
-                ...config,
-                retries: parseInt(e.target.value, 10) || 0,
-              })
-            }
-            className="h-10"
+          <Controller
+            control={control}
+            name="methods.face.retries"
+            render={({ field, fieldState }) => (
+              <>
+                <Input
+                  id="face-max-retries"
+                  type="number"
+                  min="1"
+                  value={Number.isNaN(field.value) ? "" : field.value}
+                  onChange={(e) =>
+                    field.onChange(parseNumberInput(e.target.value))
+                  }
+                  aria-invalid={fieldState.invalid}
+                  className="h-10"
+                />
+                {fieldState.error && (
+                  <p className="text-xs text-destructive">
+                    {fieldState.error.message}
+                  </p>
+                )}
+              </>
+            )}
           />
         </div>
         <div className="grid gap-2">
@@ -103,20 +119,30 @@ export function FaceSetting() {
           >
             Retry Delay (ms)
           </Label>
-          <Input
-            id="face-retry-delay"
-            type="number"
-            min="0"
-            max="5000"
-            step="100"
-            value={config.retry_delay}
-            onChange={(e) =>
-              setFaceConfig({
-                ...config,
-                retry_delay: parseInt(e.target.value, 10) || 0,
-              })
-            }
-            className="h-10"
+          <Controller
+            control={control}
+            name="methods.face.retry_delay"
+            render={({ field, fieldState }) => (
+              <>
+                <Input
+                  id="face-retry-delay"
+                  type="number"
+                  min="0"
+                  max="5000"
+                  value={Number.isNaN(field.value) ? "" : field.value}
+                  onChange={(e) =>
+                    field.onChange(parseNumberInput(e.target.value))
+                  }
+                  aria-invalid={fieldState.invalid}
+                  className="h-10"
+                />
+                {fieldState.error && (
+                  <p className="text-xs text-destructive">
+                    {fieldState.error.message}
+                  </p>
+                )}
+              </>
+            )}
           />
         </div>
       </div>
@@ -133,10 +159,16 @@ export function FaceSetting() {
             value={cameraValue}
             onValueChange={(value) => {
               if (value === disabledOption) {
-                setFaceConfig({ ...config, camera: null });
+                setValue("methods.face.camera", null, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
                 return;
               }
-              setFaceConfig({ ...config, camera: value });
+              setValue("methods.face.camera", value, {
+                shouldDirty: true,
+                shouldValidate: true,
+              });
             }}
           >
             <SelectTrigger id="camera-device" className="h-10 w-full">
@@ -177,11 +209,12 @@ export function FaceSetting() {
               label="Model"
               value={config.detection.model}
               models={models.filter((m) => m.type === "detection")}
-              error={config.enable}
+              error={config.enable || !!errors.methods?.face?.detection?.model}
+              errorMessage={errors.methods?.face?.detection?.model?.message}
               onChange={(model) =>
-                setFaceConfig({
-                  ...config,
-                  detection: { ...config.detection, model },
+                setValue("methods.face.detection.model", model, {
+                  shouldDirty: true,
+                  shouldValidate: true,
                 })
               }
             />
@@ -191,9 +224,9 @@ export function FaceSetting() {
               label="Threshold"
               value={config.detection.threshold}
               onChange={(threshold) =>
-                setFaceConfig({
-                  ...config,
-                  detection: { ...config.detection, threshold },
+                setValue("methods.face.detection.threshold", threshold, {
+                  shouldDirty: true,
+                  shouldValidate: true,
                 })
               }
             />
@@ -206,11 +239,14 @@ export function FaceSetting() {
               label="Model"
               value={config.recognition.model}
               models={models.filter((m) => m.type === "recognition")}
-              error={config.enable}
+              error={
+                config.enable || !!errors.methods?.face?.recognition?.model
+              }
+              errorMessage={errors.methods?.face?.recognition?.model?.message}
               onChange={(model) =>
-                setFaceConfig({
-                  ...config,
-                  recognition: { ...config.recognition, model },
+                setValue("methods.face.recognition.model", model, {
+                  shouldDirty: true,
+                  shouldValidate: true,
                 })
               }
             />
@@ -220,9 +256,9 @@ export function FaceSetting() {
               label="Threshold"
               value={config.recognition.threshold}
               onChange={(threshold) =>
-                setFaceConfig({
-                  ...config,
-                  recognition: { ...config.recognition, threshold },
+                setValue("methods.face.recognition.threshold", threshold, {
+                  shouldDirty: true,
+                  shouldValidate: true,
                 })
               }
             />
@@ -243,20 +279,20 @@ export function FaceSetting() {
             value={aiModelValue}
             onValueChange={(value) => {
               if (value === disabledOption) {
-                setFaceConfig({
-                  ...config,
-                  anti_spoofing: { ...config.anti_spoofing, enable: false },
+                setValue("methods.face.anti_spoofing.enable", false, {
+                  shouldDirty: true,
+                  shouldValidate: true,
                 });
                 return;
               }
 
-              setFaceConfig({
-                ...config,
-                anti_spoofing: {
-                  ...config.anti_spoofing,
-                  enable: true,
-                  model: { ...config.anti_spoofing.model, path: value },
-                },
+              setValue("methods.face.anti_spoofing.enable", true, {
+                shouldDirty: true,
+                shouldValidate: true,
+              });
+              setValue("methods.face.anti_spoofing.model.path", value, {
+                shouldDirty: true,
+                shouldValidate: true,
               });
             }}
           >
@@ -283,6 +319,11 @@ export function FaceSetting() {
               )}
             </SelectContent>
           </Select>
+          {errors.methods?.face?.anti_spoofing?.model?.path && (
+            <p className="text-xs text-destructive">
+              {errors.methods.face.anti_spoofing.model.path.message}
+            </p>
+          )}
         </div>
 
         {config.anti_spoofing.enable && (
@@ -291,13 +332,14 @@ export function FaceSetting() {
               label="Threshold"
               value={config.anti_spoofing.model.threshold}
               onChange={(threshold) =>
-                setFaceConfig({
-                  ...config,
-                  anti_spoofing: {
-                    ...config.anti_spoofing,
-                    model: { ...config.anti_spoofing.model, threshold },
+                setValue(
+                  "methods.face.anti_spoofing.model.threshold",
+                  threshold,
+                  {
+                    shouldDirty: true,
+                    shouldValidate: true,
                   },
-                })
+                )
               }
             />
           </div>
@@ -310,18 +352,14 @@ export function FaceSetting() {
           <Select
             value={irCameraValue}
             onValueChange={(value) => {
-              if (value === disabledOption) {
-                setFaceConfig({
-                  ...config,
-                  anti_spoofing: { ...config.anti_spoofing, ir_camera: null },
-                });
-                return;
-              }
-
-              setFaceConfig({
-                ...config,
-                anti_spoofing: { ...config.anti_spoofing, ir_camera: value },
-              });
+              setValue(
+                "methods.face.anti_spoofing.ir_camera",
+                value === disabledOption ? null : value,
+                {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                },
+              );
             }}
           >
             <SelectTrigger id="ir-device" className="h-10 w-full">

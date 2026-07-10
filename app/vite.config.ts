@@ -1,7 +1,8 @@
 import path from "node:path";
+import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import react from "@vitejs/plugin-react";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 const host = process.env.TAURI_DEV_HOST;
@@ -16,6 +17,7 @@ export default defineConfig(async () => ({
       indexToken: "page",
       routeToken: "layout",
     }),
+    babel({ presets: [reactCompilerPreset()] }),
     react(),
     tailwindcss(),
   ],
@@ -38,8 +40,37 @@ export default defineConfig(async () => ({
             if (id.includes("@dnd-kit")) {
               return "vendor-dnd";
             }
-            // Put all other node_modules (including React) into a single vendor chunk
-            // to avoid circular dependency cycles between libraries.
+            if (
+              id.includes("/react/") ||
+              id.includes("/react-dom/") ||
+              id.includes("/scheduler/")
+            ) {
+              return "vendor-react";
+            }
+            if (id.includes("@tanstack")) {
+              return "vendor-router";
+            }
+            if (id.includes("lucide-react")) {
+              return "vendor-icons";
+            }
+            if (
+              id.includes("@radix-ui") ||
+              id.includes("class-variance-authority") ||
+              id.includes("clsx") ||
+              id.includes("tailwind-merge") ||
+              id.includes("next-themes") ||
+              id.includes("sonner")
+            ) {
+              return "vendor-ui";
+            }
+            if (
+              id.includes("react-hook-form") ||
+              id.includes("@hookform") ||
+              id.includes("zod")
+            ) {
+              return "vendor-forms";
+            }
+            // Keep any remaining third-party dependencies in a fallback vendor chunk.
             return "vendor";
           }
           // Group configuration UI components for better organization

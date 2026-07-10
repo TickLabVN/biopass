@@ -17,10 +17,18 @@ interface Props {
   value: string;
   models: ModelConfig[];
   error: boolean;
+  errorMessage?: string;
   onChange: (value: string) => void;
 }
 
-export function ModelSelect({ label, value, models, error, onChange }: Props) {
+export function ModelSelect({
+  label,
+  value,
+  models,
+  error,
+  errorMessage,
+  onChange,
+}: Props) {
   const selectedModel = models.find((m) => m.path === value);
   const [statusMap, setStatusMap] = useState<Record<string, boolean>>({});
 
@@ -81,6 +89,9 @@ export function ModelSelect({ label, value, models, error, onChange }: Props) {
           )}
         </SelectContent>
       </Select>
+      {errorMessage && (
+        <p className="text-xs text-destructive">{errorMessage}</p>
+      )}
     </div>
   );
 }

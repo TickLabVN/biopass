@@ -49,6 +49,14 @@ export const biopassConfigSchema = z
             threshold: thresholdSchema,
           }),
           ir_camera: z.string().nullable(),
+          ir_warmup_delay_ms: z
+            .number("IR warmup delay must be a number")
+            .int("IR warmup delay must be a whole number")
+            .min(0, "IR warmup delay must be at least 0 ms"),
+          ir_presence_timeout_ms: z
+            .number("IR presence timeout must be a number")
+            .int("IR presence timeout must be a whole number")
+            .min(0, "IR presence timeout must be at least 0 ms"),
         }),
       }),
       fingerprint: z.object({

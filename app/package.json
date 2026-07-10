@@ -45,6 +45,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
+    "@rolldown/plugin-babel": "^0.2.3",
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/router-plugin": "^1.168.18",
     "@tauri-apps/cli": "^2.11.2",
@@ -53,6 +54,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "^10.5.0",
+    "babel-plugin-react-compiler": "^1.0.0",
     "lefthook": "^2.1.9",
     "postcss": "^8.5.15",
     "shadcn": "^4.10.0",

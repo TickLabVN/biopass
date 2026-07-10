@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
 import { cmd } from "@/commands";
 import { Input } from "@/components/ui/input";
@@ -46,21 +46,16 @@ export function FaceSetting() {
     fetchDevices();
   }, []);
 
-  const selectedCamera = useMemo(() => {
-    if (!config) return null;
-    if (!config.camera) return null;
-    return videoDevices.find((device) => device.path === config.camera) ?? null;
-  }, [config, videoDevices]);
+  const selectedCamera = config.camera
+    ? (videoDevices.find((device) => device.path === config.camera) ?? null)
+    : null;
 
-  const selectedIrCamera = useMemo(() => {
-    const irCameraPath = config.anti_spoofing.ir_camera;
-    if (!irCameraPath) return null;
-    return videoDevices.find((device) => device.path === irCameraPath) ?? null;
-  }, [config, videoDevices]);
-  const antiSpoofModels = useMemo(
-    () => models.filter((m) => m.type === "anti-spoofing"),
-    [models],
-  );
+  const irCameraPath = config.anti_spoofing.ir_camera;
+  const selectedIrCamera = irCameraPath
+    ? (videoDevices.find((device) => device.path === irCameraPath) ?? null)
+    : null;
+
+  const antiSpoofModels = models.filter((m) => m.type === "anti-spoofing");
 
   const disabledOption = "__disabled__";
   const unavailableAiModelOption = "__unavailable_ai_model__";
@@ -75,6 +70,7 @@ export function FaceSetting() {
   const irCameraValue = config.anti_spoofing.ir_camera
     ? (selectedIrCamera?.path ?? unavailableIrDeviceOption)
     : disabledOption;
+
   const aiModelValue = config.anti_spoofing.enable
     ? selectedAiModelExists
       ? config.anti_spoofing.model.path
@@ -99,8 +95,7 @@ export function FaceSetting() {
                 <Input
                   id="face-max-retries"
                   type="number"
-                  min="0"
-                  max="10"
+                  min="1"
                   value={Number.isNaN(field.value) ? "" : field.value}
                   onChange={(e) =>
                     field.onChange(parseNumberInput(e.target.value))

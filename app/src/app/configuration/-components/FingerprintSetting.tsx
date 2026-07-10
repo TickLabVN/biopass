@@ -54,7 +54,7 @@ export function FingerprintSetting() {
             );
           });
           setValue("methods.fingerprint.fingers", syncedFingers, {
-            shouldDirty: true,
+            shouldDirty: false,
             shouldValidate: true,
           });
         }
@@ -115,7 +115,7 @@ export function FingerprintSetting() {
         id: toastId,
       });
 
-      // The backend saves to config, but we update UI immediately
+      // The backend already saved this finger to config; just update the UI.
       setValue(
         "methods.fingerprint.fingers",
         [
@@ -123,7 +123,7 @@ export function FingerprintSetting() {
           { name: selectedFinger, created_at: Math.floor(Date.now() / 1000) },
         ],
         {
-          shouldDirty: true,
+          shouldDirty: false,
           shouldValidate: true,
         },
       );
@@ -146,11 +146,12 @@ export function FingerprintSetting() {
         formattedName.charAt(0).toUpperCase() + formattedName.slice(1);
       toast.success(`${capitalizedName} deleted`);
 
+      // The backend already removed this finger from config; just update the UI.
       setValue(
         "methods.fingerprint.fingers",
         currentConfig.fingers.filter((f) => f.name !== fingerName),
         {
-          shouldDirty: true,
+          shouldDirty: false,
           shouldValidate: true,
         },
       );

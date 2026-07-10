@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute } from "@tanstack/react-router";
 import { RotateCcw, Save } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { cmd } from "@/commands";
@@ -11,72 +11,29 @@ import { MethodConfig } from "./-components/MethodConfig";
 import { StrategyConfig } from "./-components/StrategyConfig";
 import { biopassConfigSchema, validateConfig } from "./-components/validation";
 
-function cloneConfig(config: BiopassConfig): BiopassConfig {
-  return {
-    ...config,
-    models: config.models.map((model) => ({ ...model })),
-    strategy: {
-      ...config.strategy,
-      order: [...config.strategy.order],
-      ignore_services: [...config.strategy.ignore_services],
-    },
-    methods: {
-      face: {
-        ...config.methods.face,
-        detection: { ...config.methods.face.detection },
-        recognition: { ...config.methods.face.recognition },
-        anti_spoofing: {
-          ...config.methods.face.anti_spoofing,
-          model: { ...config.methods.face.anti_spoofing.model },
-        },
-      },
-      fingerprint: {
-        ...config.methods.fingerprint,
-        fingers: config.methods.fingerprint.fingers.map((finger) => ({
-          ...finger,
-        })),
-      },
-    },
-  };
-}
-
 function ConfigurationRouteComponent() {
-  const [config, setConfig] = useState<BiopassConfig | null>(null);
-  const [savedConfig, setSavedConfig] = useState<BiopassConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [initialConfig, setInitialConfig] = useState<BiopassConfig | null>(
+    null,
+  );
 
   useEffect(() => {
     let canceled = false;
 
-    async function initializeConfig() {
-      try {
-        setLoading(true);
-        const loadedConfig = await cmd.config.load();
-        if (canceled) return;
-
-        const nextConfig = cloneConfig(loadedConfig);
-        setConfig(nextConfig);
-        setSavedConfig(cloneConfig(nextConfig));
-      } catch (err) {
-        if (!canceled) {
-          toast.error(`Failed to load config: ${err}`);
-        }
-      } finally {
-        if (!canceled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    initializeConfig();
+    cmd.config
+      .load()
+      .then((loadedConfig) => {
+        if (!canceled) setInitialConfig(loadedConfig);
+      })
+      .catch((err) => {
+        if (!canceled) toast.error(`Failed to load config: ${err}`);
+      });
 
     return () => {
       canceled = true;
     };
   }, []);
 
-  if (loading || !config) {
+  if (!initialConfig) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -84,71 +41,39 @@ function ConfigurationRouteComponent() {
     );
   }
 
-  return (
-    <ConfigurationForm
-      config={config}
-      savedConfig={savedConfig}
-      saving={saving}
-      onConfigSaved={(nextConfig) => {
-        const saved = cloneConfig(nextConfig);
-        setConfig(saved);
-        setSavedConfig(cloneConfig(saved));
-      }}
-      onReset={(nextConfig) => setConfig(cloneConfig(nextConfig))}
-      setSaving={setSaving}
-    />
-  );
-}
-
-interface ConfigurationFormProps {
-  config: BiopassConfig;
-  savedConfig: BiopassConfig | null;
-  saving: boolean;
-  onConfigSaved: (config: BiopassConfig) => void;
-  onReset: (config: BiopassConfig) => void;
-  setSaving: (saving: boolean) => void;
+  return <ConfigurationForm initialConfig={initialConfig} />;
 }
 
 function ConfigurationForm({
-  config,
-  savedConfig,
-  saving,
-  onConfigSaved,
-  onReset,
-  setSaving,
-}: ConfigurationFormProps) {
+  initialConfig,
+}: {
+  initialConfig: BiopassConfig;
+}) {
   const form = useForm<BiopassConfig>({
-    defaultValues: cloneConfig(config),
+    defaultValues: structuredClone(initialConfig),
     resolver: zodResolver(biopassConfigSchema),
   });
+  const { isSubmitting, isDirty } = form.formState;
 
-  useEffect(() => {
-    form.reset(cloneConfig(config));
-  }, [config, form]);
+  async function onSave(values: BiopassConfig) {
+    const configToSave = structuredClone(values);
 
-  const handleSave = useCallback(
-    async (values: BiopassConfig) => {
-      const configToSave = cloneConfig(values);
+    const isValid = await validateConfig(configToSave);
+    if (!isValid) return;
 
-      const isValid = await validateConfig(configToSave);
-      if (!isValid) return;
+    try {
+      await cmd.config.save(configToSave);
+      form.reset(configToSave);
+      toast.success("Settings saved successfully!");
+    } catch (err) {
+      console.error("Failed to save config:", err);
+      toast.error(`Failed to save config: ${err}`);
+    }
+  }
 
-      try {
-        setSaving(true);
-        await cmd.config.save(configToSave);
-        const nextSavedConfig = cloneConfig(configToSave);
-        onConfigSaved(nextSavedConfig);
-        form.reset(nextSavedConfig);
-        toast.success("Settings saved successfully!");
-      } catch (err) {
-        console.error("Failed to save config:", err);
-        toast.error(`Failed to save config: ${err}`);
-      } finally {
-        setSaving(false);
-      }
-    },
-    [form, onConfigSaved, setSaving],
-  );
+  const submit = form.handleSubmit(onSave, () => {
+    toast.error("Please fix validation errors before saving");
+  });
 
   useEffect(() => {
     function handleSaveShortcut(event: KeyboardEvent) {
@@ -160,11 +85,7 @@ function ConfigurationForm({
       }
 
       event.preventDefault();
-      if (saving) return;
-
-      form.handleSubmit(handleSave, () => {
-        toast.error("Please fix validation errors before saving");
-      })();
+      void submit();
     }
 
     window.addEventListener("keydown", handleSaveShortcut);
@@ -172,23 +93,17 @@ function ConfigurationForm({
     return () => {
       window.removeEventListener("keydown", handleSaveShortcut);
     };
-  }, [form, saving, handleSave]);
+  }, [submit]);
 
   function handleReset() {
-    if (!savedConfig) return;
-
-    const resetValue = cloneConfig(savedConfig);
-    onReset(resetValue);
-    form.reset(resetValue);
+    form.reset();
     toast.info("Configuration reset to last saved state");
   }
 
   return (
     <FormProvider {...form}>
       <form
-        onSubmit={form.handleSubmit(handleSave, () => {
-          toast.error("Please fix validation errors before saving");
-        })}
+        onSubmit={submit}
         className="flex flex-col gap-6 w-full max-w-4xl mx-auto p-6"
       >
         <div className="flex justify-between items-center">
@@ -205,6 +120,7 @@ function ConfigurationForm({
               type="button"
               variant="outline"
               onClick={handleReset}
+              disabled={!isDirty || isSubmitting}
               className="flex items-center gap-2 cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
@@ -212,11 +128,11 @@ function ConfigurationForm({
             </Button>
             <Button
               type="submit"
-              disabled={saving}
+              disabled={isSubmitting}
               className="flex items-center gap-2 cursor-pointer"
             >
               <Save className="w-4 h-4" />
-              {saving ? "Saving..." : "Save"}
+              {isSubmitting ? "Saving..." : "Save"}
             </Button>
           </div>
         </div>

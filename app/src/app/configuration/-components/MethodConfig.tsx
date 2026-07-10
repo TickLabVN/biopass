@@ -99,8 +99,7 @@ export function MethodConfig() {
                       <Input
                         id="fingerprint-max-retries"
                         type="number"
-                        min="0"
-                        max="10"
+                        min={1}
                         value={Number.isNaN(field.value) ? "" : field.value}
                         onChange={(e) =>
                           field.onChange(parseNumberInput(e.target.value))

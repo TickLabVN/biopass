@@ -1,7 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { Camera, Circle, Square, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { cmd } from "@/commands";
@@ -16,14 +16,14 @@ export function FaceCapture() {
     name: "methods.face.camera",
   });
 
-  const loadFaceImages = useCallback(async () => {
+  async function loadFaceImages() {
     try {
       const images = await cmd.face.listImages();
       setFaceImages(images);
     } catch (err) {
       console.error("Failed to load face images:", err);
     }
-  }, []);
+  }
 
   useEffect(() => {
     loadFaceImages();

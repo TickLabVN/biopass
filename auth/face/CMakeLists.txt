@@ -41,10 +41,11 @@ target_include_directories(biopass_face_common PUBLIC
 target_link_libraries(biopass_face_common
     biopass_stb
     biopass_core
-    PkgConfig::LIBCAMERA
+    libcamera_bundled
     PkgConfig::TURBOJPEG
     spdlog::spdlog_header_only
 )
+add_dependencies(biopass_face_common libcamera_ext)
 
 # Face auth wrapper library
 add_library(biopass_face STATIC

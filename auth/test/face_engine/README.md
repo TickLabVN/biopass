@@ -1,7 +1,10 @@
 # Face Engine in Face Pass
 ## Preparation
 
-ONNX Runtime is automatically fetched via CMake FetchContent. Camera capture uses the system libcamera and libjpeg-turbo packages (`libcamera-dev`, `libturbojpeg0-dev`) found via pkg-config — install them before configuring.
+ONNX Runtime is automatically fetched via CMake FetchContent. Camera capture links a pinned libcamera built from
+source (see `auth/BundleLibcamera.cmake`) plus the system libjpeg-turbo package (`libturbojpeg0-dev`) found
+via pkg-config — install libjpeg-turbo and libcamera's build tools (`meson`, `ninja-build`, `python3-jinja2`,
+`python3-yaml`, `python3-ply`, `libudev-dev`) before configuring.
 
 ## Build
 ```bash

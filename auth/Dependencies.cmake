@@ -24,10 +24,14 @@ set(ONNXRUNTIME_INCLUDE_DIRS "${ONNXRUNTIME_ROOT}/include")
 set(ONNXRUNTIME_LIB_DIR "${ONNXRUNTIME_ROOT}/lib")
 find_library(ONNXRUNTIME_LIB onnxruntime PATHS ${ONNXRUNTIME_LIB_DIR} NO_DEFAULT_PATH)
 
-# libcamera + libjpeg-turbo (camera capture; system packages via pkg-config)
+# libturbojpeg (system package via pkg-config; stable soname)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBCAMERA REQUIRED IMPORTED_TARGET libcamera)
 pkg_check_modules(TURBOJPEG REQUIRED IMPORTED_TARGET libturbojpeg)
+
+# libcamera (camera capture) is built from source at a pinned version and
+# bundled into the package instead of linked against the system's copy -- see
+# BundleLibcamera.cmake for why. Provides the `libcamera_bundled` target.
+include(${CMAKE_CURRENT_LIST_DIR}/BundleLibcamera.cmake)
 
 FetchContent_Declare(
     stb

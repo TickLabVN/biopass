@@ -7,7 +7,7 @@ set -euo pipefail
 # Overwritten at package/bundle time (see Makefile build-app) to pin this to
 # the exact release tag being built, so RC/beta bundles fetch their own
 # models instead of whatever the latest stable release happens to be.
-BASE_URL="https://github.com/TickLabVN/biopass/releases/download/latest"
+BASE_URL="https://github.com/TickLabVN/biopass/releases/download/<tag>"
 
 MODELS=(
     "${BASE_URL}/yolov8n-face.onnx"

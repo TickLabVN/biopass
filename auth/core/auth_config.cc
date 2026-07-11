@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <fstream>
 
+#include "model_registry.h"
+
 namespace biopass {
 
 std::string getConfigPath(const std::string& username) {
@@ -45,6 +47,22 @@ BiopassConfig readConfig(const std::string& username) {
 
   try {
     YAML::Node yaml = YAML::LoadFile(config_path);
+
+    // Schema gate: this side never migrates config.yaml (only the Tauri app
+    // writes it), so an absent/mismatched schema_version is treated exactly
+    // like a missing/corrupt file -- fall back to defaults. A defaulted
+    // config's model_ids won't resolve against biopass.db either, so
+    // ensureModelsLoaded() safely reports Unavailable and PAM falls through
+    // to normal system auth instead of locking anyone out.
+    int schema_version = yaml["schema_version"] ? yaml["schema_version"].as<int>() : 0;
+    if (schema_version != kCurrentSchemaVersion) {
+      spdlog::warn(
+          "Biopass: config.yaml schema_version {} does not match expected {}, using defaults",
+          schema_version, kCurrentSchemaVersion);
+      return config;
+    }
+    config.schema_version = schema_version;
+
     static const std::vector<std::string> supported_methods = {"face", "fingerprint"};
 
     // 1. Strategy
@@ -110,14 +128,15 @@ BiopassConfig readConfig(const std::string& username) {
         if (f["retry_delay"])
           config.methods.face.retry_delay = f["retry_delay"].as<uint32_t>();
         if (f["detection"]) {
-          if (f["detection"]["model"])
-            config.methods.face.detection.model = f["detection"]["model"].as<std::string>();
+          if (f["detection"]["model_id"])
+            config.methods.face.detection.model_id = f["detection"]["model_id"].as<std::string>();
           if (f["detection"]["threshold"])
             config.methods.face.detection.threshold = f["detection"]["threshold"].as<float>();
         }
         if (f["recognition"]) {
-          if (f["recognition"]["model"])
-            config.methods.face.recognition.model = f["recognition"]["model"].as<std::string>();
+          if (f["recognition"]["model_id"])
+            config.methods.face.recognition.model_id =
+                f["recognition"]["model_id"].as<std::string>();
           if (f["recognition"]["threshold"])
             config.methods.face.recognition.threshold = f["recognition"]["threshold"].as<float>();
         }
@@ -132,8 +151,9 @@ BiopassConfig readConfig(const std::string& username) {
 
           if (anti_spoofing["model"] && anti_spoofing["model"].IsMap()) {
             const auto& model = anti_spoofing["model"];
-            if (model["path"])
-              config.methods.face.anti_spoofing.model.path = model["path"].as<std::string>();
+            if (model["model_id"])
+              config.methods.face.anti_spoofing.model.model_id =
+                  model["model_id"].as<std::string>();
             if (model["threshold"])
               config.methods.face.anti_spoofing.model.threshold = model["threshold"].as<float>();
           }
@@ -164,48 +184,28 @@ BiopassConfig readConfig(const std::string& username) {
           config.methods.fingerprint.retries = fp["retries"].as<uint32_t>();
         if (fp["timeout"])
           config.methods.fingerprint.timeout = fp["timeout"].as<uint32_t>();
-
-        if (fp["fingers"] && fp["fingers"].IsSequence()) {
-          config.methods.fingerprint.fingers.clear();
-          for (const auto& finger : fp["fingers"]) {
-            if (!finger.IsMap()) {
-              continue;
-            }
-            FingerConfig parsed_finger;
-            if (finger["name"] && finger["name"].IsScalar()) {
-              parsed_finger.name = finger["name"].as<std::string>();
-            }
-            if (finger["created_at"] && finger["created_at"].IsScalar()) {
-              parsed_finger.created_at = finger["created_at"].as<uint64_t>();
-            }
-            config.methods.fingerprint.fingers.push_back(parsed_finger);
-          }
-        }
-      }
-    }
-
-    if (yaml["models"] && yaml["models"].IsSequence()) {
-      config.models.clear();
-      for (const auto& model : yaml["models"]) {
-        if (!model.IsMap()) {
-          continue;
-        }
-        ModelConfig parsed_model;
-        if (model["path"] && model["path"].IsScalar()) {
-          parsed_model.path = model["path"].as<std::string>();
-        }
-        if (model["type"] && model["type"].IsScalar()) {
-          parsed_model.model_type = model["type"].as<std::string>();
-        }
-        if (parsed_model.model_type == "voice") {
-          continue;
-        }
-        config.models.push_back(parsed_model);
       }
     }
 
     if (yaml["appearance"] && yaml["appearance"].IsScalar()) {
       config.appearance = yaml["appearance"].as<std::string>();
+    }
+
+    // 3. Resolve model_id -> absolute path via the SQLite model registry.
+    // An unresolved id leaves model_path empty, which ensureModelsLoaded()
+    // already treats as a safe "model file not found" -> Unavailable outcome.
+    if (config.methods.face.enable) {
+      auto detect_path = resolveModelPath(username, config.methods.face.detection.model_id);
+      config.methods.face.detection.model_path = detect_path.value_or("");
+
+      auto recog_path = resolveModelPath(username, config.methods.face.recognition.model_id);
+      config.methods.face.recognition.model_path = recog_path.value_or("");
+
+      if (config.methods.face.anti_spoofing.enable) {
+        auto antispoof_path =
+            resolveModelPath(username, config.methods.face.anti_spoofing.model.model_id);
+        config.methods.face.anti_spoofing.model.model_path = antispoof_path.value_or("");
+      }
     }
   } catch (const YAML::BadFile& e) {
     spdlog::warn("Biopass: Config file not found at {}, using defaults", config_path);

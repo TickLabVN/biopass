@@ -1,7 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useFormContext, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { cmd } from "@/commands";
 import { Button } from "@/components/ui/button";
@@ -13,13 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { BiopassConfig } from "@/types/config";
 
 export function FingerprintSetting() {
-  const { getValues, setValue } = useFormContext<BiopassConfig>();
-  const config = useWatch<BiopassConfig, "methods.fingerprint">({
-    name: "methods.fingerprint",
-  });
+  const [enrolledFingers, setEnrolledFingers] = useState<string[]>([]);
   const [selectedFinger, setSelectedFinger] = useState<string>("");
   const [isAdding, setIsAdding] = useState(false);
   const [username, setUsername] = useState<string>("");
@@ -34,30 +29,8 @@ export function FingerprintSetting() {
 
         setUsername(user);
 
-        // Sync enrolled fingers from backend
-        const enrolledFingers = await cmd.fingerprint.listEnrolled(user);
-        if (canceled) return;
-
-        const currentConfig = getValues("methods.fingerprint");
-
-        // Update local config if there's a mismatch (best effort)
-        const currentFingerNames = currentConfig.fingers.map((f) => f.name);
-        const needsSync =
-          enrolledFingers.some((f) => !currentFingerNames.includes(f)) ||
-          currentFingerNames.some((f) => !enrolledFingers.includes(f));
-
-        if (needsSync) {
-          const syncedFingers = enrolledFingers.map((name) => {
-            const existing = currentConfig.fingers.find((f) => f.name === name);
-            return (
-              existing || { name, created_at: Math.floor(Date.now() / 1000) }
-            );
-          });
-          setValue("methods.fingerprint.fingers", syncedFingers, {
-            shouldDirty: false,
-            shouldValidate: true,
-          });
-        }
+        const fingers = await cmd.fingerprint.listEnrolled(user);
+        if (!canceled) setEnrolledFingers(fingers);
       } catch (err) {
         console.error("Failed to sync fingerprints:", err);
       }
@@ -68,7 +41,7 @@ export function FingerprintSetting() {
     return () => {
       canceled = true;
     };
-  }, [getValues, setValue]);
+  }, []);
 
   const fingerOptions = [
     "left-thumb",
@@ -84,8 +57,6 @@ export function FingerprintSetting() {
   ];
 
   const handleAdd = async () => {
-    const currentConfig = getValues("methods.fingerprint");
-
     setIsAdding(true);
     const toastId = toast.loading(
       `Enrolling ${selectedFinger.replace(/-/g, " ")}... Please touch the sensor.`,
@@ -115,18 +86,8 @@ export function FingerprintSetting() {
         id: toastId,
       });
 
-      // The backend already saved this finger to config; just update the UI.
-      setValue(
-        "methods.fingerprint.fingers",
-        [
-          ...currentConfig.fingers,
-          { name: selectedFinger, created_at: Math.floor(Date.now() / 1000) },
-        ],
-        {
-          shouldDirty: false,
-          shouldValidate: true,
-        },
-      );
+      // The backend already recorded this finger; just update the UI.
+      setEnrolledFingers((prev) => [...prev, selectedFinger]);
       setSelectedFinger("");
     } catch (err) {
       toast.error(`Enrollment failed: ${err}`, { id: toastId });
@@ -137,8 +98,6 @@ export function FingerprintSetting() {
   };
 
   const handleDelete = async (fingerName: string) => {
-    const currentConfig = getValues("methods.fingerprint");
-
     try {
       await cmd.fingerprint.remove(username, fingerName);
       const formattedName = fingerName.replace(/-/g, " ");
@@ -146,15 +105,8 @@ export function FingerprintSetting() {
         formattedName.charAt(0).toUpperCase() + formattedName.slice(1);
       toast.success(`${capitalizedName} deleted`);
 
-      // The backend already removed this finger from config; just update the UI.
-      setValue(
-        "methods.fingerprint.fingers",
-        currentConfig.fingers.filter((f) => f.name !== fingerName),
-        {
-          shouldDirty: false,
-          shouldValidate: true,
-        },
-      );
+      // The backend already removed this finger; just update the UI.
+      setEnrolledFingers((prev) => prev.filter((f) => f !== fingerName));
     } catch (err) {
       toast.error(`Delete failed: ${err}`);
     }
@@ -164,21 +116,21 @@ export function FingerprintSetting() {
     <div className="grid gap-4">
       <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
         <h4 className="font-medium mb-3 text-sm">Registered Fingers</h4>
-        {config.fingers.length > 0 ? (
+        {enrolledFingers.length > 0 ? (
           <div className="grid gap-2">
-            {config.fingers.map((f) => (
+            {enrolledFingers.map((name) => (
               <div
-                key={f.name}
+                key={name}
                 className="flex items-center justify-between p-2 bg-background rounded-lg border"
               >
                 <div className="flex flex-col">
                   <span className="text-sm font-medium capitalize">
-                    {f.name.replace(/-/g, " ")}
+                    {name.replace(/-/g, " ")}
                   </span>
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleDelete(f.name)}
+                  onClick={() => handleDelete(name)}
                   className="p-1 rounded hover:bg-destructive/20 text-destructive cursor-pointer transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -216,7 +168,7 @@ export function FingerprintSetting() {
                     key={f}
                     value={f}
                     className="capitalize"
-                    disabled={config.fingers.some((cf) => cf.name === f)}
+                    disabled={enrolledFingers.includes(f)}
                   >
                     {f.replace(/-/g, " ")}
                   </SelectItem>

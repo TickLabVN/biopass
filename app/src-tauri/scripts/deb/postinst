@@ -4,32 +4,10 @@
 
 set -e
 
-run_config_migration() {
-    HELPER="/usr/bin/biopass-helper"
-    if [ ! -x "$HELPER" ]; then
-        return 0
-    fi
-
-    # Migrate every existing user that already has a Biopass config.
-    # Idempotent operation; safe to run repeatedly.
-    while IFS=: read -r username _ _ _ _ home _; do
-        [ -n "$username" ] || continue
-        [ -n "$home" ] || continue
-
-        CONFIG_PATH="$home/.config/com.ticklab.biopass/config.yaml"
-        if [ -f "$CONFIG_PATH" ]; then
-            echo "Biopass: Migrating config schema for user '$username'..."
-            "$HELPER" migrate --username "$username" || true
-        fi
-    done < /etc/passwd
-}
-
 case "$1" in
     configure)
         # Register the private biopass library directory with the dynamic linker.
         ldconfig
-
-        run_config_migration
 
         # Run the model downloader for the installing user.
         # On a typical `sudo dpkg -i` install, SUDO_USER is set.

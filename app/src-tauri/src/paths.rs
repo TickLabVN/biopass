@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
 pub const CONFIG_FILE: &str = "config.yaml";
+pub const DB_FILE: &str = "biopass.db";
 
 pub fn get_config_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
@@ -11,6 +12,10 @@ pub fn get_config_dir(app: &AppHandle) -> Result<PathBuf, String> {
 
 pub fn get_config_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(get_config_dir(app)?.join(CONFIG_FILE))
+}
+
+pub fn get_db_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(get_config_dir(app)?.join(DB_FILE))
 }
 
 pub fn get_data_dir(app: &AppHandle) -> Result<PathBuf, String> {

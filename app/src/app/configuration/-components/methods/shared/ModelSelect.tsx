@@ -10,15 +10,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { ModelConfig } from "@/types/config";
+import type { Model } from "@/types/config";
 
 interface Props {
   label: string;
   value: string;
-  models: ModelConfig[];
+  models: Model[];
   error: boolean;
   errorMessage?: string;
-  onChange: (value: string) => void;
+  onChange: (modelId: string) => void;
 }
 
 export function ModelSelect({
@@ -29,7 +29,7 @@ export function ModelSelect({
   errorMessage,
   onChange,
 }: Props) {
-  const selectedModel = models.find((m) => m.path === value);
+  const selectedModel = models.find((m) => m.id === value);
   const [statusMap, setStatusMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -38,9 +38,9 @@ export function ModelSelect({
       await Promise.all(
         models.map(async (m) => {
           try {
-            newStatusMap[m.path] = await cmd.file.exists(m.path);
+            newStatusMap[m.id] = await cmd.file.exists(m.path);
           } catch {
-            newStatusMap[m.path] = false;
+            newStatusMap[m.id] = false;
           }
         }),
       );
@@ -50,7 +50,7 @@ export function ModelSelect({
     checkAllModels();
   }, [models]);
 
-  const isValid = selectedModel && statusMap[selectedModel.path];
+  const isValid = selectedModel && statusMap[selectedModel.id];
 
   return (
     <div className="grid gap-2">
@@ -69,13 +69,11 @@ export function ModelSelect({
         <SelectContent>
           {models.length > 0 ? (
             models.map((model) => (
-              <SelectItem key={model.path} value={model.path}>
+              <SelectItem key={model.id} value={model.id}>
                 <div className="flex items-center gap-3 pr-6">
-                  <span className="truncate">
-                    {model.path.split("/").pop()}
-                  </span>
+                  <span className="truncate">{model.name}</span>
                   <ModelStatus
-                    status={statusMap[model.path]}
+                    status={statusMap[model.id]}
                     size="sm"
                     className="h-4"
                   />

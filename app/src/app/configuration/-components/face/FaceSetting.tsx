@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { BiopassConfig, VideoDeviceInfo } from "@/types/config";
+import type { BiopassConfig, Model, VideoDeviceInfo } from "@/types/config";
 import { ModelSelect } from "../methods/shared/ModelSelect";
 import { Threshold } from "../methods/shared/Threshold";
 import { FaceCapture } from "./FaceCapture";
@@ -28,10 +28,7 @@ export function FaceSetting() {
   const config = useWatch<BiopassConfig, "methods.face">({
     name: "methods.face",
   });
-  const models =
-    useWatch<BiopassConfig, "models">({
-      name: "models",
-    }) ?? [];
+  const [models, setModels] = useState<Model[]>([]);
   const [videoDevices, setVideoDevices] = useState<VideoDeviceInfo[]>([]);
 
   useEffect(() => {
@@ -46,6 +43,18 @@ export function FaceSetting() {
     fetchDevices();
   }, []);
 
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        setModels(await cmd.models.list());
+      } catch (err) {
+        console.error("Failed to fetch models:", err);
+      }
+    };
+
+    fetchModels();
+  }, []);
+
   const selectedCamera = config.camera
     ? (videoDevices.find((device) => device.path === config.camera) ?? null)
     : null;
@@ -55,13 +64,15 @@ export function FaceSetting() {
     ? (videoDevices.find((device) => device.path === irCameraPath) ?? null)
     : null;
 
-  const antiSpoofModels = models.filter((m) => m.type === "anti-spoofing");
+  const antiSpoofModels = models.filter(
+    (m) => m.model_type === "anti_spoofing",
+  );
 
   const disabledOption = "__disabled__";
   const unavailableAiModelOption = "__unavailable_ai_model__";
   const unavailableIrDeviceOption = "__unavailable_ir_device__";
   const selectedAiModelExists = antiSpoofModels.some(
-    (model) => model.path === config.anti_spoofing.model.path,
+    (model) => model.id === config.anti_spoofing.model.model_id,
   );
   const unavailableCameraDeviceOption = "__unavailable_camera_device__";
   const cameraValue = config.camera
@@ -73,7 +84,7 @@ export function FaceSetting() {
 
   const aiModelValue = config.anti_spoofing.enable
     ? selectedAiModelExists
-      ? config.anti_spoofing.model.path
+      ? config.anti_spoofing.model.model_id
       : unavailableAiModelOption
     : disabledOption;
 
@@ -207,12 +218,14 @@ export function FaceSetting() {
           <div className="flex-1 min-w-0">
             <ModelSelect
               label="Model"
-              value={config.detection.model}
-              models={models.filter((m) => m.type === "detection")}
-              error={config.enable || !!errors.methods?.face?.detection?.model}
-              errorMessage={errors.methods?.face?.detection?.model?.message}
-              onChange={(model) =>
-                setValue("methods.face.detection.model", model, {
+              value={config.detection.model_id}
+              models={models.filter((m) => m.model_type === "detection")}
+              error={
+                config.enable || !!errors.methods?.face?.detection?.model_id
+              }
+              errorMessage={errors.methods?.face?.detection?.model_id?.message}
+              onChange={(modelId) =>
+                setValue("methods.face.detection.model_id", modelId, {
                   shouldDirty: true,
                   shouldValidate: true,
                 })
@@ -237,14 +250,16 @@ export function FaceSetting() {
           <div className="flex-1 min-w-0">
             <ModelSelect
               label="Model"
-              value={config.recognition.model}
-              models={models.filter((m) => m.type === "recognition")}
+              value={config.recognition.model_id}
+              models={models.filter((m) => m.model_type === "recognition")}
               error={
-                config.enable || !!errors.methods?.face?.recognition?.model
+                config.enable || !!errors.methods?.face?.recognition?.model_id
               }
-              errorMessage={errors.methods?.face?.recognition?.model?.message}
-              onChange={(model) =>
-                setValue("methods.face.recognition.model", model, {
+              errorMessage={
+                errors.methods?.face?.recognition?.model_id?.message
+              }
+              onChange={(modelId) =>
+                setValue("methods.face.recognition.model_id", modelId, {
                   shouldDirty: true,
                   shouldValidate: true,
                 })
@@ -290,7 +305,7 @@ export function FaceSetting() {
                 shouldDirty: true,
                 shouldValidate: true,
               });
-              setValue("methods.face.anti_spoofing.model.path", value, {
+              setValue("methods.face.anti_spoofing.model.model_id", value, {
                 shouldDirty: true,
                 shouldValidate: true,
               });
@@ -308,8 +323,8 @@ export function FaceSetting() {
               )}
               {antiSpoofModels.length > 0 ? (
                 antiSpoofModels.map((model) => (
-                  <SelectItem key={model.path} value={model.path}>
-                    {model.path.split("/").pop()}
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.name}
                   </SelectItem>
                 ))
               ) : (
@@ -319,9 +334,9 @@ export function FaceSetting() {
               )}
             </SelectContent>
           </Select>
-          {errors.methods?.face?.anti_spoofing?.model?.path && (
+          {errors.methods?.face?.anti_spoofing?.model?.model_id && (
             <p className="text-xs text-destructive">
-              {errors.methods.face.anti_spoofing.model.path.message}
+              {errors.methods.face.anti_spoofing.model.model_id.message}
             </p>
           )}
         </div>

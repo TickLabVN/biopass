@@ -2,6 +2,7 @@ use std::fs;
 use tauri::AppHandle;
 
 use crate::config::{load_config, BiopassConfig};
+use crate::db;
 use crate::paths::get_faces_dir;
 
 #[tauri::command]
@@ -21,7 +22,10 @@ pub fn capture_face(app: AppHandle, camera: Option<String>) -> Result<String, St
             .map_err(|e| format!("Failed to create faces directory: {}", e))?;
     }
 
-    let detect_model = app_config.methods.face.detection.model;
+    let conn = db::open(&app)?;
+    let model_id = &app_config.methods.face.detection.model_id;
+    let detect_model = db::resolve_model_path(&conn, model_id)?
+        .ok_or_else(|| format!("Detection model '{}' not found in registry", model_id))?;
 
     let helper_bin = if std::path::Path::new("/usr/bin/biopass-helper").exists() {
         "/usr/bin/biopass-helper".to_string()

@@ -29,6 +29,6 @@ base64 = "0.22"
 webkit2gtk = "2.0.1"
 gtk = "0.18.2"
 tokio = { version = "1", features = ["rt"] }
-
-[dev-dependencies]
+rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite_migration = "1"
 tempfile = "3"

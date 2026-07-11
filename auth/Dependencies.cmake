@@ -64,3 +64,25 @@ FetchContent_Declare(
     GIT_TAG v1.13.0
 )
 FetchContent_MakeAvailable(spdlog)
+
+# sqlite3 (amalgamation, vendored) for read-only access to biopass.db (model
+# registry) from the PAM helper. Pinned by hash rather than depending on the
+# distro's sqlite3, consistent with the yaml-cpp/spdlog/onnxruntime pinning
+# above -- this runs inside a security-sensitive PAM module.
+set(SQLITE3_VERSION "3460100")
+FetchContent_Declare(
+    sqlite3_amalgamation
+    URL https://www.sqlite.org/2024/sqlite-amalgamation-${SQLITE3_VERSION}.zip
+    URL_HASH SHA256=77823cb110929c2bcb0f5d48e4833b5c59a8a6e40cdea3936b99e199dbbe5784
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(sqlite3_amalgamation)
+
+add_library(sqlite3 STATIC ${sqlite3_amalgamation_SOURCE_DIR}/sqlite3.c)
+target_include_directories(sqlite3 PUBLIC ${sqlite3_amalgamation_SOURCE_DIR})
+set_target_properties(sqlite3 PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_definitions(sqlite3 PUBLIC
+    SQLITE_OMIT_LOAD_EXTENSION
+    SQLITE_THREADSAFE=1
+    SQLITE_DQS=0
+)

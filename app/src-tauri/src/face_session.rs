@@ -9,6 +9,7 @@ use base64::{engine::general_purpose, Engine as _};
 use tauri::{AppHandle, Emitter};
 
 use crate::config::{load_config, BiopassConfig};
+use crate::db;
 use crate::paths::get_faces_dir;
 
 const PREVIEW_EVENT: &str = "face-preview-frame";
@@ -64,7 +65,10 @@ pub fn start_face_preview(app: AppHandle, camera: Option<String>) -> Result<(), 
     }
 
     let config: BiopassConfig = load_config(app.clone())?;
-    let detect_model = config.methods.face.detection.model;
+    let conn = db::open(&app)?;
+    let model_id = &config.methods.face.detection.model_id;
+    let detect_model = db::resolve_model_path(&conn, model_id)?
+        .ok_or_else(|| format!("Detection model '{}' not found in registry", model_id))?;
 
     let mut cmd = Command::new(helper_path());
     cmd.arg("preview-session")

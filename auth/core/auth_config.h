@@ -15,6 +15,14 @@
 
 namespace biopass {
 
+// Bumped whenever the on-disk config.yaml shape changes in a way that isn't
+// forward/backward compatible. Mirrors CURRENT_SCHEMA_VERSION in
+// app/src-tauri/src/config.rs - keep both in sync. readConfig() falls back to
+// defaults (same as a missing/corrupt file) whenever the on-disk
+// schema_version doesn't match this exactly; there is no migration on this
+// side, only the Tauri app writes config.yaml.
+inline constexpr int kCurrentSchemaVersion = 2;
+
 // ---------------------------------------------------------------------------
 // Per-method config structs (mirrors Tauri config.rs)
 // ---------------------------------------------------------------------------
@@ -26,18 +34,26 @@ struct StrategyConfig {
   std::vector<std::string> ignore_services = {"polkit-1", "pkexec"};
 };
 
+// `model_id` is read verbatim from config.yaml; `model_path` is the resolved
+// absolute path looked up from biopass.db (see model_registry.h), filled in
+// by readConfig(). Empty model_path means unresolved / unavailable --
+// FaceAuth::ensureModelsLoaded() already treats a missing model file as a
+// safe "Unavailable" outcome, so no separate error handling is needed here.
 struct DetectionConfig {
-  std::string model = "models/yolov8n-face.onnx";
+  std::string model_id;
+  std::string model_path;
   float threshold = 0.8f;
 };
 
 struct RecognitionConfig {
-  std::string model = "models/edgeface_s_gamma_05.onnx";
+  std::string model_id;
+  std::string model_path;
   float threshold = 0.8f;
 };
 
 struct AntiSpoofingModelConfig {
-  std::string path = "models/mobilenetv3_antispoof.onnx";
+  std::string model_id;
+  std::string model_path;
   float threshold = 0.8f;
 };
 
@@ -73,26 +89,20 @@ struct FaceMethodConfig {
   AntiSpoofingConfig anti_spoofing;
 };
 
-struct FingerConfig {
-  std::string name;
-  uint64_t created_at = 0;
-};
-
+// Fingerprint enrollment metadata (name + enrolled-at timestamp) now lives in
+// the `fingerprints` table of biopass.db instead of config.yaml. C++ never
+// reads it -- fingerprint enumeration goes through fprintd over D-Bus (see
+// auth/fingerprint/fingerprint_auth.cc) -- so there is no equivalent field
+// here anymore.
 struct FingerprintMethodConfig {
   bool enable = false;
   uint32_t retries = 1;
   uint32_t timeout = 5000;
-  std::vector<FingerConfig> fingers;
 };
 
 struct MethodsConfig {
   FaceMethodConfig face;
   FingerprintMethodConfig fingerprint;
-};
-
-struct ModelConfig {
-  std::string path;
-  std::string model_type;
 };
 
 // ---------------------------------------------------------------------------
@@ -104,9 +114,9 @@ struct ModelConfig {
  * Loaded from ~/.config/com.ticklab.biopass/config.yaml
  */
 struct BiopassConfig {
+  int schema_version = 0;
   StrategyConfig strategy = {};
   MethodsConfig methods = {};
-  std::vector<ModelConfig> models = {};
   std::string appearance = "system";
 };
 std::string getConfigPath(const std::string& username);

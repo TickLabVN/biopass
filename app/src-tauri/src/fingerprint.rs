@@ -1,7 +1,6 @@
-use crate::config::{load_config, save_config, FingerConfig};
+use crate::db;
 use crate::fingerprint_ffi::FingerprintAuth;
 use serde::Serialize;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
 
 #[derive(Debug, Serialize, Clone)]
@@ -53,35 +52,22 @@ pub async fn enroll_fingerprint(
         return Err("Fingerprint device not available".to_string());
     }
 
+    let conn = db::open(&app)?;
+    if db::list_fingerprints(&conn)?
+        .iter()
+        .any(|f| f.name == finger_name)
+    {
+        return Err(format!("Finger {} is already enrolled", finger_name));
+    }
+
     // Perform enrollment through FFI
     let success = auth.enroll(&username, &finger_name, &app)?;
     if !success {
         return Err("Failed to enroll fingerprint".to_string());
     }
 
-    // Save to config
-    let mut config = load_config(app.clone())?;
-
-    // Check if this finger is already enrolled
-    if config
-        .methods
-        .fingerprint
-        .fingers
-        .iter()
-        .any(|f| f.name == finger_name)
-    {
-        return Err(format!("Finger {} is already in config", finger_name));
-    }
-
-    config.methods.fingerprint.fingers.push(FingerConfig {
-        name: finger_name.clone(),
-        created_at: SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs(),
-    });
-
-    save_config(app, config)?;
+    // Record enrollment metadata in the database.
+    db::insert_fingerprint(&conn, &finger_name)?;
 
     Ok(())
 }
@@ -105,21 +91,9 @@ pub async fn remove_fingerprint(
         return Err("Failed to remove fingerprint from device".to_string());
     }
 
-    // Remove from config
-    let mut config = load_config(app.clone())?;
-
-    let original_len = config.methods.fingerprint.fingers.len();
-    config
-        .methods
-        .fingerprint
-        .fingers
-        .retain(|f| f.name != finger_name);
-
-    if config.methods.fingerprint.fingers.len() == original_len {
-        return Err(format!("Finger {} not found in config", finger_name));
-    }
-
-    save_config(app, config)?;
+    // Remove enrollment metadata from the database.
+    let conn = db::open(&app)?;
+    db::delete_fingerprint(&conn, &finger_name)?;
     Ok(())
 }
 

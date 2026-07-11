@@ -10,11 +10,9 @@ FaceDetection::FaceDetection(const std::string& ckpt, int imgsz, const float con
     : conf(conf), iou(iou), imgsz(imgsz), session(ckpt, "FaceDetection") {}
 
 std::vector<Detection> FaceDetection::inference(const ImageRGB& image) {
-  // Preprocess
   ImageRGB input_image = imageLetterbox(image, this->imgsz, this->imgsz);
   std::vector<float> image_data = this->preprocess(input_image);
 
-  // Inference
   std::vector<int64_t> input_shape = {1, 3, (int64_t)this->imgsz, (int64_t)this->imgsz};
   auto output_tensors = this->session.run(image_data, input_shape);
 
@@ -24,11 +22,9 @@ std::vector<Detection> FaceDetection::inference(const ImageRGB& image) {
   int num_preds = static_cast<int>(shape[2]);
   const float* output_data = out.GetTensorData<float>();
 
-  // NMS
   auto raw_dets = non_max_suppression(output_data, num_preds, pred_dim, this->conf, this->iou);
   scale_boxes({input_image.height, input_image.width}, raw_dets, {image.height, image.width});
 
-  // Get detection results
   std::vector<Detection> results;
   for (auto& d : raw_dets) {
     int x1 = std::max(0, (int)d.x1);

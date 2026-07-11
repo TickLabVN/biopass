@@ -209,7 +209,6 @@ int captureAndCropFace(const std::string& cameraPath, const std::string& outputP
 int authenticate(const std::string& username, const std::string& service) {
   const char* pUsername = username.c_str();
 
-  // Load configuration from file
   if (!biopass::configExists(pUsername)) {
     // User has not configured biopass — skip this module transparently
     return 2;  // PAM_IGNORE
@@ -236,14 +235,12 @@ int authenticate(const std::string& username, const std::string& service) {
                              (config.methods.face.anti_spoofing.ir_camera.has_value() &&
                               !config.methods.face.anti_spoofing.ir_camera->empty());
 
-  // Create and configure AuthManager
   biopass::AuthManager manager;
   manager.setMode(config.strategy.execution_mode == "sequential"
                       ? biopass::ExecutionMode::Sequential
                       : biopass::ExecutionMode::Parallel);
   manager.setConfig(runtime_config);
 
-  // Add requested authentication methods
   int numOfMethods = 0;
   for (const auto& method_name : config.strategy.order) {
     if (method_name == "face" && config.methods.face.enable) {
@@ -260,7 +257,6 @@ int authenticate(const std::string& username, const std::string& service) {
     return 2;  // PAM_IGNORE
   }
 
-  // Authenticate
   int retval = manager.authenticate(pUsername);
 
   if (retval == 0 /* PAM_SUCCESS is usually 0 */) {

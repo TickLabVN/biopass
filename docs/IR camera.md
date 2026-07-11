@@ -59,13 +59,11 @@ Then, configure your IR emitter:
 sudo linux-enable-ir-emitter configure
 ```
 
-Follow instructions printed when it is configuring your camera. After successfully triggering your IR emitter, please run this command:
+After successfully triggering your IR emitter, run:
 
 ```bash
 sudo systemctl enable --now linux-enable-ir-emitter
 ```
-
-Thanks @notherealmarco for help me on this https://github.com/TickLabVN/biopass/discussions/60#discussioncomment-16521628.
 
 ## 4. If The IR Presence Check Fails Intermittently
 

@@ -50,7 +50,6 @@ export function ModelStatus({
     );
   }
 
-  // Missing or false
   return (
     <Badge
       variant="destructive"

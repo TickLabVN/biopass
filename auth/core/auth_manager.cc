@@ -36,7 +36,6 @@ int AuthManager::authenticate(const std::string& username) {
     return PAM_IGNORE;
   }
 
-  // Set default logger level according to debug config
   if (this->config_.debug) {
     spdlog::set_level(spdlog::level::debug);
   } else {
@@ -135,7 +134,6 @@ int AuthManager::runParallel(const std::string& username) {
           AuthResult result;
 
           do {
-            // Early exit if another method already succeeded
             if (success_found.load()) {
               return AuthResult::Failure;
             }

@@ -64,7 +64,6 @@ BiopassConfig readConfig(const std::string& username) {
 
     static const std::vector<std::string> supported_methods = {"face", "fingerprint"};
 
-    // 1. Strategy
     if (yaml["strategy"]) {
       const auto& s = yaml["strategy"];
       if (s["debug"])
@@ -113,11 +112,9 @@ BiopassConfig readConfig(const std::string& username) {
     }
     config.strategy.order = std::move(normalized_order);
 
-    // 2. Methods — enable flags + model paths
     if (yaml["methods"]) {
       const auto& m = yaml["methods"];
 
-      // Face
       if (m["face"]) {
         const auto& f = m["face"];
         if (f["enable"])
@@ -174,7 +171,6 @@ BiopassConfig readConfig(const std::string& username) {
         }
       }
 
-      // Fingerprint
       if (m["fingerprint"]) {
         const auto& fp = m["fingerprint"];
         if (fp["enable"])

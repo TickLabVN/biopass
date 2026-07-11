@@ -16,17 +16,13 @@
     </a>
 </p>
 
-<h2 align="center">Biopass</h2>
-<p align="center"><b>Modern multi-modal biometric login for Linux</b></p>
-<p align="center">A fast, secure, and privacy-focused biometric recognition module for Linux desktops supporting face and fingerprint.</p>
+<p align="center"><b>Modern multi-modal biometric login for Linux — face and fingerprint, with GUI management.</b></p>
 
 ---
 
 ## Why Biopass?
 
-While Windows Hello provides a seamless multi-modal biometric experience (Face, Fingerprint, PIN) on Windows 11, Linux has historically lacked a modern, unified equivalent. The most well-known project in this space, [Howdy](https://github.com/boltgolt/howdy), focuses exclusively on facial recognition and has not seen significant updates in recent years.
-
-Biopass was developed by [@phucvinh57](https://github.com/phucvinh57) and [@thaitran24](https://github.com/thaitran24) to fill this gap, providing a fast, secure, and modern biometric suite that goes beyond just face ID.
+While Windows Hello provides a seamless multi-modal biometric experience (Face, Fingerprint, PIN) on Windows 11, Linux has historically lacked a modern, unified equivalent. Biopass was developed by [@phucvinh57](https://github.com/phucvinh57) and [@thaitran24](https://github.com/thaitran24) to fill that gap — see the comparison with [Howdy](https://github.com/boltgolt/howdy) below.
 
 ## Comparison
 

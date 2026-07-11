@@ -42,7 +42,6 @@ export function MethodConfig() {
       </h2>
 
       <div className="grid gap-4">
-        {/* Face Authentication */}
         <MethodCard
           title="Face Recognition"
           icon={methodIcons.face}
@@ -62,7 +61,6 @@ export function MethodConfig() {
           <FaceSetting />
         </MethodCard>
 
-        {/* Fingerprint Authentication */}
         <MethodCard
           title="Fingerprint"
           icon={methodIcons.fingerprint}
@@ -82,7 +80,6 @@ export function MethodConfig() {
           }
         >
           <div className="grid gap-4 pt-4">
-            {/* Retries and Delay */}
             <div className="grid grid-cols-2 gap-6 p-4 rounded-lg bg-muted/50 border border-border/50">
               <div className="grid gap-2">
                 <Label

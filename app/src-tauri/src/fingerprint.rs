@@ -9,14 +9,12 @@ pub struct FingerprintDevice {
     pub device_id: String,
 }
 
-/// Check if fingerprint hardware is available
 #[tauri::command]
 pub fn fingerprint_is_available() -> Result<bool, String> {
     let auth = FingerprintAuth::new();
     Ok(auth.is_available())
 }
 
-/// List fingerprint devices (compatible with current UI)
 #[tauri::command]
 pub fn list_fingerprint_devices() -> Result<Vec<FingerprintDevice>, String> {
     let auth = FingerprintAuth::new();
@@ -31,14 +29,12 @@ pub fn list_fingerprint_devices() -> Result<Vec<FingerprintDevice>, String> {
     }
 }
 
-/// List enrolled fingerprints for the current user
 #[tauri::command]
 pub fn list_enrolled_fingerprints(username: String) -> Result<Vec<String>, String> {
     let auth = FingerprintAuth::new();
     auth.list_enrolled_fingers(&username)
 }
 
-/// Enroll a new fingerprint
 #[tauri::command]
 pub async fn enroll_fingerprint(
     app: AppHandle,
@@ -59,7 +55,6 @@ pub async fn enroll_fingerprint(
         return Err(format!("Finger {} is already enrolled", finger_name));
     }
 
-    // Perform enrollment through FFI
     let success = auth.enroll(&username, &finger_name, &app)?;
     if !success {
         return Err("Failed to enroll fingerprint".to_string());
@@ -68,7 +63,6 @@ pub async fn enroll_fingerprint(
     Ok(())
 }
 
-/// Remove an enrolled fingerprint
 #[tauri::command]
 pub async fn remove_fingerprint(
     _app: AppHandle,
@@ -81,7 +75,6 @@ pub async fn remove_fingerprint(
         return Err("Fingerprint device not available".to_string());
     }
 
-    // Remove through FFI
     let success = auth.remove_finger(&username, &finger_name)?;
     if !success {
         return Err("Failed to remove fingerprint from device".to_string());
@@ -97,8 +90,6 @@ pub async fn add_fingerprint(
     _device_id: String,
     finger: String,
 ) -> Result<(), String> {
-    // Delegate to enroll_fingerprint
-    // Get username from system
     let username = std::env::var("USER")
         .or_else(|_| std::env::var("USERNAME"))
         .unwrap_or_else(|_| "root".to_string());
@@ -113,7 +104,6 @@ pub fn delete_fingerprint(app: AppHandle, finger: String) -> Result<(), String> 
         .or_else(|_| std::env::var("USERNAME"))
         .unwrap_or_else(|_| "root".to_string());
 
-    // Run async function synchronously
     let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
     rt.block_on(remove_fingerprint(app, username, finger))
 }

@@ -192,7 +192,6 @@ AuthResult FingerprintAuth::authenticate(const std::string& username, const Auth
     return AuthResult::Unavailable;
   }
 
-  // 1. Get Manager
   manager = g_dbus_proxy_new_sync(connection, G_DBUS_PROXY_FLAGS_NONE, nullptr, FPRINT_SERVICE,
                                   FPRINT_MANAGER_PATH, FPRINT_MANAGER_INTERFACE, nullptr, &error);
 
@@ -203,7 +202,6 @@ AuthResult FingerprintAuth::authenticate(const std::string& username, const Auth
     return AuthResult::Unavailable;
   }
 
-  // 2. Get Default Device
   GVariant* dev_ret = g_dbus_proxy_call_sync(manager, "GetDefaultDevice", nullptr,
                                              G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
   if (!dev_ret) {
@@ -220,7 +218,6 @@ AuthResult FingerprintAuth::authenticate(const std::string& username, const Auth
   std::string dev_path_str = device_path;
   g_variant_unref(dev_ret);
 
-  // 3. Get Device Proxy
   device = g_dbus_proxy_new_sync(connection, G_DBUS_PROXY_FLAGS_NONE, nullptr, FPRINT_SERVICE,
                                  dev_path_str.c_str(), FPRINT_DEVICE_INTERFACE, nullptr, &error);
 
@@ -231,7 +228,6 @@ AuthResult FingerprintAuth::authenticate(const std::string& username, const Auth
     return AuthResult::Unavailable;
   }
 
-  // 4. Check Enrolled Fingers
   GVariant* enrolled_ret =
       g_dbus_proxy_call_sync(device, "ListEnrolledFingers", g_variant_new("(s)", username.c_str()),
                              G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
@@ -264,7 +260,6 @@ AuthResult FingerprintAuth::authenticate(const std::string& username, const Auth
                                      // not set up.
   }
 
-  // 5. Claim Device
   GVariant* claim_ret =
       g_dbus_proxy_call_sync(device, "Claim", g_variant_new("(s)", username.c_str()),
                              G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
@@ -279,7 +274,6 @@ AuthResult FingerprintAuth::authenticate(const std::string& username, const Auth
   g_variant_unref(claim_ret);
   device_claimed = true;
 
-  // 6. Start Verification
   // "any" is typically used to accept any enrolled finger
   GVariant* verify_ret = g_dbus_proxy_call_sync(device, "VerifyStart", g_variant_new("(s)", "any"),
                                                 G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
@@ -295,7 +289,6 @@ AuthResult FingerprintAuth::authenticate(const std::string& username, const Auth
   g_variant_unref(verify_ret);
   verification_started = true;
 
-  // 7. Loop Loop
   ctx.loop = g_main_loop_new(nullptr, FALSE);
   ctx.debug = config.debug;
   ctx.cancel_signal = cancel_signal;
@@ -331,7 +324,6 @@ std::vector<std::string> FingerprintAuth::listEnrolledFingers(const std::string&
     return enrolled_fingers;
   }
 
-  // 1. Get Manager
   GDBusProxy* manager =
       g_dbus_proxy_new_sync(connection, G_DBUS_PROXY_FLAGS_NONE, nullptr, FPRINT_SERVICE,
                             FPRINT_MANAGER_PATH, FPRINT_MANAGER_INTERFACE, nullptr, &error);
@@ -343,7 +335,6 @@ std::vector<std::string> FingerprintAuth::listEnrolledFingers(const std::string&
     return enrolled_fingers;
   }
 
-  // 2. Get Default Device
   GVariant* dev_ret = g_dbus_proxy_call_sync(manager, "GetDefaultDevice", nullptr,
                                              G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
   if (!dev_ret) {
@@ -361,7 +352,6 @@ std::vector<std::string> FingerprintAuth::listEnrolledFingers(const std::string&
   std::string dev_path_str = device_path;
   g_variant_unref(dev_ret);
 
-  // 3. Get Device Proxy
   GDBusProxy* device =
       g_dbus_proxy_new_sync(connection, G_DBUS_PROXY_FLAGS_NONE, nullptr, FPRINT_SERVICE,
                             dev_path_str.c_str(), FPRINT_DEVICE_INTERFACE, nullptr, &error);
@@ -374,7 +364,6 @@ std::vector<std::string> FingerprintAuth::listEnrolledFingers(const std::string&
     return enrolled_fingers;
   }
 
-  // 4. List Enrolled Fingers
   GVariant* enrolled_ret =
       g_dbus_proxy_call_sync(device, "ListEnrolledFingers", g_variant_new("(s)", username.c_str()),
                              G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
@@ -390,7 +379,6 @@ std::vector<std::string> FingerprintAuth::listEnrolledFingers(const std::string&
     return enrolled_fingers;
   }
 
-  // 5. Parse the result
   GVariantIter* iter;
   gchar* finger_name;
   g_variant_get(enrolled_ret, "(as)", &iter);
@@ -418,7 +406,6 @@ bool FingerprintAuth::enroll(const std::string& username, const std::string& fin
     return false;
   }
 
-  // 1. Get Manager
   GDBusProxy* manager =
       g_dbus_proxy_new_sync(connection, G_DBUS_PROXY_FLAGS_NONE, nullptr, FPRINT_SERVICE,
                             FPRINT_MANAGER_PATH, FPRINT_MANAGER_INTERFACE, nullptr, &error);
@@ -430,7 +417,6 @@ bool FingerprintAuth::enroll(const std::string& username, const std::string& fin
     return false;
   }
 
-  // 2. Get Default Device
   GVariant* dev_ret = g_dbus_proxy_call_sync(manager, "GetDefaultDevice", nullptr,
                                              G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
   if (!dev_ret) {
@@ -448,7 +434,6 @@ bool FingerprintAuth::enroll(const std::string& username, const std::string& fin
   std::string dev_path_str = device_path;
   g_variant_unref(dev_ret);
 
-  // 3. Get Device Proxy
   GDBusProxy* device =
       g_dbus_proxy_new_sync(connection, G_DBUS_PROXY_FLAGS_NONE, nullptr, FPRINT_SERVICE,
                             dev_path_str.c_str(), FPRINT_DEVICE_INTERFACE, nullptr, &error);
@@ -461,7 +446,6 @@ bool FingerprintAuth::enroll(const std::string& username, const std::string& fin
     return false;
   }
 
-  // 4. Claim Device
   GVariant* claim_ret =
       g_dbus_proxy_call_sync(device, "Claim", g_variant_new("(s)", username.c_str()),
                              G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
@@ -477,7 +461,6 @@ bool FingerprintAuth::enroll(const std::string& username, const std::string& fin
   }
   g_variant_unref(claim_ret);
 
-  // 5. Start Enrollment
   GVariant* enroll_start_ret =
       g_dbus_proxy_call_sync(device, "EnrollStart", g_variant_new("(s)", finger_name.c_str()),
                              G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
@@ -486,7 +469,6 @@ bool FingerprintAuth::enroll(const std::string& username, const std::string& fin
     spdlog::error("FingerprintAuth: Failed to start enrollment: {}", (error ? error->message : ""));
     if (error)
       g_error_free(error);
-    // Release
     GVariant* rel_ret = g_dbus_proxy_call_sync(device, "Release", nullptr, G_DBUS_CALL_FLAGS_NONE,
                                                -1, nullptr, nullptr);
     if (rel_ret)
@@ -498,7 +480,6 @@ bool FingerprintAuth::enroll(const std::string& username, const std::string& fin
   }
   g_variant_unref(enroll_start_ret);
 
-  // 6. Set up signal subscription for enrollment status
   struct EnrollContext {
     GMainLoop* loop;
     bool success;
@@ -556,13 +537,11 @@ bool FingerprintAuth::enroll(const std::string& username, const std::string& fin
   g_dbus_connection_signal_unsubscribe(connection, sub_id);
   g_main_loop_unref(ctx.loop);
 
-  // 7. Stop Enrollment
   GVariant* enroll_stop_ret = g_dbus_proxy_call_sync(device, "EnrollStop", nullptr,
                                                      G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr);
   if (enroll_stop_ret)
     g_variant_unref(enroll_stop_ret);
 
-  // 8. Release
   GVariant* release_ret = g_dbus_proxy_call_sync(device, "Release", nullptr, G_DBUS_CALL_FLAGS_NONE,
                                                  -1, nullptr, nullptr);
   if (release_ret)
@@ -584,7 +563,6 @@ bool FingerprintAuth::removeFinger(const std::string& username, const std::strin
     return false;
   }
 
-  // 1. Get Manager
   GDBusProxy* manager =
       g_dbus_proxy_new_sync(connection, G_DBUS_PROXY_FLAGS_NONE, nullptr, FPRINT_SERVICE,
                             FPRINT_MANAGER_PATH, FPRINT_MANAGER_INTERFACE, nullptr, &error);
@@ -596,7 +574,6 @@ bool FingerprintAuth::removeFinger(const std::string& username, const std::strin
     return false;
   }
 
-  // 2. Get Default Device
   GVariant* dev_ret = g_dbus_proxy_call_sync(manager, "GetDefaultDevice", nullptr,
                                              G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
   if (!dev_ret) {
@@ -614,7 +591,6 @@ bool FingerprintAuth::removeFinger(const std::string& username, const std::strin
   std::string dev_path_str = device_path;
   g_variant_unref(dev_ret);
 
-  // 3. Get Device Proxy
   GDBusProxy* device =
       g_dbus_proxy_new_sync(connection, G_DBUS_PROXY_FLAGS_NONE, nullptr, FPRINT_SERVICE,
                             dev_path_str.c_str(), FPRINT_DEVICE_INTERFACE, nullptr, &error);
@@ -627,7 +603,6 @@ bool FingerprintAuth::removeFinger(const std::string& username, const std::strin
     return false;
   }
 
-  // 4. Claim Device
   GVariant* claim_ret =
       g_dbus_proxy_call_sync(device, "Claim", g_variant_new("(s)", username.c_str()),
                              G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
@@ -644,7 +619,6 @@ bool FingerprintAuth::removeFinger(const std::string& username, const std::strin
   }
   g_variant_unref(claim_ret);
 
-  // 5. Delete enrolled finger
   // DeleteEnrolledFinger expects only the finger name (s), not (username, finger_name)
   GVariant* delete_ret = g_dbus_proxy_call_sync(device, "DeleteEnrolledFinger",
                                                 g_variant_new("(s)", finger_name.c_str()),
@@ -662,7 +636,6 @@ bool FingerprintAuth::removeFinger(const std::string& username, const std::strin
       g_error_free(error);
   }
 
-  // 6. Release Device
   GVariant* release_ret = g_dbus_proxy_call_sync(device, "Release", nullptr, G_DBUS_CALL_FLAGS_NONE,
                                                  -1, nullptr, nullptr);
   if (release_ret)

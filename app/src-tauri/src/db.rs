@@ -19,13 +19,6 @@ pub struct Model {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Fingerprint {
-    pub id: i64,
-    pub name: String,
-    pub created_at: i64,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FaceEnrollment {
     pub id: i64,
     pub image_path: String,
@@ -224,43 +217,6 @@ pub fn delete_model(conn: &Connection, id: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn list_fingerprints(conn: &Connection) -> Result<Vec<Fingerprint>, String> {
-    let mut stmt = conn
-        .prepare("SELECT id, name, created_at FROM fingerprints ORDER BY created_at")
-        .map_err(|e| format!("Failed to prepare fingerprints query: {}", e))?;
-    let rows = stmt
-        .query_map([], |row| {
-            Ok(Fingerprint {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                created_at: row.get(2)?,
-            })
-        })
-        .map_err(|e| format!("Failed to query fingerprints: {}", e))?;
-    rows.collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Failed to read fingerprints: {}", e))
-}
-
-pub fn insert_fingerprint(conn: &Connection, name: &str) -> Result<Fingerprint, String> {
-    let created_at = now_unix();
-    conn.execute(
-        "INSERT INTO fingerprints (name, created_at) VALUES (?1, ?2)",
-        params![name, created_at],
-    )
-    .map_err(|e| format!("Failed to insert fingerprint '{}': {}", name, e))?;
-    Ok(Fingerprint {
-        id: conn.last_insert_rowid(),
-        name: name.to_string(),
-        created_at,
-    })
-}
-
-pub fn delete_fingerprint(conn: &Connection, name: &str) -> Result<(), String> {
-    conn.execute("DELETE FROM fingerprints WHERE name = ?1", params![name])
-        .map_err(|e| format!("Failed to delete fingerprint '{}': {}", name, e))?;
-    Ok(())
-}
-
 // Face-enrollment rows are provisioned for future use and not wired into any
 // read/write path yet; directory listing under <data_dir>/faces remains the
 // source of truth for now.
@@ -366,18 +322,5 @@ mod tests {
 
         let all = list_models(&conn, None).unwrap();
         assert_eq!(all.len(), 2);
-    }
-
-    #[test]
-    fn fingerprint_crud() {
-        let conn = setup_conn();
-        let fp = insert_fingerprint(&conn, "right-index").unwrap();
-        assert_eq!(fp.name, "right-index");
-
-        let all = list_fingerprints(&conn).unwrap();
-        assert_eq!(all.len(), 1);
-
-        delete_fingerprint(&conn, "right-index").unwrap();
-        assert!(list_fingerprints(&conn).unwrap().is_empty());
     }
 }

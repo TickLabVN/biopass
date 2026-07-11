@@ -10,12 +10,6 @@ CREATE TABLE models (
 );
 CREATE INDEX idx_models_type ON models(model_type);
 
-CREATE TABLE fingerprints (
-    id         INTEGER PRIMARY KEY,
-    name       TEXT NOT NULL UNIQUE,
-    created_at INTEGER NOT NULL
-);
-
 -- Provisioned for future use; not read from or written to by this schema version.
 CREATE TABLE face_enrollments (
     id         INTEGER PRIMARY KEY,

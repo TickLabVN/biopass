@@ -10,11 +10,11 @@ Biopass persists per-user state in two files under
   `yaml-cpp`) — the two parsers are hand-maintained in parallel, not
   generated from a shared schema, so any field change must be applied to
   both.
-- `biopass.db` — a SQLite database holding the model catalog and fingerprint
-  enrollment metadata. Only the Tauri app writes to it
-  (`app/src-tauri/src/db.rs`, via `rusqlite`); the PAM helper opens it
-  read-only (`auth/core/model_registry.cc`, via a vendored sqlite3
-  amalgamation) purely to resolve a `model_id` to a file path at login time.
+- `biopass.db` — a SQLite database holding the model catalog. Only the Tauri
+  app writes to it (`app/src-tauri/src/db.rs`, via `rusqlite`); the PAM
+  helper opens it read-only (`auth/core/model_registry.cc`, via a vendored
+  sqlite3 amalgamation) purely to resolve a `model_id` to a file path at
+  login time. Enrolled fingerprints are *not* stored here — see below.
 
 ## Why models moved out of config.yaml
 
@@ -78,8 +78,10 @@ A reference fixture lives at `app/src-tauri/testdata/config_v2.yaml` and is
 exercised by `app/src-tauri/src/config.rs`'s unit tests.
 
 Fingerprint enrollment metadata (`fingers: [{name, created_at}]` in the old
-schema) and the model registry no longer appear in config.yaml at all — see
-below.
+schema) and the model registry no longer appear in config.yaml at all.
+Fingerprints are also not tracked in biopass.db (see below) — enrollment is
+queried live from fprintd via FFI on every read, so there's nothing to keep
+in sync.
 
 ## biopass.db schema
 
@@ -98,12 +100,6 @@ CREATE TABLE models (
     installed_at INTEGER NOT NULL
 );
 
-CREATE TABLE fingerprints (
-    id         INTEGER PRIMARY KEY,
-    name       TEXT NOT NULL UNIQUE,
-    created_at INTEGER NOT NULL
-);
-
 -- Provisioned for future use; not read from or written to yet. Directory
 -- listing of <data_dir>/faces remains the source of truth for enrolled faces.
 CREATE TABLE face_enrollments (
@@ -118,6 +114,15 @@ CREATE TABLE face_enrollments (
 and inserting a row per file that actually exists on disk. There is no
 `is_active` column — which model is "active" for a given sub-task is
 whatever `model_id` that method's block in config.yaml points at.
+
+There is deliberately no `fingerprints` table: fprintd is the only writer of
+fingerprint enrollment, and biopass isn't guaranteed to be the only thing
+enrolling/removing fingers on the system (a user could run `fprintd-enroll`
+or GNOME Settings directly). A cached copy in SQLite would silently go stale
+the moment that happens. Instead, `list_enrolled_fingerprints`
+(`app/src-tauri/src/fingerprint.rs`) always queries fprintd live through
+`fingerprint_ffi::FingerprintAuth::list_enrolled_fingers`, and
+`enroll_fingerprint`'s duplicate-name check does the same.
 
 ## Known follow-up (not addressed by this change)
 

@@ -1,4 +1,3 @@
-use crate::db;
 use crate::fingerprint_ffi::FingerprintAuth;
 use serde::Serialize;
 use tauri::AppHandle;
@@ -52,10 +51,10 @@ pub async fn enroll_fingerprint(
         return Err("Fingerprint device not available".to_string());
     }
 
-    let conn = db::open(&app)?;
-    if db::list_fingerprints(&conn)?
+    if auth
+        .list_enrolled_fingers(&username)?
         .iter()
-        .any(|f| f.name == finger_name)
+        .any(|f| f == &finger_name)
     {
         return Err(format!("Finger {} is already enrolled", finger_name));
     }
@@ -66,16 +65,13 @@ pub async fn enroll_fingerprint(
         return Err("Failed to enroll fingerprint".to_string());
     }
 
-    // Record enrollment metadata in the database.
-    db::insert_fingerprint(&conn, &finger_name)?;
-
     Ok(())
 }
 
 /// Remove an enrolled fingerprint
 #[tauri::command]
 pub async fn remove_fingerprint(
-    app: AppHandle,
+    _app: AppHandle,
     username: String,
     finger_name: String,
 ) -> Result<(), String> {
@@ -91,9 +87,6 @@ pub async fn remove_fingerprint(
         return Err("Failed to remove fingerprint from device".to_string());
     }
 
-    // Remove enrollment metadata from the database.
-    let conn = db::open(&app)?;
-    db::delete_fingerprint(&conn, &finger_name)?;
     Ok(())
 }
 

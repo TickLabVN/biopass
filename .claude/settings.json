@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(git log)",
+      "Bash(git log *)",
+      "Bash(git show)",
+      "Bash(git show *)",
+      "Bash(git branch)",
+      "Bash(git branch --show-current)",
+      "Bash(bun install)",
+      "Bash(bun install *)",
+      "Bash(bun run lint)",
+      "Bash(bun run build)",
+      "Bash(bun run check)",
+      "Bash(bun run dev)",
+      "Bash(bun run tauri *)",
+      "Bash(cargo build)",
+      "Bash(cargo build *)",
+      "Bash(cargo fmt)",
+      "Bash(cargo fmt *)",
+      "Bash(cargo test)",
+      "Bash(cargo test *)",
+      "Bash(cargo check)",
+      "Bash(cargo check *)",
+      "Bash(cmake -S auth *)",
+      "Bash(cmake --build *)",
+      "Bash(make build)",
+      "Bash(make build-auth)",
+      "Bash(make build-app)",
+      "Bash(make clean)",
+      "Bash(make clean-auth)",
+      "Bash(make clean-app)",
+      "Bash(make package)",
+      "Bash(clang-format -i *)"
+    ]
+  }
+}

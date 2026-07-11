@@ -29,7 +29,7 @@ AntiSpoofTask make_task(const std::string& name, std::future<bool> future) {
 
 bool checkAntiSpoofByAIModel(const FaceMethodConfig& faceCfg, const std::string& username,
                              const ImageRGB& face, const AuthConfig& authCfg) {
-  const std::string modelPath = faceCfg.anti_spoofing.model.path;
+  const std::string modelPath = faceCfg.anti_spoofing.model.model_path;
   if (modelPath.empty() || !std::ifstream(modelPath).good()) {
     spdlog::error("FaceAuth: Anti-spoofing model file not found: {}", modelPath);
     return false;

@@ -1,38 +1,38 @@
-use serde::{Deserialize, Deserializer, Serialize};
-use serde_yaml::Value as YamlValue;
+use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::io::Write;
 use tauri::AppHandle;
 
-use crate::paths::{get_config_dir, get_config_path, get_data_dir};
+use crate::paths::{get_config_dir, get_config_path};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/// Bumped whenever the on-disk config.yaml shape changes in a way that isn't
+/// forward/backward compatible. Mirrors CURRENT_SCHEMA_VERSION in
+/// auth/core/auth_config.h - keep both in sync.
+pub const CURRENT_SCHEMA_VERSION: u32 = 2;
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct BiopassConfig {
+    pub schema_version: u32,
     pub strategy: StrategyConfig,
     pub methods: MethodsConfig,
-    pub models: Vec<ModelConfig>,
     pub appearance: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct StrategyConfig {
-    #[serde(default)]
     pub debug: bool,
-    #[serde(default = "default_execution_mode")]
     pub execution_mode: String,
-    #[serde(default = "default_order")]
     pub order: Vec<String>,
-    #[serde(default = "default_ignored_services")]
     pub ignore_services: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct MethodsConfig {
     pub face: FaceMethodConfig,
     pub fingerprint: FingerprintMethodConfig,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct FaceMethodConfig {
     pub enable: bool,
     pub retries: u32,
@@ -43,125 +43,25 @@ pub struct FaceMethodConfig {
     pub anti_spoofing: AntiSpoofingConfig,
 }
 
-#[derive(Debug, Deserialize, Default)]
-struct LegacyIRCameraConfig {
-    #[serde(default)]
-    pub enable: bool,
-    #[serde(default)]
-    pub device_id: i32,
-}
-
-#[derive(Debug, Deserialize, Default)]
-struct AntiSpoofingConfigRaw {
-    #[serde(default)]
-    pub enable: bool,
-    #[serde(default)]
-    pub model: Option<YamlValue>,
-    #[serde(default)]
-    pub threshold: Option<f32>,
-    #[serde(default)]
-    pub ir_camera: Option<String>,
-    #[serde(default)]
-    pub ir_warmup_delay_ms: Option<i32>,
-    #[serde(default)]
-    pub ir_presence_timeout_ms: Option<i32>,
-}
-
-#[derive(Debug, Deserialize)]
-struct FaceMethodConfigRaw {
-    #[serde(default = "default_face_enable")]
-    pub enable: bool,
-    #[serde(default = "default_face_retries")]
-    pub retries: u32,
-    #[serde(default = "default_face_delay")]
-    pub retry_delay: u32,
-    #[serde(default)]
-    pub camera: Option<String>,
-    #[serde(default)]
-    pub detection: DetectionConfig,
-    #[serde(default)]
-    pub recognition: RecognitionConfig,
-    #[serde(default)]
-    pub anti_spoofing: AntiSpoofingConfigRaw,
-    #[serde(default)]
-    pub ir_camera: Option<LegacyIRCameraConfig>,
-}
-
-impl<'de> Deserialize<'de> for FaceMethodConfig {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let raw = FaceMethodConfigRaw::deserialize(deserializer)?;
-
-        let mut anti_spoofing = AntiSpoofingConfig::from_raw(raw.anti_spoofing);
-        if anti_spoofing.ir_camera.is_none() {
-            if let Some(legacy_ir_camera) = raw.ir_camera {
-                if legacy_ir_camera.enable {
-                    anti_spoofing.ir_camera =
-                        Some(format!("/dev/video{}", legacy_ir_camera.device_id));
-                }
-            }
-        }
-
-        Ok(Self {
-            enable: raw.enable,
-            retries: raw.retries,
-            retry_delay: raw.retry_delay,
-            camera: raw.camera,
-            detection: raw.detection,
-            recognition: raw.recognition,
-            anti_spoofing,
-        })
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DetectionConfig {
-    pub model: String,
+    pub model_id: String,
     pub threshold: f32,
 }
 
-impl Default for DetectionConfig {
-    fn default() -> Self {
-        Self {
-            model: "models/yolov8n-face.onnx".to_string(),
-            threshold: 0.8,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct RecognitionConfig {
-    pub model: String,
+    pub model_id: String,
     pub threshold: f32,
 }
 
-impl Default for RecognitionConfig {
-    fn default() -> Self {
-        Self {
-            model: "models/edgeface_s_gamma_05.onnx".to_string(),
-            threshold: 0.8,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct AntiSpoofingModelConfig {
-    pub path: String,
+    pub model_id: String,
     pub threshold: f32,
 }
 
-impl Default for AntiSpoofingModelConfig {
-    fn default() -> Self {
-        Self {
-            path: "models/mobilenetv3_antispoof.onnx".to_string(),
-            threshold: 0.8,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct AntiSpoofingConfig {
     pub enable: bool,
     pub model: AntiSpoofingModelConfig,
@@ -170,119 +70,24 @@ pub struct AntiSpoofingConfig {
     pub ir_presence_timeout_ms: i32,
 }
 
-impl AntiSpoofingConfig {
-    fn from_raw(raw: AntiSpoofingConfigRaw) -> Self {
-        let mut model = AntiSpoofingModelConfig::default();
-
-        if let Some(model_value) = raw.model {
-            match model_value {
-                YamlValue::Mapping(map) => {
-                    if let Some(path_value) = map.get(&YamlValue::String("path".to_string())) {
-                        if let Some(path) = path_value.as_str() {
-                            model.path = path.to_string();
-                        }
-                    }
-                    if let Some(threshold_value) =
-                        map.get(&YamlValue::String("threshold".to_string()))
-                    {
-                        if let Some(threshold) = threshold_value.as_f64() {
-                            model.threshold = threshold as f32;
-                        }
-                    }
-                }
-                YamlValue::String(path) => {
-                    // Backward compatibility with old schema:
-                    // anti_spoofing.model: "<path>"
-                    model.path = path;
-                }
-                _ => {}
-            }
-        }
-
-        // Backward compatibility with old schema:
-        // anti_spoofing.threshold: <float>
-        if let Some(threshold) = raw.threshold {
-            model.threshold = threshold;
-        }
-
-        Self {
-            enable: raw.enable,
-            model,
-            ir_camera: raw.ir_camera,
-            ir_warmup_delay_ms: raw.ir_warmup_delay_ms.unwrap_or(DEFAULT_IR_WARMUP_DELAY_MS),
-            ir_presence_timeout_ms: raw
-                .ir_presence_timeout_ms
-                .unwrap_or(DEFAULT_IR_PRESENCE_TIMEOUT_MS),
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct FingerprintMethodConfig {
-    #[serde(default)]
     pub enable: bool,
-    #[serde(default = "default_fingerprint_retries")]
     pub retries: u32,
-    // TODO: rename the actual field in config from "retry_delay" to "timeout" for clarity
-    #[serde(default = "default_fingerprint_timeout", alias = "retry_delay")]
     pub timeout: u32,
-    #[serde(default)]
-    pub fingers: Vec<FingerConfig>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FingerConfig {
-    pub name: String,
-    pub created_at: u64,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ModelConfig {
-    pub path: String,
-    #[serde(rename = "type")]
-    pub model_type: String,
-}
-
-fn default_face_retries() -> u32 {
-    5
-}
-fn default_face_delay() -> u32 {
-    200
-}
-fn default_face_enable() -> bool {
-    true
-}
-fn default_fingerprint_retries() -> u32 {
-    1
-}
-fn default_fingerprint_timeout() -> u32 {
-    5000
-}
-
-fn default_ignored_services() -> Vec<String> {
-    vec!["polkit-1".to_string(), "pkexec".to_string()]
-}
-
-fn default_execution_mode() -> String {
-    "parallel".to_string()
-}
-
-fn default_order() -> Vec<String> {
-    vec!["face".to_string(), "fingerprint".to_string()]
 }
 
 // Mirrors the defaults in auth/core/auth_config.h's AntiSpoofingConfig.
 const DEFAULT_IR_WARMUP_DELAY_MS: i32 = 300;
 const DEFAULT_IR_PRESENCE_TIMEOUT_MS: i32 = 1500;
 
-fn get_default_config(app: &AppHandle) -> BiopassConfig {
-    let models_dir = get_data_dir(app)
-        .map(|d| d.join("models"))
-        .unwrap_or_else(|_| PathBuf::from("models"));
+fn default_ignored_services() -> Vec<String> {
+    vec!["polkit-1".to_string(), "pkexec".to_string()]
+}
 
-    let model_path = |name: &str| -> String { models_dir.join(name).to_string_lossy().to_string() };
-
+fn get_default_config() -> BiopassConfig {
     BiopassConfig {
+        schema_version: CURRENT_SCHEMA_VERSION,
         strategy: StrategyConfig {
             debug: false,
             execution_mode: "parallel".to_string(),
@@ -296,17 +101,17 @@ fn get_default_config(app: &AppHandle) -> BiopassConfig {
                 retry_delay: 200,
                 camera: None,
                 detection: DetectionConfig {
-                    model: model_path("yolov8n-face.onnx"),
+                    model_id: "yolov8n-face".to_string(),
                     threshold: 0.8,
                 },
                 recognition: RecognitionConfig {
-                    model: model_path("edgeface_s_gamma_05.onnx"),
+                    model_id: "edgeface-s-gamma-05".to_string(),
                     threshold: 0.8,
                 },
                 anti_spoofing: AntiSpoofingConfig {
                     enable: true,
                     model: AntiSpoofingModelConfig {
-                        path: model_path("mobilenetv3_antispoof.onnx"),
+                        model_id: "mobilenetv3-antispoof".to_string(),
                         threshold: 0.8,
                     },
                     ir_camera: None,
@@ -318,24 +123,32 @@ fn get_default_config(app: &AppHandle) -> BiopassConfig {
                 enable: false,
                 retries: 1,
                 timeout: 5000,
-                fingers: vec![],
             },
         },
-        models: vec![
-            ModelConfig {
-                path: model_path("yolov8n-face.onnx"),
-                model_type: "detection".to_string(),
-            },
-            ModelConfig {
-                path: model_path("edgeface_s_gamma_05.onnx"),
-                model_type: "recognition".to_string(),
-            },
-            ModelConfig {
-                path: model_path("mobilenetv3_antispoof.onnx"),
-                model_type: "anti-spoofing".to_string(),
-            },
-        ],
         appearance: "system".to_string(),
+    }
+}
+
+/// Parses config.yaml content, falling back to defaults on a parse error or a
+/// schema_version that doesn't match CURRENT_SCHEMA_VERSION -- mirrors the
+/// defaults+warn fallback in auth/core/auth_config.cc's readConfig().
+fn parse_config(content: &str) -> BiopassConfig {
+    match serde_yaml::from_str::<BiopassConfig>(content) {
+        Ok(config) if config.schema_version == CURRENT_SCHEMA_VERSION => config,
+        Ok(config) => {
+            eprintln!(
+                "Warning: config.yaml schema_version {} does not match expected {}; using defaults",
+                config.schema_version, CURRENT_SCHEMA_VERSION
+            );
+            get_default_config()
+        }
+        Err(e) => {
+            eprintln!(
+                "Warning: failed to parse config.yaml ({}); using defaults",
+                e
+            );
+            get_default_config()
+        }
     }
 }
 
@@ -344,13 +157,13 @@ pub fn load_config(app: AppHandle) -> Result<BiopassConfig, String> {
     let config_path = get_config_path(&app)?;
 
     if !config_path.exists() {
-        return Ok(get_default_config(&app));
+        return Ok(get_default_config());
     }
 
     let content = fs::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config file: {}", e))?;
 
-    serde_yaml::from_str(&content).map_err(|e| format!("Failed to parse config file: {}", e))
+    Ok(parse_config(&content))
 }
 
 #[tauri::command]
@@ -358,13 +171,84 @@ pub fn save_config(app: AppHandle, config: BiopassConfig) -> Result<(), String> 
     let config_dir = get_config_dir(&app)?;
     let config_path = get_config_path(&app)?;
 
-    let yaml_content =
-        serde_yaml::to_string(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;
-
     if !config_dir.exists() {
         fs::create_dir_all(&config_dir)
             .map_err(|e| format!("Failed to create config directory: {}", e))?;
     }
 
-    fs::write(&config_path, yaml_content).map_err(|e| format!("Failed to write config file: {}", e))
+    let yaml_content =
+        serde_yaml::to_string(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+    // Write to a temp file in the same directory (so the rename below is an
+    // atomic same-filesystem operation) then persist over the real path, so a
+    // crash mid-write can never leave config.yaml truncated/corrupt.
+    let mut tmp_file = tempfile::NamedTempFile::new_in(&config_dir)
+        .map_err(|e| format!("Failed to create temporary config file: {}", e))?;
+    tmp_file
+        .write_all(yaml_content.as_bytes())
+        .map_err(|e| format!("Failed to write temporary config file: {}", e))?;
+    tmp_file
+        .as_file()
+        .sync_all()
+        .map_err(|e| format!("Failed to sync temporary config file: {}", e))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        tmp_file
+            .as_file()
+            .set_permissions(std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| format!("Failed to set config file permissions: {}", e))?;
+    }
+
+    tmp_file
+        .persist(&config_path)
+        .map_err(|e| format!("Failed to save config file: {}", e))?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FIXTURE: &str = include_str!("../testdata/config_v2.yaml");
+
+    #[test]
+    fn parses_v2_fixture() {
+        let config = parse_config(FIXTURE);
+        assert_eq!(config.schema_version, CURRENT_SCHEMA_VERSION);
+        assert_eq!(config.methods.face.detection.model_id, "yolov8n-face");
+        assert_eq!(
+            config.methods.face.recognition.model_id,
+            "edgeface-s-gamma-05"
+        );
+        assert_eq!(
+            config.methods.face.anti_spoofing.model.model_id,
+            "mobilenetv3-antispoof"
+        );
+        assert!(!config.methods.fingerprint.enable);
+    }
+
+    #[test]
+    fn falls_back_to_defaults_on_schema_mismatch() {
+        let mismatched = FIXTURE.replacen("schema_version: 2", "schema_version: 1", 1);
+        let config = parse_config(&mismatched);
+        assert_eq!(config.schema_version, CURRENT_SCHEMA_VERSION);
+        assert_eq!(config, get_default_config());
+    }
+
+    #[test]
+    fn falls_back_to_defaults_on_garbage() {
+        let config = parse_config("not: [valid, yaml, config");
+        assert_eq!(config, get_default_config());
+    }
+
+    #[test]
+    fn default_config_round_trips_through_yaml() {
+        let original = get_default_config();
+        let yaml = serde_yaml::to_string(&original).unwrap();
+        let parsed = parse_config(&yaml);
+        assert_eq!(original, parsed);
+    }
 }

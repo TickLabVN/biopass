@@ -1,9 +1,11 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 pub mod config;
+pub mod db;
 pub mod face;
 pub mod face_session;
 pub mod fingerprint;
 pub mod fingerprint_ffi;
+pub mod models;
 pub mod paths;
 pub mod system;
 
@@ -14,6 +16,7 @@ use fingerprint::{
     add_fingerprint, delete_fingerprint, enroll_fingerprint, fingerprint_is_available,
     list_enrolled_fingerprints, list_fingerprint_devices, remove_fingerprint,
 };
+use models::list_models;
 use system::{get_current_username, list_video_devices};
 
 use tauri::Manager;
@@ -58,7 +61,8 @@ pub fn run() {
             remove_fingerprint,
             fingerprint_is_available,
             list_enrolled_fingerprints,
-            list_fingerprint_devices
+            list_fingerprint_devices,
+            list_models
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

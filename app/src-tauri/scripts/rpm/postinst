@@ -4,30 +4,8 @@
 
 set -e
 
-run_config_migration() {
-    HELPER="/usr/bin/biopass-helper"
-    if [ ! -x "$HELPER" ]; then
-        return 0
-    fi
-
-    # Migrate every existing user that already has a Biopass config.
-    # Idempotent operation; safe to run repeatedly.
-    while IFS=: read -r username _ _ _ _ home _; do
-        [ -n "$username" ] || continue
-        [ -n "$home" ] || continue
-
-        CONFIG_PATH="$home/.config/com.ticklab.biopass/config.yaml"
-        if [ -f "$CONFIG_PATH" ]; then
-            echo "Biopass: Migrating config schema for user '$username'..."
-            "$HELPER" migrate --username "$username" || true
-        fi
-    done < /etc/passwd
-}
-
 # Refresh linker cache after installing the private Biopass library path.
 ldconfig
-
-run_config_migration
 
 # Run the model downloader for the installing user.
 SCRIPT="/usr/share/com.ticklab.biopass/download_models.sh"

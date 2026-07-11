@@ -31,8 +31,8 @@ bool FaceAuth::ensureModelsLoaded() {
     return true;
   }
 
-  const std::string& recogModelPath = face_config_.recognition.model;
-  const std::string& detectModelPath = face_config_.detection.model;
+  const std::string& recogModelPath = face_config_.recognition.model_path;
+  const std::string& detectModelPath = face_config_.detection.model_path;
   if (!std::ifstream(recogModelPath).good() || !std::ifstream(detectModelPath).good()) {
     spdlog::error("FaceAuth: Model files not found");
     return false;

@@ -1,0 +1,40 @@
+# Reference fixture for the v2 config.yaml schema. Kept in sync with
+# BiopassConfig in app/src-tauri/src/config.rs and auth/core/auth_config.h --
+# see docs/config-schema.md for the full schema writeup. Model paths referenced
+# by model_id (yolov8n-face, edgeface-s-gamma-05, mobilenetv3-antispoof) live
+# in the SQLite `models` table (biopass.db), not in this file.
+schema_version: 2
+strategy:
+  debug: false
+  execution_mode: parallel
+  order:
+    - face
+    - fingerprint
+  ignore_services:
+    - polkit-1
+    - pkexec
+methods:
+  face:
+    enable: true
+    retries: 5
+    retry_delay: 200
+    camera: null
+    detection:
+      model_id: yolov8n-face
+      threshold: 0.8
+    recognition:
+      model_id: edgeface-s-gamma-05
+      threshold: 0.8
+    anti_spoofing:
+      enable: true
+      model:
+        model_id: mobilenetv3-antispoof
+        threshold: 0.8
+      ir_camera: null
+      ir_warmup_delay_ms: 300
+      ir_presence_timeout_ms: 1500
+  fingerprint:
+    enable: false
+    retries: 1
+    timeout: 5000
+appearance: system

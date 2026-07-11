@@ -1,7 +1,7 @@
 export interface BiopassConfig {
+  schema_version: number;
   strategy: StrategyConfig;
   methods: MethodsConfig;
-  models: ModelConfig[];
   appearance: string;
 }
 
@@ -29,17 +29,17 @@ export interface FaceMethodConfig {
   retry_delay: number;
   camera: string | null;
   detection: {
-    model: string;
+    model_id: string;
     threshold: number;
   };
   recognition: {
-    model: string;
+    model_id: string;
     threshold: number;
   };
   anti_spoofing: {
     enable: boolean;
     model: {
-      path: string;
+      model_id: string;
       threshold: number;
     };
     ir_camera: string | null;
@@ -52,15 +52,19 @@ export interface FingerprintMethodConfig {
   enable: boolean;
   retries: number;
   timeout: number;
-  fingers: FingerConfig[];
 }
 
-export interface FingerConfig {
+export type ModelType = "detection" | "recognition" | "anti_spoofing";
+
+// A row from the SQLite `models` table (see app/src-tauri/src/db.rs), listed
+// via the list_models command rather than embedded in config.yaml.
+export interface Model {
+  id: string;
   name: string;
-  created_at: number;
-}
-
-export interface ModelConfig {
+  model_type: ModelType;
   path: string;
-  type: "detection" | "recognition" | "anti-spoofing";
+  version: string | null;
+  checksum: string | null;
+  source: string;
+  installed_at: number;
 }

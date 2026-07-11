@@ -1,7 +1,5 @@
-use crate::config::{load_config, save_config, FingerConfig};
 use crate::fingerprint_ffi::FingerprintAuth;
 use serde::Serialize;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
 
 #[derive(Debug, Serialize, Clone)]
@@ -53,35 +51,19 @@ pub async fn enroll_fingerprint(
         return Err("Fingerprint device not available".to_string());
     }
 
+    if auth
+        .list_enrolled_fingers(&username)?
+        .iter()
+        .any(|f| f == &finger_name)
+    {
+        return Err(format!("Finger {} is already enrolled", finger_name));
+    }
+
     // Perform enrollment through FFI
     let success = auth.enroll(&username, &finger_name, &app)?;
     if !success {
         return Err("Failed to enroll fingerprint".to_string());
     }
-
-    // Save to config
-    let mut config = load_config(app.clone())?;
-
-    // Check if this finger is already enrolled
-    if config
-        .methods
-        .fingerprint
-        .fingers
-        .iter()
-        .any(|f| f.name == finger_name)
-    {
-        return Err(format!("Finger {} is already in config", finger_name));
-    }
-
-    config.methods.fingerprint.fingers.push(FingerConfig {
-        name: finger_name.clone(),
-        created_at: SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs(),
-    });
-
-    save_config(app, config)?;
 
     Ok(())
 }
@@ -89,7 +71,7 @@ pub async fn enroll_fingerprint(
 /// Remove an enrolled fingerprint
 #[tauri::command]
 pub async fn remove_fingerprint(
-    app: AppHandle,
+    _app: AppHandle,
     username: String,
     finger_name: String,
 ) -> Result<(), String> {
@@ -105,21 +87,6 @@ pub async fn remove_fingerprint(
         return Err("Failed to remove fingerprint from device".to_string());
     }
 
-    // Remove from config
-    let mut config = load_config(app.clone())?;
-
-    let original_len = config.methods.fingerprint.fingers.len();
-    config
-        .methods
-        .fingerprint
-        .fingers
-        .retain(|f| f.name != finger_name);
-
-    if config.methods.fingerprint.fingers.len() == original_len {
-        return Err(format!("Finger {} not found in config", finger_name));
-    }
-
-    save_config(app, config)?;
     Ok(())
 }
 

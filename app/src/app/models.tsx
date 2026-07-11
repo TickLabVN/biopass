@@ -10,11 +10,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { ModelConfig } from "@/types/config";
+import type { Model } from "@/types/config";
 import { ModelStatus, type ModelStatusType } from "./-components/ModelStatus";
 
 interface ModelCardProps {
-  model: ModelConfig;
+  model: Model;
   status: ModelStatusType;
 }
 
@@ -70,7 +70,7 @@ function ModelCard({ model, status }: ModelCardProps) {
                 {filename}
               </h3>
               <p className="text-xs text-muted-foreground capitalize mt-1 block">
-                {model.type}
+                {model.model_type.replace(/_/g, " ")}
               </p>
             </div>
             <ModelFileFolderButton path={model.path} />
@@ -86,50 +86,50 @@ function ModelCard({ model, status }: ModelCardProps) {
 }
 
 function ModelsRouteComponent() {
-  const [models, setModels] = useState<ModelConfig[]>([]);
+  const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusMap, setStatusMap] = useState<
     Record<string, "checking" | "available" | "missing" | "inuse">
   >({});
 
-  const checkModelsStatus = useCallback(async (modelList: ModelConfig[]) => {
+  const checkModelsStatus = useCallback(async (modelList: Model[]) => {
     const newStatuses: Record<
       string,
       "checking" | "available" | "missing" | "inuse"
     > = {};
 
-    for (const model of modelList) newStatuses[model.path] = "checking";
+    for (const model of modelList) newStatuses[model.id] = "checking";
     setStatusMap({ ...newStatuses });
 
     try {
       const config = await cmd.config.load();
-      const inUsePaths = new Set<string>();
+      const inUseIds = new Set<string>();
 
-      if (config.methods.face.detection.model) {
-        inUsePaths.add(config.methods.face.detection.model);
+      if (config.methods.face.detection.model_id) {
+        inUseIds.add(config.methods.face.detection.model_id);
       }
-      if (config.methods.face.recognition.model) {
-        inUsePaths.add(config.methods.face.recognition.model);
+      if (config.methods.face.recognition.model_id) {
+        inUseIds.add(config.methods.face.recognition.model_id);
       }
       if (
         config.methods.face.anti_spoofing.enable &&
-        config.methods.face.anti_spoofing.model.path
+        config.methods.face.anti_spoofing.model.model_id
       ) {
-        inUsePaths.add(config.methods.face.anti_spoofing.model.path);
+        inUseIds.add(config.methods.face.anti_spoofing.model.model_id);
       }
       const checks = modelList.map(async (model) => {
         try {
           const exists = await cmd.file.exists(model.path);
           if (!exists) {
-            newStatuses[model.path] = "missing";
-          } else if (inUsePaths.has(model.path)) {
-            newStatuses[model.path] = "inuse";
+            newStatuses[model.id] = "missing";
+          } else if (inUseIds.has(model.id)) {
+            newStatuses[model.id] = "inuse";
           } else {
-            newStatuses[model.path] = "available";
+            newStatuses[model.id] = "available";
           }
         } catch (err) {
           console.error(`Status check failed for ${model.path}:`, err);
-          newStatuses[model.path] = "missing";
+          newStatuses[model.id] = "missing";
         }
       });
 
@@ -143,8 +143,7 @@ function ModelsRouteComponent() {
   const loadModels = useCallback(async () => {
     try {
       setLoading(true);
-      const config = await cmd.config.load();
-      const loadedModels = config.models || [];
+      const loadedModels = await cmd.models.list();
       setModels(loadedModels);
       await checkModelsStatus(loadedModels);
     } catch (err) {
@@ -191,9 +190,9 @@ function ModelsRouteComponent() {
         ) : (
           models.map((model) => (
             <ModelCard
-              key={model.path}
+              key={model.id}
               model={model}
-              status={statusMap[model.path]}
+              status={statusMap[model.id]}
             />
           ))
         )}

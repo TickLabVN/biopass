@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
+import { ModelStatus } from "@/app/-components/ModelStatus";
 import { cmd } from "@/commands";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,9 @@ export function FaceSetting() {
   });
   const [models, setModels] = useState<Model[]>([]);
   const [videoDevices, setVideoDevices] = useState<VideoDeviceInfo[]>([]);
+  const [antiSpoofStatusMap, setAntiSpoofStatusMap] = useState<
+    Record<string, boolean>
+  >({});
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -67,6 +71,24 @@ export function FaceSetting() {
   const antiSpoofModels = models.filter(
     (m) => m.model_type === "anti_spoofing",
   );
+
+  useEffect(() => {
+    const checkAntiSpoofModels = async () => {
+      const newStatusMap: Record<string, boolean> = {};
+      await Promise.all(
+        antiSpoofModels.map(async (m) => {
+          try {
+            newStatusMap[m.id] = await cmd.file.exists(m.path);
+          } catch {
+            newStatusMap[m.id] = false;
+          }
+        }),
+      );
+      setAntiSpoofStatusMap(newStatusMap);
+    };
+
+    checkAntiSpoofModels();
+  }, [models]);
 
   const disabledOption = "__disabled__";
   const unavailableAiModelOption = "__unavailable_ai_model__";
@@ -324,7 +346,14 @@ export function FaceSetting() {
               {antiSpoofModels.length > 0 ? (
                 antiSpoofModels.map((model) => (
                   <SelectItem key={model.id} value={model.id}>
-                    {model.name}
+                    <div className="flex items-center gap-3 pr-6">
+                      <span className="truncate">{model.name}</span>
+                      <ModelStatus
+                        status={antiSpoofStatusMap[model.id]}
+                        size="sm"
+                        className="h-4"
+                      />
+                    </div>
                   </SelectItem>
                 ))
               ) : (

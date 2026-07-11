@@ -102,11 +102,11 @@ fn get_default_config() -> BiopassConfig {
                 camera: None,
                 detection: DetectionConfig {
                     model_id: "yolov8n-face".to_string(),
-                    threshold: 0.8,
+                    threshold: 0.5,
                 },
                 recognition: RecognitionConfig {
                     model_id: "edgeface-s-gamma-05".to_string(),
-                    threshold: 0.8,
+                    threshold: 0.5,
                 },
                 anti_spoofing: AntiSpoofingConfig {
                     enable: true,

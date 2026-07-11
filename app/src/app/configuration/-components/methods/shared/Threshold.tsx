@@ -20,7 +20,7 @@ export function Threshold({ label, value, onChange }: Props) {
         <Slider
           value={[value]}
           max={1}
-          step={0.01}
+          step={0.05}
           onValueChange={([v]) => onChange(v)}
           className="cursor-pointer"
         />

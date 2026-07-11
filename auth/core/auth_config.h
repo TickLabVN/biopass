@@ -39,12 +39,12 @@ struct StrategyConfig {
 // stored here -- this struct mirrors the config.yaml schema only.
 struct DetectionConfig {
   std::string model_id;
-  float threshold = 0.8f;
+  float threshold = 0.5f;
 };
 
 struct RecognitionConfig {
   std::string model_id;
-  float threshold = 0.8f;
+  float threshold = 0.5f;
 };
 
 struct AntiSpoofingModelConfig {

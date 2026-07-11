@@ -132,7 +132,7 @@ export function AddModelDialog({ onAdded }: AddModelDialogProps) {
     >
       <DialogTrigger asChild>
         <Button type="button">
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="w-4 h-4" />
           Add model
         </Button>
       </DialogTrigger>

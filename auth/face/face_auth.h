@@ -7,6 +7,7 @@
 #include "camera_capture.h"
 #include "face_detection.h"
 #include "face_recognition.h"
+#include "model_registry.h"
 
 namespace biopass {
 
@@ -16,7 +17,11 @@ namespace biopass {
  */
 class FaceAuth : public IAuthMethod {
  public:
-  explicit FaceAuth(const FaceMethodConfig& config) : face_config_(config) {}
+  // model_registry_ opens one sqlite connection for the lifetime of this
+  // instance (one authentication session), reused for every model_id lookup
+  // instead of opening/closing the DB per lookup.
+  FaceAuth(const FaceMethodConfig& config, const std::string& username)
+      : face_config_(config), model_registry_(username) {}
   ~FaceAuth() override = default;
 
   std::string name() const override { return "Face"; }
@@ -35,6 +40,7 @@ class FaceAuth : public IAuthMethod {
   bool ensureModelsLoaded();
 
   FaceMethodConfig face_config_;
+  ModelRegistry model_registry_;
   std::unique_ptr<ICameraCaptureSession> camera_session_;
   std::unique_ptr<ICameraCaptureSession> ir_camera_session_;
   std::unique_ptr<FaceDetection> detector_;

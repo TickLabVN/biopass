@@ -8,8 +8,6 @@
 #include <algorithm>
 #include <fstream>
 
-#include "model_registry.h"
-
 namespace biopass {
 
 std::string getConfigPath(const std::string& username) {
@@ -52,8 +50,9 @@ BiopassConfig readConfig(const std::string& username) {
     // writes it), so an absent/mismatched schema_version is treated exactly
     // like a missing/corrupt file -- fall back to defaults. A defaulted
     // config's model_ids won't resolve against biopass.db either, so
-    // ensureModelsLoaded() safely reports Unavailable and PAM falls through
-    // to normal system auth instead of locking anyone out.
+    // ModelRegistry::resolveModelPath() returns nullopt and
+    // ensureModelsLoaded() safely reports Unavailable, letting PAM fall
+    // through to normal system auth instead of locking anyone out.
     int schema_version = yaml["schema_version"] ? yaml["schema_version"].as<int>() : 0;
     if (schema_version != kCurrentSchemaVersion) {
       spdlog::warn(
@@ -189,23 +188,6 @@ BiopassConfig readConfig(const std::string& username) {
 
     if (yaml["appearance"] && yaml["appearance"].IsScalar()) {
       config.appearance = yaml["appearance"].as<std::string>();
-    }
-
-    // 3. Resolve model_id -> absolute path via the SQLite model registry.
-    // An unresolved id leaves model_path empty, which ensureModelsLoaded()
-    // already treats as a safe "model file not found" -> Unavailable outcome.
-    if (config.methods.face.enable) {
-      auto detect_path = resolveModelPath(username, config.methods.face.detection.model_id);
-      config.methods.face.detection.model_path = detect_path.value_or("");
-
-      auto recog_path = resolveModelPath(username, config.methods.face.recognition.model_id);
-      config.methods.face.recognition.model_path = recog_path.value_or("");
-
-      if (config.methods.face.anti_spoofing.enable) {
-        auto antispoof_path =
-            resolveModelPath(username, config.methods.face.anti_spoofing.model.model_id);
-        config.methods.face.anti_spoofing.model.model_path = antispoof_path.value_or("");
-      }
     }
   } catch (const YAML::BadFile& e) {
     spdlog::warn("Biopass: Config file not found at {}, using defaults", config_path);

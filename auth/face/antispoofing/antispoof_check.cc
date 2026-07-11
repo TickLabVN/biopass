@@ -28,8 +28,10 @@ AntiSpoofTask make_task(const std::string& name, std::future<bool> future) {
 }
 
 bool checkAntiSpoofByAIModel(const FaceMethodConfig& faceCfg, const std::string& username,
-                             const ImageRGB& face, const AuthConfig& authCfg) {
-  const std::string modelPath = faceCfg.anti_spoofing.model.model_path;
+                             const ImageRGB& face, const AuthConfig& authCfg,
+                             const ModelRegistry& model_registry) {
+  const std::string modelPath =
+      model_registry.resolveModelPath(faceCfg.anti_spoofing.model.model_id).value_or("");
   if (modelPath.empty() || !std::ifstream(modelPath).good()) {
     spdlog::error("FaceAuth: Anti-spoofing model file not found: {}", modelPath);
     return false;
@@ -57,7 +59,8 @@ bool checkAntiSpoofByAIModel(const FaceMethodConfig& faceCfg, const std::string&
 }  // namespace
 
 bool checkAntiSpoof(const FaceMethodConfig& face_config, const std::string& username,
-                    const ImageRGB& face, const AuthConfig& config, FaceDetection* shared_detector,
+                    const ImageRGB& face, const AuthConfig& config,
+                    const ModelRegistry& model_registry, FaceDetection* shared_detector,
                     ICameraCaptureSession* ir_camera_session) {
   const bool ai_enabled = face_config.anti_spoofing.enable;
   const bool ir_enabled = face_config.anti_spoofing.ir_camera.has_value() &&
@@ -77,12 +80,14 @@ bool checkAntiSpoof(const FaceMethodConfig& face_config, const std::string& user
     const auto face_config_copy = face_config;
     const auto username_copy = username;
     const auto config_copy = config;
+    const auto* model_registry_ptr = &model_registry;
     auto shared_face = std::make_shared<const ImageRGB>(face);
-    tasks.push_back(make_task("AI", std::async(std::launch::async, [face_config_copy, username_copy,
-                                                                    shared_face, config_copy]() {
-                                return checkAntiSpoofByAIModel(face_config_copy, username_copy,
-                                                               *shared_face, config_copy);
-                              })));
+    tasks.push_back(make_task(
+        "AI", std::async(std::launch::async, [face_config_copy, username_copy, shared_face,
+                                              config_copy, model_registry_ptr]() {
+          return checkAntiSpoofByAIModel(face_config_copy, username_copy, *shared_face, config_copy,
+                                         *model_registry_ptr);
+        })));
   }
 
   if (ir_enabled) {

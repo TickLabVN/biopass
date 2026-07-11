@@ -31,8 +31,10 @@ bool FaceAuth::ensureModelsLoaded() {
     return true;
   }
 
-  const std::string& recogModelPath = face_config_.recognition.model_path;
-  const std::string& detectModelPath = face_config_.detection.model_path;
+  const std::string detectModelPath =
+      model_registry_.resolveModelPath(face_config_.detection.model_id).value_or("");
+  const std::string recogModelPath =
+      model_registry_.resolveModelPath(face_config_.recognition.model_id).value_or("");
   if (!std::ifstream(recogModelPath).good() || !std::ifstream(detectModelPath).good()) {
     spdlog::error("FaceAuth: Model files not found");
     return false;
@@ -128,7 +130,7 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
 
   ensureIrSession();
 
-  if (!checkAntiSpoof(face_config_, username, face, config, detector_.get(),
+  if (!checkAntiSpoof(face_config_, username, face, config, model_registry_, detector_.get(),
                       ir_camera_session_.get())) {
     spdlog::warn("FaceAuth: Anti-spoofing failed — returning Failure (no retry allowed)");
     // Always tear down the IR session so a subsequent call cannot reuse a

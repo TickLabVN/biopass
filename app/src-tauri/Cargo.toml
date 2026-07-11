@@ -30,9 +30,9 @@ base64 = "0.22"
 webkit2gtk = "2.0.1"
 gtk = "0.18.2"
 tokio = { version = "1", features = ["rt"] }
-rusqlite = { version = "0.32", features = ["bundled"] }
-rusqlite_migration = "1"
+rusqlite = { version = "0.40.1", features = ["bundled"] }
+rusqlite_migration = "2.6.0"
 tempfile = "3"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
-sha2 = "0.10"
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "stream"] }
+sha2 = "0.11.0"
 futures-util = "0.3"

@@ -119,12 +119,28 @@ fn validate_onnx_file(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn hex_encode(bytes: impl AsRef<[u8]>) -> String {
+    bytes
+        .as_ref()
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect()
+}
+
 fn sha256_file(path: &Path) -> Result<String, String> {
     let mut file = File::open(path).map_err(|e| format!("Failed to open model file: {}", e))?;
     let mut hasher = Sha256::new();
-    std::io::copy(&mut file, &mut hasher)
-        .map_err(|e| format!("Failed to hash model file: {}", e))?;
-    Ok(format!("sha256:{:x}", hasher.finalize()))
+    let mut buf = [0u8; 8192];
+    loop {
+        let n = file
+            .read(&mut buf)
+            .map_err(|e| format!("Failed to hash model file: {}", e))?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(format!("sha256:{}", hex_encode(hasher.finalize())))
 }
 
 #[tauri::command]
@@ -203,7 +219,7 @@ pub async fn add_model_from_url(
         .sync_all()
         .map_err(|e| format!("Failed to sync model file: {}", e))?;
 
-    let checksum = format!("sha256:{:x}", hasher.finalize());
+    let checksum = format!("sha256:{}", hex_encode(hasher.finalize()));
     let final_path = dir.join(format!("{id}.onnx"));
     tmp.persist(&final_path)
         .map_err(|e| format!("Failed to save model file: {}", e))?;

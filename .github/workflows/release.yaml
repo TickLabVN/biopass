@@ -37,6 +37,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: Install system dependencies
         if: contains(matrix.runner, 'ubuntu')
@@ -89,7 +91,7 @@ jobs:
           ls -R app/src-tauri/target/release/bundle/
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ steps.get_version.outputs.version }}

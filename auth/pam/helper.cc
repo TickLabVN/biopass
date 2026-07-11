@@ -247,7 +247,7 @@ int authenticate(const std::string& username, const std::string& service) {
   int numOfMethods = 0;
   for (const auto& method_name : config.strategy.order) {
     if (method_name == "face" && config.methods.face.enable) {
-      manager.addMethod(std::make_unique<biopass::FaceAuth>(config.methods.face));
+      manager.addMethod(std::make_unique<biopass::FaceAuth>(config.methods.face, username));
       numOfMethods++;
     } else if (method_name == "fingerprint" && config.methods.fingerprint.enable) {
       manager.addMethod(std::make_unique<biopass::FingerprintAuth>(config.methods.fingerprint));

@@ -34,26 +34,21 @@ struct StrategyConfig {
   std::vector<std::string> ignore_services = {"polkit-1", "pkexec"};
 };
 
-// `model_id` is read verbatim from config.yaml; `model_path` is the resolved
-// absolute path looked up from biopass.db (see model_registry.h), filled in
-// by readConfig(). Empty model_path means unresolved / unavailable --
-// FaceAuth::ensureModelsLoaded() already treats a missing model file as a
-// safe "Unavailable" outcome, so no separate error handling is needed here.
+// `model_id` is read verbatim from config.yaml. Resolving it to an absolute
+// .onnx path is done on demand via ModelRegistry (see model_registry.h), not
+// stored here -- this struct mirrors the config.yaml schema only.
 struct DetectionConfig {
   std::string model_id;
-  std::string model_path;
   float threshold = 0.8f;
 };
 
 struct RecognitionConfig {
   std::string model_id;
-  std::string model_path;
   float threshold = 0.8f;
 };
 
 struct AntiSpoofingModelConfig {
   std::string model_id;
-  std::string model_path;
   float threshold = 0.8f;
 };
 

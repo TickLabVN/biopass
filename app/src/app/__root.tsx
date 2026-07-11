@@ -102,7 +102,6 @@ function App() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Navigation */}
       <nav className="sticky top-0 z-50 backdrop-blur-lg bg-background/80 border-b border-border">
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
@@ -114,7 +113,6 @@ function App() {
                 </span>
               </div>
 
-              {/* Tab Navigation */}
               <div className="flex items-center gap-2">
                 <Link
                   to="/configuration"
@@ -190,7 +188,6 @@ function App() {
         </div>
       </nav>
 
-      {/* Content */}
       <main className="max-w-6xl mx-auto">
         <Outlet />
       </main>

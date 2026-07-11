@@ -1,7 +1,5 @@
 # Contributing guidelines
 
-Welcome to Biopass! We appreciate your interest in contributing. This guide outlines how to get the project running locally, explains the core architecture, and provides important debugging guidelines.
-
 ## Contribution rules
 
 We encourage you to use AI tools for coding help, but pull request descriptions and issues MUST be written in your own words. We need to understand what you changed, why you changed it, and how you verified it without having to review a large AI-generated explanation.
@@ -78,23 +76,21 @@ bun run tauri dev
 
 ## 2. Tech Stack
 
-Biopass is built using modern and reliable technologies across both the backend logic and the desktop management application.
-
 ### Backend Authentication Module (`auth/`)
-- **C++17**: High performance system-level execution.
-- **CMake**: Build system.
-- **libcamera**: Camera capture. Built from source at a pinned version and bundled into the package (see
+- **C++17**
+- **CMake**
+- **libcamera**: built from source at a pinned version and bundled into the package (see
   `auth/BundleLibcamera.cmake`) instead of linked against the system's copy, since libcamera's C++ ABI
   breaks across minor versions.
-- **ONNX Runtime**: Running the machine learning models (YOLO for detection, EdgeFace for recognition, MobileNetV3 for anti-spoofing).
-- **Linux PAM**: Pluggable Authentication Module integration for the OS.
+- **ONNX Runtime**: runs the machine learning models (YOLO for detection, EdgeFace for recognition, MobileNetV3 for anti-spoofing).
+- **Linux PAM**
 
 ### Desktop Application (`app/`)
-- **Tauri v2**: Lightweight and secure desktop framework bridging the backend and frontend.
-- **Rust**: Systems programming for the Tauri backend (invoking configurations, paths, etc.).
-- **Vite & React**: Fast frontend UI framework for managing biometric settings.
-- **TypeScript**: Type-safe logic for the UI.
-- **TailwindCSS**: UI styling and layout.
+- **Tauri v2**
+- **Rust**
+- **Vite & React**
+- **TypeScript**
+- **TailwindCSS**
 
 ## 3. Architecture and Flow
 
@@ -129,11 +125,7 @@ sequenceDiagram
     end
 ```
 
-### The PAM Module (`auth/`)
-
 ### Directory Structure
-
-The repository is organized by separating the backend systems-level logic from the frontend desktop application logic.
 
 ```text
 biopass/

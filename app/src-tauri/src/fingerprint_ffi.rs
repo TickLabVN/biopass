@@ -1,8 +1,6 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
-// FFI bindings to the C fingerprint authentication library
-
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct FingerprintAuthConfig {
@@ -43,7 +41,6 @@ extern "C" {
     ) -> bool;
 }
 
-/// Safe Rust wrapper for fingerprint authentication
 pub struct FingerprintAuth {
     inner: *mut std::ffi::c_void,
 }
@@ -159,17 +156,5 @@ impl Drop for FingerprintAuth {
         unsafe {
             fingerprint_auth_free(self.inner);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_fingerprint_auth_creation() {
-        let auth = FingerprintAuth::new();
-        let available = auth.is_available();
-        println!("Fingerprint available: {}", available);
     }
 }

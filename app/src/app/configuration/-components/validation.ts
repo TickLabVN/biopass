@@ -102,7 +102,6 @@ export async function validateConfig(config: BiopassConfig): Promise<boolean> {
       return false;
     }
 
-    // Validate face samples
     try {
       const samples = await cmd.face.listImages();
       if (samples.length === 0) {
@@ -116,7 +115,6 @@ export async function validateConfig(config: BiopassConfig): Promise<boolean> {
     }
   }
 
-  // Check for missing model files
   const modelIdsToCheck: string[] = [];
   if (config.methods.face.enable) {
     if (config.methods.face.detection.model_id)

@@ -111,7 +111,6 @@ export function StrategyConfig() {
           </a>
         </div>
 
-        {/* Debug Logging Toggle */}
         <div className="flex items-center justify-between p-3 rounded-lg border border-border transition-all">
           <div className="grid gap-0.5">
             <Label
@@ -137,7 +136,6 @@ export function StrategyConfig() {
           />
         </div>
 
-        {/* Execution Mode */}
         <div className="grid gap-2.5">
           <Label className="text-sm font-medium text-muted-foreground">
             Execution Mode
@@ -206,7 +204,6 @@ export function StrategyConfig() {
           </div>
         )}
 
-        {/* Ignored PAM Services */}
         <div className="grid gap-2.5">
           <Label
             htmlFor="ignored-services"

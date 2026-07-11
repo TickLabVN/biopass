@@ -131,7 +131,6 @@ export function FaceCapture() {
       </h4>
 
       <div className="grid gap-4">
-        {/* Camera Preview */}
         <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
           <img
             ref={previewRef}
@@ -145,7 +144,6 @@ export function FaceCapture() {
           )}
         </div>
 
-        {/* Controls */}
         <div className="flex gap-2">
           {!capturing ? (
             <Button type="button" onClick={startCamera} className="flex-1">
@@ -172,7 +170,6 @@ export function FaceCapture() {
           </p>
         )}
 
-        {/* Saved Faces */}
         {faceImages.length > 0 && (
           <div>
             <p className="text-sm text-muted-foreground mb-2">

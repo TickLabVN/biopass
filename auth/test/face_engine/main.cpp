@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
   app.add_option("--det-model", detector_model, "Path to face detection ONNX model.");
   app.add_option("--reg-model", recognition_model, "Path to face recognition ONNX model.");
   app.add_option("--threshold", threshold,
-                 "Similarity threshold used by face recognition (default: 0.5).");
+                 "Similarity threshold used by face recognition (default: 0.8).");
   app.add_flag("--save-crops", save_crops,
                "Save detected largest face crops to --crop1 and --crop2 paths.");
   app.add_option("--crop1", crop_1_path, "Output path for cropped face from image1.");

@@ -9,10 +9,3 @@ CREATE TABLE models (
     installed_at INTEGER NOT NULL
 );
 CREATE INDEX idx_models_type ON models(model_type);
-
--- Provisioned for future use; not read from or written to by this schema version.
-CREATE TABLE face_enrollments (
-    id         INTEGER PRIMARY KEY,
-    image_path TEXT NOT NULL UNIQUE,
-    created_at INTEGER NOT NULL
-);

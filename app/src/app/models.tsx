@@ -4,6 +4,7 @@ import { Cpu, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { cmd } from "@/commands";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -81,6 +82,11 @@ function ModelCard({ model, status, onRenamed, onDelete }: ModelCardProps) {
                 {model.model_type.replace(/_/g, " ")}
                 {isDefault ? " · Default" : ""}
               </p>
+              {model.source === "builtin" && (
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+                  System
+                </Badge>
+              )}
             </div>
             <ModelFileFolderButton path={model.path} />
           </div>

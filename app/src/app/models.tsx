@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { Cpu } from "lucide-react";
+import { Cpu, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { cmd } from "@/commands";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -11,11 +12,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { Model } from "@/types/config";
+import { AddModelDialog } from "./-components/AddModelDialog";
 import { ModelStatus, type ModelStatusType } from "./-components/ModelStatus";
+import { RenameModelDialog } from "./-components/RenameModelDialog";
 
 interface ModelCardProps {
   model: Model;
   status: ModelStatusType;
+  onRenamed: (model: Model) => void;
+  onDelete: (model: Model) => void;
 }
 
 function ModelFileFolderButton({ path }: { path: string }) {
@@ -51,8 +56,11 @@ function ModelFileFolderButton({ path }: { path: string }) {
   );
 }
 
-function ModelCard({ model, status }: ModelCardProps) {
-  const filename = model.path.split(/[/]/).pop() || model.path;
+function ModelCard({ model, status, onRenamed, onDelete }: ModelCardProps) {
+  const isDefault = model.source === "builtin";
+  const deleteDisabled = status === "inuse" || status === "checking";
+  const deleteDisabledReason =
+    status === "inuse" ? "Model is currently in use" : undefined;
 
   return (
     <div className="group relative flex flex-col gap-4 p-5 rounded-xl border border-border bg-linear-to-b from-card to-muted/20 shadow-sm hover:border-primary/30 hover:shadow-md transition-all duration-300">
@@ -65,12 +73,13 @@ function ModelCard({ model, status }: ModelCardProps) {
             <div className="flex items-center gap-4">
               <h3
                 className="font-semibold leading-none truncate max-w-100"
-                title={filename}
+                title={model.name}
               >
-                {filename}
+                {model.name}
               </h3>
               <p className="text-xs text-muted-foreground capitalize mt-1 block">
                 {model.model_type.replace(/_/g, " ")}
+                {isDefault ? " · Default" : ""}
               </p>
             </div>
             <ModelFileFolderButton path={model.path} />
@@ -79,6 +88,32 @@ function ModelCard({ model, status }: ModelCardProps) {
 
         <div className="flex items-center gap-1">
           <ModelStatus status={status} />
+          <RenameModelDialog model={model} onRenamed={onRenamed} />
+          {!isDefault && (
+            <TooltipProvider>
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={deleteDisabled}
+                      onClick={() => onDelete(model)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {deleteDisabledReason && (
+                  <TooltipContent side="bottom">
+                    <p className="text-xs">{deleteDisabledReason}</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       </div>
     </div>
@@ -111,10 +146,9 @@ function ModelsRouteComponent() {
       if (config.methods.face.recognition.model_id) {
         inUseIds.add(config.methods.face.recognition.model_id);
       }
-      if (
-        config.methods.face.anti_spoofing.enable &&
-        config.methods.face.anti_spoofing.model.model_id
-      ) {
+      if (config.methods.face.anti_spoofing.model.model_id) {
+        // Counted as in-use even when anti-spoofing is currently disabled:
+        // re-enabling it later must not resolve to a deleted model.
         inUseIds.add(config.methods.face.anti_spoofing.model.model_id);
       }
       const checks = modelList.map(async (model) => {
@@ -158,6 +192,25 @@ function ModelsRouteComponent() {
     loadModels();
   }, [loadModels]);
 
+  function handleModelUpdated(updated: Model) {
+    setModels((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+  }
+
+  function handleModelAdded(added: Model) {
+    setModels((prev) => [...prev, added]);
+    checkModelsStatus([...models, added]);
+  }
+
+  async function handleDelete(model: Model) {
+    try {
+      await cmd.models.remove(model.id);
+      toast.success("Model deleted");
+      setModels((prev) => prev.filter((m) => m.id !== model.id));
+    } catch (err) {
+      toast.error(`Failed to delete model: ${err}`);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -174,9 +227,10 @@ function ModelsRouteComponent() {
             AI Model Management
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            View AI models used for authentication.
+            View, add, rename, and remove AI models used for authentication.
           </p>
         </div>
+        <AddModelDialog onAdded={handleModelAdded} />
       </div>
 
       <div className="flex flex-col gap-4">
@@ -193,6 +247,8 @@ function ModelsRouteComponent() {
               key={model.id}
               model={model}
               status={statusMap[model.id]}
+              onRenamed={handleModelUpdated}
+              onDelete={handleDelete}
             />
           ))
         )}

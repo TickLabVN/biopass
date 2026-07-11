@@ -96,13 +96,6 @@ pub fn open(app: &AppHandle) -> Result<Connection, String> {
 }
 
 fn seed_default_models(conn: &Connection, app: &AppHandle) -> Result<(), String> {
-    let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM models", [], |row| row.get(0))
-        .map_err(|e| format!("Failed to count models: {}", e))?;
-    if count > 0 {
-        return Ok(());
-    }
-
     let models_dir = get_data_dir(app)?.join("models");
     let now = now_unix();
 
@@ -175,8 +168,27 @@ pub fn resolve_model_path(conn: &Connection, id: &str) -> Result<Option<String>,
     .map_err(|e| format!("Failed to resolve model path for '{}': {}", id, e))
 }
 
+pub fn delete_model(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM models WHERE id = ?1", params![id])
+        .map_err(|e| format!("Failed to delete model '{}': {}", id, e))?;
+    Ok(())
+}
+
+pub fn update_model_name(conn: &Connection, id: &str, name: &str) -> Result<(), String> {
+    let affected = conn
+        .execute(
+            "UPDATE models SET name = ?2 WHERE id = ?1",
+            params![id, name],
+        )
+        .map_err(|e| format!("Failed to rename model '{}': {}", id, e))?;
+    if affected == 0 {
+        return Err(format!("Model '{}' not found", id));
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
-pub fn insert_model(
+pub fn upsert_model(
     conn: &Connection,
     id: &str,
     name: &str,
@@ -188,7 +200,11 @@ pub fn insert_model(
 ) -> Result<(), String> {
     conn.execute(
         "INSERT INTO models (id, name, model_type, path, version, checksum, source, installed_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
+         ON CONFLICT(id) DO UPDATE SET \
+             name = excluded.name, model_type = excluded.model_type, path = excluded.path, \
+             version = excluded.version, checksum = excluded.checksum, source = excluded.source, \
+             installed_at = excluded.installed_at",
         params![
             id,
             name,
@@ -200,12 +216,6 @@ pub fn insert_model(
             now_unix()
         ],
     )
-    .map_err(|e| format!("Failed to insert model '{}': {}", id, e))?;
-    Ok(())
-}
-
-pub fn delete_model(conn: &Connection, id: &str) -> Result<(), String> {
-    conn.execute("DELETE FROM models WHERE id = ?1", params![id])
-        .map_err(|e| format!("Failed to delete model '{}': {}", id, e))?;
+    .map_err(|e| format!("Failed to upsert model '{}': {}", id, e))?;
     Ok(())
 }

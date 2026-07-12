@@ -15,15 +15,16 @@ Here are steps to fix the issue:
 2. Add this override, then save:
     ```ini
     [Service]
+    # To allow camera use
     PrivateDevices=no
     DevicePolicy=auto
-
     DeviceAllow=char-video4linux rw
     DeviceAllow=char-media rw
     DeviceAllow=char-drm rw
     DeviceAllow=/dev/uinput rw
 
-    ProtectHome=read-only
+    # To write logs to `~/.local/share/com.ticklab.biopass/logs/`
+    ProtectHome=no
     ```
 3. Reload systemd and restart polkit
     ```bash

@@ -6,6 +6,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include <algorithm>
+#include <cstring>
 #include <fstream>
 
 namespace biopass {
@@ -208,13 +209,13 @@ static int mkdir_p(const std::string& path) {
       continue;
     ret = mkdir(dir.c_str(), 0777);
     if (ret == -1 && errno != EEXIST) {
-      perror("Failed to create directory");
+      spdlog::error("Biopass: Failed to create directory '{}': {}", dir, strerror(errno));
       return 1;
     }
   }
   ret = mkdir(path.c_str(), 0777);
   if (ret == -1 && errno != EEXIST) {
-    perror("Failed to create directory");
+    spdlog::error("Biopass: Failed to create directory '{}': {}", path, strerror(errno));
     return 1;
   }
   return 0;
@@ -252,11 +253,40 @@ std::string getDebugPath(const std::string& username) {
   return user_data_dir(username) + "/debugs";
 }
 
+std::string getLogPath(const std::string& username) { return user_data_dir(username) + "/logs"; }
+
+void fixOwnership(const std::string& path, const std::string& username) {
+  if (geteuid() != 0) {
+    return;
+  }
+  struct passwd* pw = getpwnam(username.c_str());
+  if (pw == nullptr) {
+    return;
+  }
+  if (chown(path.c_str(), pw->pw_uid, pw->pw_gid) != 0) {
+    spdlog::error("Biopass: Failed to chown '{}' to {}: {}", path, username, strerror(errno));
+  }
+}
+
 int setupConfig(const std::string& username) {
   const std::string dataDir = user_data_dir(username);
   if (mkdir_p(dataDir + "/faces") != 0)
     return 1;
-  return mkdir_p(dataDir + "/debugs");
+  if (mkdir_p(dataDir + "/debugs") != 0)
+    return 1;
+  if (mkdir_p(dataDir + "/logs") != 0)
+    return 1;
+
+  // PAM auth flows run this as root, which leaves freshly created
+  // directories owned by root:root; a later user-invoked run (the desktop
+  // app capturing a preview, or a dev testing biopass-helper directly) then
+  // can't write into them. Hand the whole subtree back to the target user
+  // so root- and user-invoked runs never fight over ownership.
+  fixOwnership(dataDir, username);
+  fixOwnership(dataDir + "/faces", username);
+  fixOwnership(dataDir + "/debugs", username);
+  fixOwnership(dataDir + "/logs", username);
+  return 0;
 }
 
 }  // namespace biopass

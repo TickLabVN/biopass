@@ -34,8 +34,8 @@ std::string device_label(const std::optional<std::string>& linux_video_device_pa
   return linux_video_device_path.has_value() ? *linux_video_device_path : std::string("<default>");
 }
 
-// Routes libcamera's internal logging through spdlog so it lands in the same
-// /var/log/biopass/<user>/ files the rest of the process writes to.
+// Routes libcamera's internal logging through spdlog so it lands wherever
+// the rest of the process's logs go (see setupBiopassLogger in helper.cc).
 class SpdlogStreambuf : public std::streambuf {
  public:
   int overflow(int ch) override {

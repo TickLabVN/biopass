@@ -62,7 +62,7 @@ Models used in this project:
 ## Star History
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=TickLabVN/biopass&type=Date&theme=dark" />
-  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=TickLabVN/biopass&type=Date" />
-  <img alt="Star History Chart" src="https://api.star-history.com/image?repos=TickLabVN/biopass&type=Date" />
+  <source media="(prefers-color-scheme: dark)" srcset="assets/star-history-dark.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="assets/star-history-light.svg" />
+  <img alt="Star History Chart" src="assets/star-history-light.svg" />
 </picture>

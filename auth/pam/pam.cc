@@ -7,20 +7,20 @@
 #include <unistd.h>
 
 // Called by PAM when a user needs to be authenticated
-PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv) {
+PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc, const char** argv) {
   (void)flags;
   (void)argc;
   (void)argv;
 
   int retval;
 
-  const char *service = nullptr;
-  retval = pam_get_item(pamh, PAM_SERVICE, (const void **)&service);
+  const char* service = nullptr;
+  retval = pam_get_item(pamh, PAM_SERVICE, (const void**)&service);
   if (retval != PAM_SUCCESS) {
     service = nullptr;
   }
 
-  const char *pUsername;
+  const char* pUsername;
   retval = pam_get_user(pamh, &pUsername, NULL);
   if (retval != PAM_SUCCESS) {
     return retval;
@@ -38,8 +38,11 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
       execl("/usr/bin/biopass-helper", "biopass-helper", "auth", "--username", pUsername, NULL);
     }
 
-    // If execl returns, it failed
-    perror("execl failed");
+    // If execl returns, it failed. Don't perror() here: this process's
+    // stdio is inherited from the PAM caller (e.g. polkit-agent-helper-1),
+    // which some callers (GNOME Shell's polkit agent) parse as a strict
+    // line protocol -- any unexpected line on it derails the caller's
+    // authentication state machine instead of a clean failure.
     exit(1);
   } else {
     int status;
@@ -62,7 +65,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 }
 
 // The functions below are required by PAM, but not needed in this module
-PAM_EXTERN int pam_sm_open_session(pam_handle_t *pamh, int flags, int argc, const char **argv) {
+PAM_EXTERN int pam_sm_open_session(pam_handle_t* pamh, int flags, int argc, const char** argv) {
   (void)pamh;
   (void)flags;
   (void)argc;
@@ -70,7 +73,7 @@ PAM_EXTERN int pam_sm_open_session(pam_handle_t *pamh, int flags, int argc, cons
   return PAM_IGNORE;
 }
 
-PAM_EXTERN int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
+PAM_EXTERN int pam_sm_acct_mgmt(pam_handle_t* pamh, int flags, int argc, const char** argv) {
   (void)pamh;
   (void)flags;
   (void)argc;
@@ -78,7 +81,7 @@ PAM_EXTERN int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const c
   return PAM_IGNORE;
 }
 
-PAM_EXTERN int pam_sm_close_session(pam_handle_t *pamh, int flags, int argc, const char **argv) {
+PAM_EXTERN int pam_sm_close_session(pam_handle_t* pamh, int flags, int argc, const char** argv) {
   (void)pamh;
   (void)flags;
   (void)argc;
@@ -86,7 +89,7 @@ PAM_EXTERN int pam_sm_close_session(pam_handle_t *pamh, int flags, int argc, con
   return PAM_IGNORE;
 }
 
-PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv) {
+PAM_EXTERN int pam_sm_chauthtok(pam_handle_t* pamh, int flags, int argc, const char** argv) {
   (void)pamh;
   (void)flags;
   (void)argc;
@@ -94,7 +97,7 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
   return PAM_IGNORE;
 }
 
-PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv) {
+PAM_EXTERN int pam_sm_setcred(pam_handle_t* pamh, int flags, int argc, const char** argv) {
   (void)pamh;
   (void)flags;
   (void)argc;

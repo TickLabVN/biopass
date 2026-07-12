@@ -1,4 +1,4 @@
-#include <spdlog/sinks/ansicolor_sink.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/spdlog.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,6 +6,7 @@
 
 #include <CLI/CLI.hpp>
 #include <algorithm>
+#include <ctime>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -33,6 +34,48 @@ bool encodeJpeg(const ImageRGB& img, int quality, std::vector<uint8_t>& out) {
   out.clear();
   return stbi_write_jpg_to_func(&appendJpegToBuffer, &out, img.width, img.height, 3, img.ptr(),
                                 quality) != 0;
+}
+
+std::string todayDateString() {
+  std::time_t now = std::time(nullptr);
+  std::tm local{};
+  localtime_r(&now, &local);
+  char buf[sizeof("yyyy-mm-dd")];
+  std::strftime(buf, sizeof(buf), "%Y-%m-%d", &local);
+  return std::string(buf);
+}
+
+// This process's stdout/stderr are inherited from whatever spawned the PAM
+// stack, and PAM callers routinely treat those fds as a structured control
+// channel rather than a log stream -- e.g. GNOME Shell's polkit auth agent
+// reads polkit-agent-helper-1's inherited output as a strict line protocol
+// (SUCCESS / FAILURE / PAM_PROMPT_ECHO_OFF ...). biopass-helper is forked
+// from that same process tree, so *any* line it writes there, even a single
+// warning, is garbage to that parser and derails the caller's state machine
+// (observed as GNOME Shell logging "Unknown line ... from helper" and
+// retrying authentication in a tight loop -- `pkexec id` never returning).
+// So: never write to stdout/stderr here, regardless of level. Verbose output
+// only goes to a per-day file, and only when Debug Mode is on.
+void setupBiopassLogger(const std::string& username, bool debug) {
+  std::vector<spdlog::sink_ptr> sinks;
+
+  if (debug) {
+    biopass::setupConfig(username);
+    const std::string log_path = biopass::getLogPath(username) + "/" + todayDateString() + ".log";
+    try {
+      auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(log_path,
+                                                                           /*truncate=*/false);
+      sinks.push_back(file_sink);
+      biopass::fixOwnership(log_path, username);
+    } catch (const spdlog::spdlog_ex&) {
+      // Can't log this failure anywhere safe (see above) -- fall through
+      // with no sinks; log calls become no-ops rather than risk stdout/stderr.
+    }
+  }
+
+  auto logger = std::make_shared<spdlog::logger>("biopass", sinks.begin(), sinks.end());
+  spdlog::set_default_logger(logger);
+  spdlog::set_level(debug ? spdlog::level::debug : spdlog::level::off);
 }
 
 }  // namespace
@@ -221,13 +264,7 @@ int authenticate(const std::string& username, const std::string& service) {
     return 2;  // PAM_IGNORE
   }
 
-  auto stderr_sink = std::make_shared<spdlog::sinks::ansicolor_stderr_sink_mt>();
-  spdlog::set_default_logger(std::make_shared<spdlog::logger>("biopass", stderr_sink));
-  if (config.strategy.debug) {
-    spdlog::set_level(spdlog::level::debug);
-  } else {
-    spdlog::set_level(spdlog::level::off);
-  }
+  setupBiopassLogger(pUsername, config.strategy.debug);
 
   biopass::AuthConfig runtime_config;
   runtime_config.debug = config.strategy.debug;

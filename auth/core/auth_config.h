@@ -119,6 +119,10 @@ bool configExists(const std::string& username);
 
 std::vector<std::string> listFaces(const std::string& username);
 std::string getDebugPath(const std::string& username);
+std::string getLogPath(const std::string& username);
 int setupConfig(const std::string& username);
+
+// Chowns `path` to `username`'s uid/gid; no-op unless running as root.
+void fixOwnership(const std::string& path, const std::string& username);
 
 }  // namespace biopass

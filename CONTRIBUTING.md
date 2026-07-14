@@ -23,9 +23,8 @@ Biopass consists of a backend C++ authentication module and a frontend Tauri des
 
 **For the C++ Backend:**
 
-You need to install CMake, Make, PAM headers, CLI11, libjpeg-turbo, and the build tools libcamera needs
-(the build pulls and compiles a pinned libcamera from source — see `auth/BundleLibcamera.cmake` —
-so you don't need `libcamera-dev`)
+You need to install CMake, Make, PAM headers, CLI11, libjpeg-turbo, and the build tools libcamera needs.
+
 ```bash
 sudo apt update
 sudo apt install cmake make g++ pkg-config libpam0g-dev libcli11-dev libturbojpeg0-dev \

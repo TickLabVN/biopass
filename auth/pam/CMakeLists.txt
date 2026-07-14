@@ -13,6 +13,10 @@ add_executable(biopass-helper
     helper.cc
 )
 
+target_compile_definitions(biopass-helper PRIVATE
+    BIOPASS_VERSION="${PROJECT_VERSION}"
+)
+
 target_include_directories(biopass-helper PRIVATE
     ${ONNXRUNTIME_INCLUDE_DIRS}
     ${FaceDetection_INCLUDE_DIRS}

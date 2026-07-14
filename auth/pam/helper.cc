@@ -305,6 +305,7 @@ int authenticate(const std::string& username, const std::string& service) {
 
 int main(int argc, char** argv) {
   CLI::App app{"Biopass Helper Tool"};
+  app.set_version_flag("--version,-v", BIOPASS_VERSION);
   app.require_subcommand(1, 1);
 
   auto crop_cmd = app.add_subcommand("crop-face", "Crop a face from an image");

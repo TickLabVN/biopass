@@ -1,12 +1,17 @@
 cmake_minimum_required(VERSION 3.22)
-project(biopass)
+# Resolve version from the environment (CI) or -DPROJECT_VERSION (Makefile),
+# before project() clears the variable, otherwise fall back to a default.
 if(DEFINED ENV{PROJECT_VERSION})
-    message(STATUS "Project version: $ENV{PROJECT_VERSION}")
-    set(PROJECT_VERSION $ENV{PROJECT_VERSION})
+    set(BIOPASS_VERSION $ENV{PROJECT_VERSION})
+elseif(PROJECT_VERSION)
+    set(BIOPASS_VERSION ${PROJECT_VERSION})
 else()
-    message(STATUS "Project version: latest")
-    set(PROJECT_VERSION 0.1.0)
+    set(BIOPASS_VERSION 0.1.0)
 endif()
+
+project(biopass)
+set(PROJECT_VERSION ${BIOPASS_VERSION})
+message(STATUS "Project version: ${PROJECT_VERSION}")
 
 # Require C++17
 set(CMAKE_CXX_STANDARD          17)

@@ -5,6 +5,7 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Cpu, Laptop, Moon, Settings, Sun, User } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -21,6 +22,7 @@ import {
 
 function App() {
   const [username, setUsername] = useState("");
+  const [version, setVersion] = useState("");
   const { setTheme, theme } = useTheme();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
@@ -80,8 +82,17 @@ function App() {
       }
     };
 
+    const loadVersion = async () => {
+      try {
+        setVersion(await getVersion());
+      } catch (err) {
+        console.error("Failed to get app version:", err);
+      }
+    };
+
     loadUsername();
     loadInitialTheme();
+    loadVersion();
   }, [setTheme]);
 
   // Update theme in config when it changes manually via toggle
@@ -111,6 +122,11 @@ function App() {
                 <span className="font-bold text-lg hidden sm:inline-block">
                   Biopass
                 </span>
+                {version && (
+                  <span className="text-xs text-muted-foreground">
+                    v{version}
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center gap-2">

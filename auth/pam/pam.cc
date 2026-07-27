@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -40,6 +41,14 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc, cons
   (void)argc;
   (void)argv;
 
+  // At the login screen there is no Wayland or X11 display yet.  Face auth
+  // requires a display, and pam_fprintd.so (which runs before us in the
+  // PAM stack) already handles fingerprint.  Skip entirely so the password
+  // prompt appears immediately.
+  if (!has_display()) {
+    return PAM_IGNORE;
+  }
+
   // Set up the SIGALRM handler and save the old one so we can restore it.
   struct sigaction sa, old_sa;
   sa.sa_flags = 0;
@@ -68,9 +77,6 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc, cons
     // Child process: no alarm handler needed, restore default and exec.
     signal(SIGALRM, SIG_DFL);
 
-    // Detect whether a display server is available before building args.
-    // Without one, face auth fails and the GUI prompts can't show, so tell
-    // the helper to skip display-dependent parts.
     bool display_avail = has_display();
     const char* helper = "/usr/bin/biopass-helper";
     const char* auth_cmd = "auth";

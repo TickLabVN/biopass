@@ -249,7 +249,7 @@ int captureAndCropFace(const std::string& cameraPath, const std::string& outputP
   return 0;
 }
 
-int authenticate(const std::string& username, const std::string& service) {
+int authenticate(const std::string& username, const std::string& service, bool no_display) {
   const char* pUsername = username.c_str();
 
   if (!biopass::configExists(pUsername)) {
@@ -278,9 +278,25 @@ int authenticate(const std::string& username, const std::string& service) {
                       : biopass::ExecutionMode::Parallel);
   manager.setConfig(runtime_config);
 
+  if (no_display && !config.methods.fingerprint.enable) {
+    // No display and fingerprint is not enabled.  Face auth needs a camera
+    // and GPU resources that may not work without a desktop session, and
+    // there is no GUI to show prompts.  Skip the module entirely so PAM
+    // falls through to the password prompt without delay.
+    return 2;  // PAM_IGNORE
+  }
+
   int numOfMethods = 0;
   for (const auto& method_name : config.strategy.order) {
     if (method_name == "face" && config.methods.face.enable) {
+      if (no_display) {
+        // Without a display, skip face auth.  Face auth opens the camera
+        // and may initialise GPU-accelerated ML inference that requires a
+        // display server.  The login screen has no Wayland or X11 session
+        // so those calls could fail or hang.
+        spdlog::debug("Skipping face auth (no display available)");
+        continue;
+      }
       manager.addMethod(std::make_unique<biopass::FaceAuth>(config.methods.face, username));
       numOfMethods++;
     } else if (method_name == "fingerprint" && config.methods.fingerprint.enable) {
@@ -336,9 +352,13 @@ int main(int argc, char** argv) {
 
   std::string username;
   std::string pamService;
+  bool no_display = false;
   auto auth_cmd = app.add_subcommand("auth", "Authenticate a user with Biopass");
   auth_cmd->add_option("--username,-u", username, "Username for authentication")->required();
   auth_cmd->add_option("--service,-s", pamService, "PAM service name");
+  auth_cmd->add_flag("--no-display", no_display,
+                     "No display server available (login or lock screen). "
+                     "Skip face auth since it needs Wayland or X11.");
 
   try {
     app.parse(argc, argv);
@@ -363,7 +383,7 @@ int main(int argc, char** argv) {
       spdlog::info("{}", app.help());
       return 2;  // PAM_IGNORE logic / error
     }
-    return authenticate(username, pamService);
+    return authenticate(username, pamService, no_display);
   }
 
   spdlog::error("No valid subcommand provided");

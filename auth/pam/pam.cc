@@ -77,28 +77,18 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc, cons
     // Child process: no alarm handler needed, restore default and exec.
     signal(SIGALRM, SIG_DFL);
 
-    bool display_avail = has_display();
+    // When no display is available the PAM module returns PAM_IGNORE early
+    // so we never reach this fork.  Here we always have a display.
     const char* helper = "/usr/bin/biopass-helper";
     const char* auth_cmd = "auth";
     const char* user_flag = "--username";
     const char* service_flag = "--service";
-    const char* no_display_flag = "--no-display";
 
     if (service != nullptr && service[0] != '\0') {
-      if (!display_avail) {
-        execl(helper, "biopass-helper", auth_cmd, user_flag, pUsername,
-              service_flag, service, no_display_flag, NULL);
-      } else {
-        execl(helper, "biopass-helper", auth_cmd, user_flag, pUsername,
-              service_flag, service, NULL);
-      }
+      execl(helper, "biopass-helper", auth_cmd, user_flag, pUsername,
+            service_flag, service, NULL);
     } else {
-      if (!display_avail) {
-        execl(helper, "biopass-helper", auth_cmd, user_flag, pUsername,
-              no_display_flag, NULL);
-      } else {
-        execl(helper, "biopass-helper", auth_cmd, user_flag, pUsername, NULL);
-      }
+      execl(helper, "biopass-helper", auth_cmd, user_flag, pUsername, NULL);
     }
 
     // If execl returns, it failed. Don't perror() here: this process's

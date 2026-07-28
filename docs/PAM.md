@@ -39,7 +39,7 @@ Keep a root terminal open while testing. Incorrect PAM configuration can lock yo
     ```
 3. Insert Biopass and fprintd before the existing `pam_unix.so` auth rule:
     ```pam
-    auth sufficient pam_fprintd.so timeout=5 max-tries=1
+    auth sufficient pam_fprintd.so timeout=3 max-tries=1
     auth sufficient libbiopass_pam.so
     auth [success=1 default=ignore] pam_unix.so nullok
     auth requisite pam_deny.so

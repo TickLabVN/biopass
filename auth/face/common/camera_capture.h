@@ -17,11 +17,30 @@ enum class CameraCaptureFormat {
              // expose the stream as YUYV/MJPEG.
 };
 
-// Shared tuning for IR (V4L2Grey) camera sessions: more warmup frames and a
-// shorter timeout than the default color capture, since IR sensors settle
-// faster and the anti-spoofing check should fail fast rather than block login.
-constexpr int kIrCaptureWarmupFrames = 5;
-constexpr int kIrCaptureTimeoutMs = 3000;
+// How a session warms up and samples frames. Colour and IR sensors need
+// different treatment, so the profile follows the negotiated stream (or the
+// caller's explicit choice, e.g. the user's IR settings from the UI).
+struct CaptureProfile {
+  int max_warmup_ms;      // upper bound on warm-up; colour sessions stop earlier once
+                          // auto-exposure has converged (frame brightness stable)
+  int min_warmup_frames;  // always discard at least this many frames
+  int brightest_of;       // sample N frames per capture and keep the brightest
+  int capture_timeout_ms;
+};
+
+// RGB sensors: wait for auto-exposure to converge. Detected from the frames
+// themselves (no light sensor needed): warm-up ends when the mean brightness
+// of consecutive frames stops changing, or at max_warmup_ms. In daylight that
+// is a few frames; in a dim room a slow USB 2.0 webcam needs most of the cap.
+// Once per session; a single frame is captured.
+constexpr CaptureProfile kColourCaptureProfile{2000, 3, 1, 10000};
+
+// IR sensors: fixed short settle after the emitter comes on (brightness is
+// not a convergence signal here because many emitters strobe, alternating
+// bright/dark frames) and keep the brightest of a few frames per capture.
+// Warm-up happens on every capture. Short timeout so a failing anti-spoof
+// check does not block login.
+constexpr CaptureProfile kIrCaptureProfile{300, 3, 4, 3000};
 
 class ICameraCaptureSession {
  public:
@@ -30,16 +49,18 @@ class ICameraCaptureSession {
   virtual ImageRGB capture() = 0;
 };
 
+
 bool checkCameraAvailability(const std::optional<std::string>& device_path);
+// `profile` overrides the automatic choice (kIrCaptureProfile for a grey
+// stream, kColourCaptureProfile otherwise).
 std::unique_ptr<ICameraCaptureSession> openCameraSession(
     const std::optional<std::string>& device_path,
-    CameraCaptureFormat format = CameraCaptureFormat::Default, int warmup_frames = 5,
-    int capture_timeout_ms = 10000);
+    CameraCaptureFormat format = CameraCaptureFormat::Default,
+    std::optional<CaptureProfile> profile = std::nullopt);
 ImageRGB captureImage(const std::optional<std::string>& device_path,
                       CameraCaptureFormat format = CameraCaptureFormat::Default);
 ImageRGB captureImageByIRCamera(const std::string& device_path,
-                                int warmup_frames = kIrCaptureWarmupFrames,
-                                int capture_timeout_ms = kIrCaptureTimeoutMs);
+                                const CaptureProfile& profile = kIrCaptureProfile);
 
 // Introspection helpers used by camera_capture_test (field debugging).
 struct CameraDeviceInfo {

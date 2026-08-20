@@ -102,7 +102,7 @@ int cropFace(const std::string& inputPath, const std::string& outputPath,
     return 2;  // Special exit code for "no face detected"
   }
 
-  ImageRGB faceCrop = detectedFaces[0].image;
+  ImageRGB faceCrop = detectedFaces[0].recognitionFace();
   if (!saveImage(outputPath, faceCrop)) {
     spdlog::error("Could not save cropped image to: {}", outputPath);
     return 1;
@@ -193,7 +193,7 @@ int previewSession(const std::string& cameraPath, const std::string& modelPath, 
         std::cout << "NO_FACE\n" << std::flush;
         continue;
       }
-      if (!saveImage(outPath, faces[0].image)) {
+      if (!saveImage(outPath, faces[0].recognitionFace())) {
         std::cout << "ERR save failed\n" << std::flush;
         continue;
       }
@@ -239,7 +239,7 @@ int captureAndCropFace(const std::string& cameraPath, const std::string& outputP
     return 2;
   }
 
-  ImageRGB faceCrop = detectedFaces[0].image;
+  ImageRGB faceCrop = detectedFaces[0].recognitionFace();
   if (!saveImage(outputPath, faceCrop)) {
     spdlog::error("Could not save cropped image to: {}", outputPath);
     return 1;

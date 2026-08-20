@@ -153,6 +153,10 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
   }
 
   ImageRGB face = detectedImages[0].image;
+  const ImageRGB& recogFace = detectedImages[0].recognitionFace();
+  spdlog::debug("FaceAuth: Recognition input {}", detectedImages[0].aligned.empty()
+                                                     ? "= raw crop (no landmarks)"
+                                                     : "= 5-point aligned 112x112");
 
   // When the IR sensor is also the main camera (Windows-Hello style: enrol and
   // recognise on IR), libcamera cannot acquire the same device twice, so the
@@ -187,7 +191,7 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
       continue;
     }
 
-    MatchResult match = recognizer_->match(preparedFace, face);
+    MatchResult match = recognizer_->match(preparedFace, recogFace);
     spdlog::debug("FaceAuth: Recognition | face='{}' score={:.4f} threshold={:.3f} similar={}",
                   facePath, match.dist, face_config_.recognition.threshold, match.similar);
     if (match.similar) {

@@ -76,7 +76,8 @@ void FaceAuth::beginAuthenticationSession() {
   if (!camera_session_) {
     camera_session_ = openCameraSession(face_config_.camera);
   }
-  ensureIrSession();
+  // IR session is opened lazily in authenticate(), right before the anti-spoof
+  // check, so the colour capture never shares USB bandwidth with the IR stream.
   ensureModelsLoaded();
 }
 

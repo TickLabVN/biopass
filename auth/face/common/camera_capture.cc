@@ -204,7 +204,10 @@ bool negotiate(libcamera::CameraConfiguration& config, CameraCaptureFormat reque
     // instead of failing outright.
     preference = {libcamera::formats::R8, libcamera::formats::YUYV, libcamera::formats::MJPEG};
   } else {
-    preference = {libcamera::formats::YUYV, libcamera::formats::MJPEG, libcamera::formats::R8};
+    // Prefer MJPEG for the colour stream: on USB 2.0 cameras an uncompressed
+    // 720p YUYV stream plus a concurrently-open IR stream exceeds the isochronous
+    // bandwidth budget and the RGB frames arrive truncated (bytesused << expected).
+    preference = {libcamera::formats::MJPEG, libcamera::formats::YUYV, libcamera::formats::R8};
   }
 
   const auto available = formats.pixelformats();

@@ -124,11 +124,32 @@ AuthResult FaceAuth::authenticate(const std::string& username, const AuthConfig&
     return AuthResult::Retry;
   }
 
-  std::vector<std::string> enrolledFaces = biopass::listFaces(username);
-  if (enrolledFaces.empty()) {
+  std::vector<std::string> allEnrolled = biopass::listFaces(username);
+  if (allEnrolled.empty()) {
     spdlog::error("FaceAuth: No face enrolled for user {}, skipping", username);
     return AuthResult::Unavailable;
   }
+  // RGB and IR images of the same face do not match reliably, so only compare
+  // against enrolments captured by the same kind of sensor as the active
+  // camera. Untagged (older) enrolments are kept for backwards compatibility.
+  const SensorKind activeSensor =
+      camera_session_->isGrey() ? SensorKind::Ir : SensorKind::Rgb;
+  std::vector<std::string> enrolledFaces;
+  for (const auto& path : allEnrolled) {
+    const SensorKind kind = sensorKindOfEnrolment(path);
+    if (kind == SensorKind::Unknown || kind == activeSensor) {
+      enrolledFaces.push_back(path);
+    }
+  }
+  if (enrolledFaces.empty()) {
+    spdlog::warn(
+        "FaceAuth: {} enrolment(s) exist for user {} but none captured with an {} camera; "
+        "re-enrol with the currently selected camera, skipping",
+        allEnrolled.size(), username, sensorTag(activeSensor));
+    return AuthResult::Unavailable;
+  }
+  spdlog::debug("FaceAuth: Active sensor '{}' -> {} of {} enrolment(s) eligible",
+                sensorTag(activeSensor), enrolledFaces.size(), allEnrolled.size());
 
   if (!ensureModelsLoaded()) {
     spdlog::error("FaceAuth: Models not available for user {}, skipping", username);

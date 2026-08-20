@@ -309,6 +309,7 @@ class LibcameraCaptureSession : public ICameraCaptureSession {
   ~LibcameraCaptureSession() override { close(); }
 
   bool isOpen() const override { return started_; }
+  bool isGrey() const override { return is_grey_; }
 
   ImageRGB capture() override {
     if (!isOpen()) {
@@ -641,6 +642,37 @@ class LibcameraCaptureSession : public ICameraCaptureSession {
 };
 
 }  // namespace
+
+const char* sensorTag(SensorKind kind) {
+  switch (kind) {
+    case SensorKind::Rgb:
+      return "rgb";
+    case SensorKind::Ir:
+      return "ir";
+    default:
+      return "";
+  }
+}
+
+SensorKind sensorKindOfEnrolment(const std::string& path) {
+  const auto slash = path.find_last_of('/');
+  const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+  if (name.find(".ir.") != std::string::npos) return SensorKind::Ir;
+  if (name.find(".rgb.") != std::string::npos) return SensorKind::Rgb;
+  return SensorKind::Unknown;
+}
+
+std::string tagEnrolmentPath(const std::string& path, SensorKind kind) {
+  if (kind == SensorKind::Unknown || sensorKindOfEnrolment(path) != SensorKind::Unknown) {
+    return path;
+  }
+  const auto slash = path.find_last_of('/');
+  const auto dot = path.find_last_of('.');
+  if (dot == std::string::npos || (slash != std::string::npos && dot < slash)) {
+    return path + "." + sensorTag(kind);
+  }
+  return path.substr(0, dot) + "." + sensorTag(kind) + path.substr(dot);
+}
 
 bool checkCameraAvailability(const std::optional<std::string>& linux_video_device_path) {
   auto session = openCameraSession(linux_video_device_path);

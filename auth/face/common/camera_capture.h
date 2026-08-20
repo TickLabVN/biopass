@@ -47,8 +47,19 @@ class ICameraCaptureSession {
   virtual ~ICameraCaptureSession() = default;
   virtual bool isOpen() const = 0;
   virtual ImageRGB capture() = 0;
+  // True for grey/IR streams (negotiated R8 or requested V4L2Grey).
+  virtual bool isGrey() const = 0;
 };
 
+// Enrolled faces are tagged with the sensor they were captured by, as
+// `face_<ts>.ir.jpg` / `face_<ts>.rgb.jpg`, because RGB and IR images of the
+// same person do not match reliably. Untagged files (older enrolments) are
+// treated as matching any sensor.
+enum class SensorKind { Unknown, Rgb, Ir };
+const char* sensorTag(SensorKind kind);                 // "rgb" / "ir" / ""
+SensorKind sensorKindOfEnrolment(const std::string& path);  // from the file name
+// Inserts the tag before the extension unless the path is already tagged.
+std::string tagEnrolmentPath(const std::string& path, SensorKind kind);
 
 bool checkCameraAvailability(const std::optional<std::string>& device_path);
 // `profile` overrides the automatic choice (kIrCaptureProfile for a grey
